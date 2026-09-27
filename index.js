@@ -313,6 +313,11 @@ bot.command('history', async (ctx) => {
 bot.on('text', async (ctx) => {
   const userId = ctx.from.id;
   const userText = ctx.message.text;
+
+  // Ignore persistent menu clicks
+  const menuOptions = ['📚 បញ្ជីមេរៀន (Lessons)', '🔄 ប្តូរគ្រូ AI', '🕰️ ប្រវត្តិសិក្សា', '❓ ជំនួយ (Help)'];
+  if (menuOptions.includes(userText)) return;
+
   const state = await getUserState(userId);
   const aiType = await getUserAI(userId);
 
@@ -322,8 +327,19 @@ bot.on('text', async (ctx) => {
   let systemPrompt = "You are an expert English-Khmer bilingual teacher. Help the Cambodian student learn English. Explain clearly in Khmer.";
   
   if (state.startsWith('learning_')) {
-    const topicId = state.split('_')[1];
-    systemPrompt += ` The student is currently studying topic ID: ${topicId}. Focus your answers on this topic if relevant, correct their grammar, and encourage them.`;
+    const topicId = state.replace('learning_', '');
+    systemPrompt += ` The student is currently studying topic: ${topicId}. Focus your answers on this topic if relevant, correct their grammar, and encourage them.`;
+  } else if (state.startsWith('quiz_')) {
+    const topicId = state.replace('quiz_', '');
+    systemPrompt = `You are a strict English teacher evaluating a student's answer for the topic: ${topicId}. 
+The student just submitted their answer: "${userText}".
+Evaluate their English grammar, relevance, and vocabulary. 
+You MUST start your response with exactly "GRADE: A", "GRADE: B", "GRADE: C", or "GRADE: F". 
+- Grade A: Perfect or minor mistakes.
+- Grade B: Good but with some grammar mistakes.
+- Grade C: Passable but has major errors.
+- Grade F: Irrelevant to the topic, completely wrong, or not English.
+After the grade, provide helpful feedback in Khmer explaining why they got this grade and how to improve.`;
   }
 
   try {
@@ -347,12 +363,36 @@ bot.on('text', async (ctx) => {
 
     await saveHistory(userId, 'ai', aiResponse);
     await db.ref(`users/${userId}/latestResponse`).set(aiResponse);
+    
+    // Send AI Response
+    await ctx.reply(aiResponse);
 
-    await ctx.reply(aiResponse, 
-      Markup.inlineKeyboard([
-        Markup.button.callback('🔊 ស្តាប់សម្លេងគ្រូ (Listen)', `tts_${userId}`)
-      ])
-    );
+    // Grade Logic
+    if (state.startsWith('quiz_')) {
+      const gradeMatch = aiResponse.match(/GRADE:\s*([ABCF])/i);
+      if (gradeMatch) {
+        const grade = gradeMatch[1].toUpperCase();
+        if (['A', 'B', 'C'].includes(grade)) {
+          const lessonKey = state.replace('quiz_', ''); // e.g. m1_w1_l1
+          const parts = lessonKey.split('_');
+          const monthData = curriculum.months.find(m => m.id === parts[0]);
+          const weekData = monthData?.weeks.find(w => w.id === parts[1]);
+          const lessonData = weekData?.lessons.find(l => l.id === parts[2]);
+
+          if (lessonData) {
+            await db.ref(`users/${userId}/history/${lessonKey}`).set({
+              title: `${monthData.title} > ${weekData.title} > ${lessonData.title}`,
+              grade: grade,
+              timestamp: Date.now()
+            });
+            await ctx.reply(`🎉 អបអរសាទរ! អ្នកបានប្រឡងជាប់មេរៀននេះជាមួយនឹងនិទ្ទេស **${grade}**! ប្រវត្តិសិក្សារបស់អ្នកត្រូវបានកត់ត្រាទុកជោគជ័យ។`, { parse_mode: 'Markdown' });
+            await setUserState(userId, `learning_${lessonKey}`); // Reset back to learning state
+          }
+        } else {
+          await ctx.reply(`❌ អ្នកទទួលបាននិទ្ទេស **F** (មិនទាន់ជាប់ទេ)។ សូមសាកល្បងម្ដងទៀត!`, { parse_mode: 'Markdown' });
+        }
+      }
+    }
   } catch (error) {
     console.error(error);
     ctx.reply("សុំទោស មានបញ្ហាបច្ចេកទេសបន្តិច! សូមពិនិត្យមើលការភ្ជាប់ API។");
