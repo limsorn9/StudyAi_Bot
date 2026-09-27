@@ -69,6 +69,7 @@ try {
     bot.telegram.setMyCommands([
       { command: 'start', description: '📚 ចាប់ផ្តើមរៀន (Start Learning)' },
       { command: 'switch_ai', description: '🔄 ប្តូរគ្រូ AI (Switch AI Teacher)' },
+      { command: 'history', description: '🕰️ ប្រវត្តិមេរៀន (Learning History)' },
       { command: 'help', description: '❓ ជំនួយ (Help)' }
     ]);
   }
@@ -185,6 +186,12 @@ bot.action(/lesson_([^-]+)-([^-]+)-(.+)/, async (ctx) => {
   // Store the lesson text to read it later via TTS
   await db.ref(`users/${userId}/latestResponse`).set(lessonData.content);
 
+  // Record History
+  await db.ref(`users/${userId}/history/${monthId}_${weekId}_${lessonId}`).set({
+    title: `${monthData.title} > ${weekData.title} > ${lessonData.title}`,
+    timestamp: Date.now()
+  });
+
   await ctx.reply(lessonData.content, 
     Markup.inlineKeyboard([
       [Markup.button.callback('🔊 អានជាសំឡេង (Listen)', `tts_${userId}`)],
@@ -213,6 +220,33 @@ bot.action('set_ai_gemini', async (ctx) => {
 bot.action('set_ai_groq', async (ctx) => {
   await setUserAI(ctx.from.id, 'groq');
   await ctx.reply("✅ គ្រូ Groq ត្រូវបានកំណត់! (វាយ /start ដើម្បីទៅកាន់មេរៀន)");
+});
+
+// Check History
+bot.command('history', async (ctx) => {
+  const userId = ctx.from.id;
+  const snapshot = await db.ref(`users/${userId}/history`).once('value');
+  const historyData = snapshot.val();
+
+  if (!historyData) {
+    return ctx.reply("📝 អ្នកមិនទាន់បានចូលរៀនមេរៀនណាមួយនៅឡើយទេ។ សូមចុច /start ដើម្បីជ្រើសរើសមេរៀន!");
+  }
+
+  const lessons = Object.values(historyData).sort((a, b) => b.timestamp - a.timestamp);
+  
+  let msg = "📚 **ប្រវត្តិមេរៀនដែលអ្នកបានរៀនថ្មីៗនេះ៖**\n\n";
+  const limit = Math.min(lessons.length, 10);
+  
+  for (let i = 0; i < limit; i++) {
+    const date = new Date(lessons[i].timestamp).toLocaleString('en-GB', { timeZone: 'Asia/Phnom_Penh' });
+    msg += `✅ ${lessons[i].title}\n🕒 ${date}\n\n`;
+  }
+
+  if (lessons.length > 10) {
+    msg += `...និង ${lessons.length - 10} មេរៀនទៀត។`;
+  }
+
+  ctx.reply(msg, { parse_mode: 'Markdown' });
 });
 
 // AI Chat Handling
