@@ -493,21 +493,33 @@ bot.on('voice', async (ctx) => {
       responseType: 'stream'
     });
 
-    const formData = new FormData();
-    formData.append('file', response.data, 'audio.ogg');
-    formData.append('model', 'whisper-large-v3');
+    const apiKey = getNextGeminiKey();
+    if (!apiKey) return ctx.reply("❌ គ្មាន GEMINI_API_KEYS ដែលត្រឹមត្រូវទេ!");
 
-    const apiKey = getNextGroqKey();
-    if (!apiKey) return ctx.reply("❌ គ្មាន GROQ_API_KEYS ដែលត្រឹមត្រូវទេ!");
-
-    const groqRes = await axios.post('https://api.groq.com/openai/v1/audio/transcriptions', formData, {
-      headers: {
-        ...formData.getHeaders(),
-        'Authorization': `Bearer ${apiKey}`
-      }
+    const fs = require('fs');
+    const writer = fs.createWriteStream('temp_audio.ogg');
+    response.data.pipe(writer);
+    await new Promise((resolve, reject) => {
+      writer.on('finish', resolve);
+      writer.on('error', reject);
     });
-
-    const userText = groqRes.data.text;
+    const audioBase64 = fs.readFileSync('temp_audio.ogg').toString('base64');
+    
+    const { GoogleGenerativeAI } = require("@google/generative-ai");
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: "gemini-pro-latest" });
+    
+    const promptText = "Please transcribe this audio exactly as it is spoken. If it is in Khmer, transcribe it in Khmer. Do not translate. Output ONLY the transcribed text.";
+    const audioPart = {
+      inlineData: {
+        data: audioBase64,
+        mimeType: "audio/ogg"
+      }
+    };
+    
+    const result = await model.generateContent([promptText, audioPart]);
+    const userText = result.response.text().trim();
+    
     if (!userText) {
       return ctx.reply("❌ មិនអាចស្តាប់សំឡេងបានច្បាស់ទេ។ សូមនិយាយម្តងទៀត!");
     }
