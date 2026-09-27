@@ -367,7 +367,7 @@ After the grade, provide helpful feedback in Khmer explaining why they got this 
   try {
     let aiResponse = "";
     if (aiType === 'gemini') {
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro-latest" });
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
       const prompt = `${systemPrompt}\n\n[Past Conversation]\n${pastContextText}\n\nStudent: ${userText}\nTeacher:`;
       const result = await model.generateContent(prompt);
       aiResponse = result.response.text();
@@ -415,7 +415,7 @@ After the grade, provide helpful feedback in Khmer explaining why they got this 
     }
   } catch (error) {
     console.error("AI Error:", error);
-    ctx.reply("សុំទោស មានបញ្ហាបច្ចេកទេសបន្តិច! សូមពិនិត្យមើលការភ្ជាប់ API។");
+    ctx.reply(`សុំទោស មានបញ្ហាបច្ចេកទេសបន្តិច! សូមពិនិត្យមើលការភ្ជាប់ API។\n\n🔍 **កំណត់ត្រាបញ្ហា (Error):** ${error.message}`);
   }
 }
 
