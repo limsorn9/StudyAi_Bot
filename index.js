@@ -399,7 +399,7 @@ After the grade, provide helpful feedback in Khmer explaining why they got this 
   }
 });
 
-// TTS Generation Action
+// TTS Generation Action (Using Edge TTS)
 bot.action(/tts_(.+)/, async (ctx) => {
   const userId = ctx.match[1];
   if (ctx.from.id.toString() !== userId) return ctx.answerCbQuery("អ្នកមិនអាចស្តាប់សម្លេងនេះបានទេ។");
@@ -416,17 +416,22 @@ bot.action(/tts_(.+)/, async (ctx) => {
     // Clean text to avoid TTS reading emojis heavily
     text = text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '');
 
-    const mp3 = await openai.audio.speech.create({
-      model: "tts-1",
-      voice: "alloy",
-      input: text.substring(0, 4000),
-    });
+    const { MsEdgeTTS, OUTPUT_FORMAT } = require("msedge-tts");
+    const edgeTts = new MsEdgeTTS();
+    await edgeTts.setMetadata("en-US-AriaNeural", OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
     
-    const buffer = Buffer.from(await mp3.arrayBuffer());
+    // Generate Audio Stream
+    const stream = edgeTts.toStream(text.substring(0, 4000));
+    const chunks = [];
+    for await (const chunk of stream) {
+      chunks.push(chunk);
+    }
+    const buffer = Buffer.concat(chunks);
+    
     await ctx.replyWithVoice({ source: buffer });
   } catch (error) {
-    console.error(error);
-    ctx.reply("មិនអាចបង្កើតសម្លេងបានទេពេលនេះ (ពិនិត្យមើល OpenAI Key)។");
+    console.error("TTS Error:", error);
+    ctx.reply("មិនអាចបង្កើតសម្លេងបានទេពេលនេះ។");
   }
 });
 
