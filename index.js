@@ -438,13 +438,13 @@ bot.action(/tts_(.+)/, async (ctx) => {
     await edgeTts.setMetadata("en-US-AriaNeural", OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
     
     // Generate Audio Stream
-    const stream = edgeTts.toStream(text.substring(0, 4000));
+    const { audioStream } = edgeTts.toStream(text.substring(0, 4000));
     const chunks = [];
     
     await new Promise((resolve, reject) => {
-      stream.on('data', (chunk) => chunks.push(chunk));
-      stream.on('end', resolve);
-      stream.on('error', reject);
+      audioStream.on('data', (chunk) => chunks.push(chunk));
+      audioStream.on('end', resolve);
+      audioStream.on('error', reject);
     });
 
     const buffer = Buffer.concat(chunks);
