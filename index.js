@@ -494,7 +494,7 @@ bot.action(/tts_(.+)/, async (ctx) => {
 
     const { MsEdgeTTS, OUTPUT_FORMAT } = require("msedge-tts");
     const edgeTts = new MsEdgeTTS();
-    await edgeTts.setMetadata("en-US-AriaNeural", OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
+    await edgeTts.setMetadata("km-KH-SreymomNeural", OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
     
     // Generate Audio Stream
     const { audioStream } = edgeTts.toStream(text.substring(0, 4000));
