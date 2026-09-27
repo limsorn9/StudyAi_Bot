@@ -324,14 +324,14 @@ bot.on('text', async (ctx) => {
   ctx.sendChatAction('typing');
   await saveHistory(userId, 'user', userText);
 
-  let systemPrompt = "You are an expert English-Khmer bilingual teacher. Help the Cambodian student learn English. Explain clearly in Khmer.";
+  let systemPrompt = "You are a friendly, highly skilled English teacher for Cambodian students. You speak both English and Khmer perfectly. Always encourage the student. Answer questions clearly using Khmer for explanations and English for examples.";
   
   if (state.startsWith('learning_')) {
     const topicId = state.replace('learning_', '');
-    systemPrompt += ` The student is currently studying topic: ${topicId}. Focus your answers on this topic if relevant, correct their grammar, and encourage them.`;
+    systemPrompt += `\nThe student is currently studying topic: ${topicId}. Please help them practice this topic, correct their grammar gently, and keep the conversation natural.`;
   } else if (state.startsWith('quiz_')) {
     const topicId = state.replace('quiz_', '');
-    systemPrompt = `You are a strict English teacher evaluating a student's answer for the topic: ${topicId}. 
+    systemPrompt = `You are a strict English teacher evaluating a student's exercise for the topic: ${topicId}. 
 The student just submitted their answer: "${userText}".
 Evaluate their English grammar, relevance, and vocabulary. 
 You MUST start your response with exactly "GRADE: A", "GRADE: B", "GRADE: C", or "GRADE: F". 
@@ -342,19 +342,36 @@ You MUST start your response with exactly "GRADE: A", "GRADE: B", "GRADE: C", or
 After the grade, provide helpful feedback in Khmer explaining why they got this grade and how to improve.`;
   }
 
+  // Fetch recent chat history
+  const snap = await db.ref(`users/${userId}/history`).orderByChild('timestamp').limitToLast(12).once('value');
+  const historyItems = snap.val();
+  let pastContextText = "";
+  let groqMessages = [{ role: 'system', content: systemPrompt }];
+  
+  if (historyItems) {
+    const sorted = Object.values(historyItems)
+      .filter(i => i.role && i.text) // Only chat logs, ignore lesson click objects
+      .sort((a, b) => a.timestamp - b.timestamp);
+    
+    for (const item of sorted) {
+      pastContextText += `${item.role === 'user' ? 'Student' : 'Teacher'}: ${item.text}\n`;
+      groqMessages.push({ role: item.role === 'ai' ? 'assistant' : 'user', content: item.text });
+    }
+  }
+
+  // Ensure current user text is in Groq messages
+  groqMessages.push({ role: 'user', content: userText });
+
   try {
     let aiResponse = "";
     if (aiType === 'gemini') {
       const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro-latest" });
-      const prompt = `${systemPrompt}\n\nStudent: ${userText}\nTeacher:`;
+      const prompt = `${systemPrompt}\n\n[Past Conversation]\n${pastContextText}\n\nStudent: ${userText}\nTeacher:`;
       const result = await model.generateContent(prompt);
       aiResponse = result.response.text();
     } else if (aiType === 'groq') {
       const chatCompletion = await groq.chat.completions.create({
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userText }
-        ],
+        messages: groqMessages,
         model: 'llama3-70b-8192',
         temperature: 0.7,
       });
