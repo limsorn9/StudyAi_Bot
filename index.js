@@ -327,6 +327,23 @@ bot.command('history', async (ctx) => {
   ctx.reply(msg, { parse_mode: 'Markdown' });
 });
 
+bot.command('testapi', async (ctx) => {
+  try {
+    const apiKey = getNextGeminiKey();
+    if (!apiKey) return ctx.reply("No Gemini API key found.");
+    
+    ctx.reply("Testing Gemini API key: " + apiKey.substring(0, 10) + "...");
+    
+    const axios = require('axios');
+    const response = await axios.get(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+    
+    const models = response.data.models.map(m => m.name).join('\n');
+    ctx.reply(`Available Models:\n${models.substring(0, 3000)}`);
+  } catch (error) {
+    ctx.reply("Error testing API: " + (error.response?.data?.error?.message || error.message));
+  }
+});
+
 async function handleUserMessage(ctx, userId, userText) {
   const state = await getUserState(userId);
   const aiType = await getUserAI(userId);
