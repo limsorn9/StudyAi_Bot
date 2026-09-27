@@ -1,6 +1,7 @@
 require('dotenv').config();
 const { Telegraf, Markup } = require('telegraf');
-const admin = require('firebase-admin');
+const { initializeApp, cert, applicationDefault } = require('firebase-admin/app');
+const { getDatabase } = require('firebase-admin/database');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const Groq = require('groq-sdk');
 const OpenAI = require('openai');
@@ -16,21 +17,22 @@ try {
   if (process.env.FIREBASE_CREDENTIALS) {
     firebaseCreds = JSON.parse(process.env.FIREBASE_CREDENTIALS);
   } else {
-    throw new Error("FIREBASE_CREDENTIALS is empty");
+    console.warn("⚠️ FIREBASE_CREDENTIALS is empty. Falling back to applicationDefault().");
   }
 } catch (e) {
-  console.error("❌ ERROR: FIREBASE_CREDENTIALS មិនត្រឹមត្រូវ ឬមិនមែនជាទម្រង់ JSON ទេ។");
+  console.error("❌ ERROR: FIREBASE_CREDENTIALS មិនត្រឹមត្រូវ ឬមិនមែនជាទម្រង់ JSON ទេ។", e.message);
 }
 
+let appInstance;
 try {
-  admin.initializeApp({
-    credential: firebaseCreds ? admin.credential.cert(firebaseCreds) : admin.credential.applicationDefault(),
+  appInstance = initializeApp({
+    credential: firebaseCreds ? cert(firebaseCreds) : applicationDefault(),
     databaseURL: process.env.FIREBASE_DB_URL
   });
 } catch (e) {
   console.error("❌ ERROR: Firebase Init Failed:", e.message);
 }
-const db = admin.database();
+const db = getDatabase(appInstance);
 
 // Initialize APIs
 let bot, genAI, groq, openai;
