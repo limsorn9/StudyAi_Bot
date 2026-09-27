@@ -111,7 +111,7 @@ const setUserAI = async (userId, aiName) => {
 
 const getUserAI = async (userId) => {
   const snap = await db.ref(`users/${userId}/preferredAI`).once('value');
-  return snap.val() || 'gemini';
+  return snap.val() || 'groq';
 };
 
 const saveHistory = async (userId, role, text) => {
