@@ -128,47 +128,64 @@ bot.action(/month_(.+)/, async (ctx) => {
   const monthId = ctx.match[1];
   const monthData = curriculum.months.find(m => m.id === monthId);
   
-  if (!monthData) return ctx.answerCbQuery("រកមិនឃើញទិន្នន័យ");
+  if (!monthData) return ctx.answerCbQuery("រកមិនឃើញទិន្នន័យខែ");
 
-  if (!monthData.topics || monthData.topics.length === 0) {
-    return ctx.reply(`⚠️ មេរៀនសម្រាប់ "${monthData.title}" កំពុងរៀបចំ និងអាប់ដេតឆាប់ៗនេះ។ សូមរើសខែផ្សេង!`, getMonthsKeyboard());
-  }
-
-  const buttons = monthData.topics.map(t => [Markup.button.callback(t.title, `topic_${monthId}-${t.id}`)]);
+  const buttons = monthData.weeks.map(w => [Markup.button.callback(w.title, `week_${monthId}-${w.id}`)]);
   buttons.push([Markup.button.callback('🔙 ត្រឡប់ក្រោយ (Back)', 'back_to_months')]);
 
-  await ctx.editMessageText(`📅 ${monthData.title}\nសូមជ្រើសរើសមេរៀនលម្អិត៖`, Markup.inlineKeyboard(buttons));
+  await ctx.editMessageText(`📅 ${monthData.title}\nសូមជ្រើសរើសសប្តាហ៍សិក្សា៖`, Markup.inlineKeyboard(buttons));
 });
 
 bot.action('back_to_months', async (ctx) => {
   await ctx.editMessageText("សូមជ្រើសរើសខែដែលអ្នកចង់រៀន៖", getMonthsKeyboard());
 });
 
-// Handle Topic/Lesson Selection
-bot.action(/topic_([^-]+)-(.+)/, async (ctx) => {
+// Handle Week Selection
+bot.action(/week_([^-]+)-(.+)/, async (ctx) => {
   const monthId = ctx.match[1];
-  const topicId = ctx.match[2];
+  const weekId = ctx.match[2];
+
+  const monthData = curriculum.months.find(m => m.id === monthId);
+  if (!monthData) return ctx.answerCbQuery("រកមិនឃើញទិន្នន័យខែ");
+
+  const weekData = monthData.weeks.find(w => w.id === weekId);
+  if (!weekData) return ctx.answerCbQuery("រកមិនឃើញសប្តាហ៍");
+
+  const buttons = weekData.lessons.map(l => [Markup.button.callback(l.title, `lesson_${monthId}-${weekId}-${l.id}`)]);
+  buttons.push([Markup.button.callback('🔙 ត្រឡប់ក្រោយ (Back)', `month_${monthId}`)]);
+
+  await ctx.editMessageText(`📅 ${monthData.title} > ${weekData.title}\nសូមជ្រើសរើសមេរៀន៖`, Markup.inlineKeyboard(buttons));
+});
+
+// Handle Lesson Selection
+bot.action(/lesson_([^-]+)-([^-]+)-(.+)/, async (ctx) => {
+  const monthId = ctx.match[1];
+  const weekId = ctx.match[2];
+  const lessonId = ctx.match[3];
   
   const monthData = curriculum.months.find(m => m.id === monthId);
   if (!monthData) return ctx.answerCbQuery("រកមិនឃើញទិន្នន័យខែ");
   
-  const topicData = monthData.topics.find(t => t.id === topicId);
-  if (!topicData) return ctx.answerCbQuery("រកមិនឃើញមេរៀន");
+  const weekData = monthData.weeks.find(w => w.id === weekId);
+  if (!weekData) return ctx.answerCbQuery("រកមិនឃើញសប្តាហ៍");
+
+  const lessonData = weekData.lessons.find(l => l.id === lessonId);
+  if (!lessonData) return ctx.answerCbQuery("រកមិនឃើញមេរៀន");
 
   const userId = ctx.from.id;
-  await setUserState(userId, `learning_${topicId}`);
+  await setUserState(userId, `learning_${monthId}_${weekId}_${lessonId}`);
   
   // Store the lesson text to read it later via TTS
-  await db.ref(`users/${userId}/latestResponse`).set(topicData.content);
+  await db.ref(`users/${userId}/latestResponse`).set(lessonData.content);
 
-  await ctx.reply(topicData.content, 
+  await ctx.reply(lessonData.content, 
     Markup.inlineKeyboard([
       [Markup.button.callback('🔊 អានជាសំឡេង (Listen)', `tts_${userId}`)],
-      [Markup.button.callback('🔙 ត្រឡប់ទៅមេរៀន', `month_${monthId}`)]
+      [Markup.button.callback('🔙 ត្រឡប់ទៅបញ្ជីមេរៀន', `week_${monthId}-${weekId}`)]
     ])
   );
   
-  await ctx.reply("💬 គ្រូ AI (ជំនួយការផ្ទាល់ខ្លួន) របស់អ្នកនៅទីនេះហើយ! បើអ្នកមានចម្ងល់លើមេរៀននេះ ឬចង់សាកល្បងសន្ទនា សូមវាយសារសួរខ្ញុំមក។");
+  await ctx.reply(`💬 គ្រូ AI ជំនាញផ្នែក "${lessonData.title.split(':')[1].trim()}" នៅទីនេះហើយ! បើមានចម្ងល់សូមឆាតសួរ។`);
 });
 
 // Switch AI
