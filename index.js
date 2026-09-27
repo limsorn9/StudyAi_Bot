@@ -423,11 +423,14 @@ bot.action(/tts_(.+)/, async (ctx) => {
     // Generate Audio Stream
     const stream = edgeTts.toStream(text.substring(0, 4000));
     const chunks = [];
-    for await (const chunk of stream) {
-      chunks.push(chunk);
-    }
-    const buffer = Buffer.concat(chunks);
     
+    await new Promise((resolve, reject) => {
+      stream.on('data', (chunk) => chunks.push(chunk));
+      stream.on('end', resolve);
+      stream.on('error', reject);
+    });
+
+    const buffer = Buffer.concat(chunks);
     await ctx.replyWithVoice({ source: buffer });
   } catch (error) {
     console.error("TTS Error:", error);
