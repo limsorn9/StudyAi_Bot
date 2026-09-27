@@ -23,11 +23,21 @@ try {
   console.error("❌ ERROR: FIREBASE_CREDENTIALS មិនត្រឹមត្រូវ ឬមិនមែនជាទម្រង់ JSON ទេ។", e.message);
 }
 
+let dbUrl = process.env.FIREBASE_DB_URL;
+if (dbUrl) {
+  try {
+    const parsedUrl = new URL(dbUrl);
+    dbUrl = `${parsedUrl.protocol}//${parsedUrl.host}`;
+  } catch (e) {
+    console.error("Invalid FIREBASE_DB_URL format");
+  }
+}
+
 let appInstance;
 try {
   appInstance = initializeApp({
     credential: firebaseCreds ? cert(firebaseCreds) : applicationDefault(),
-    databaseURL: process.env.FIREBASE_DB_URL
+    databaseURL: dbUrl
   });
 } catch (e) {
   console.error("❌ ERROR: Firebase Init Failed:", e.message);
