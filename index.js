@@ -64,9 +64,16 @@ try {
     bot.telegram.setWebhook(`${process.env.WebHook_URL}/webhook`).catch(e => {
       console.error("❌ ERROR: Webhook Failed (តើ WebHook_URL ត្រឹមត្រូវទេ?):", e.message);
     });
+
+    // Set Telegram Menu Commands
+    bot.telegram.setMyCommands([
+      { command: 'start', description: '📚 ចាប់ផ្តើមរៀន (Start Learning)' },
+      { command: 'switch_ai', description: '🔄 ប្តូរគ្រូ AI (Switch AI Teacher)' },
+      { command: 'help', description: '❓ ជំនួយ (Help)' }
+    ]);
   }
 } catch (e) {
-  console.error("❌ ERROR setting up webhook:", e.message);
+  console.error("❌ ERROR setting up webhook or commands:", e.message);
 }
 
 // Helpers
