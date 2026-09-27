@@ -309,20 +309,11 @@ bot.command('history', async (ctx) => {
   ctx.reply(msg, { parse_mode: 'Markdown' });
 });
 
-// AI Chat Handling
-bot.on('text', async (ctx) => {
-  const userId = ctx.from.id;
-  const userText = ctx.message.text;
-
-  // Ignore persistent menu clicks
-  const menuOptions = ['📚 បញ្ជីមេរៀន (Lessons)', '🔄 ប្តូរគ្រូ AI', '🕰️ ប្រវត្តិសិក្សា', '❓ ជំនួយ (Help)'];
-  if (menuOptions.includes(userText)) return;
-
+async function handleUserMessage(ctx, userId, userText) {
   const state = await getUserState(userId);
   const aiType = await getUserAI(userId);
 
   ctx.sendChatAction('typing');
-  await saveHistory(userId, 'user', userText);
 
   let systemPrompt = "You are a friendly, highly skilled English teacher for Cambodian students. You speak both English and Khmer perfectly. Always encourage the student. Answer questions clearly using Khmer for explanations and English for examples.";
   
@@ -353,14 +344,25 @@ After the grade, provide helpful feedback in Khmer explaining why they got this 
       .filter(i => i.role && i.text) // Only chat logs, ignore lesson click objects
       .sort((a, b) => a.timestamp - b.timestamp);
     
+    let lastRole = 'system';
     for (const item of sorted) {
+      const currentRole = item.role === 'ai' ? 'assistant' : 'user';
+      if (currentRole === lastRole) {
+        groqMessages[groqMessages.length - 1].content += `\n${item.text}`;
+      } else {
+        groqMessages.push({ role: currentRole, content: item.text });
+        lastRole = currentRole;
+      }
       pastContextText += `${item.role === 'user' ? 'Student' : 'Teacher'}: ${item.text}\n`;
-      groqMessages.push({ role: item.role === 'ai' ? 'assistant' : 'user', content: item.text });
     }
   }
 
   // Ensure current user text is in Groq messages
-  groqMessages.push({ role: 'user', content: userText });
+  if (groqMessages[groqMessages.length - 1].role === 'user') {
+    groqMessages[groqMessages.length - 1].content += `\n${userText}`;
+  } else {
+    groqMessages.push({ role: 'user', content: userText });
+  }
 
   try {
     let aiResponse = "";
@@ -378,6 +380,7 @@ After the grade, provide helpful feedback in Khmer explaining why they got this 
       aiResponse = chatCompletion.choices[0]?.message?.content || "No response";
     }
 
+    await saveHistory(userId, 'user', userText); // Saved after fetching history
     await saveHistory(userId, 'ai', aiResponse);
     await db.ref(`users/${userId}/latestResponse`).set(aiResponse);
     
@@ -411,8 +414,64 @@ After the grade, provide helpful feedback in Khmer explaining why they got this 
       }
     }
   } catch (error) {
-    console.error(error);
+    console.error("AI Error:", error);
     ctx.reply("សុំទោស មានបញ្ហាបច្ចេកទេសបន្តិច! សូមពិនិត្យមើលការភ្ជាប់ API។");
+  }
+}
+
+// AI Chat Handling
+bot.on('text', async (ctx) => {
+  const userId = ctx.from.id.toString();
+  const userText = ctx.message.text;
+
+  // Ignore persistent menu clicks
+  const menuOptions = ['📚 បញ្ជីមេរៀន (Lessons)', '🔄 ប្តូរគ្រូ AI', '🕰️ ប្រវត្តិសិក្សា', '❓ ជំនួយ (Help)'];
+  if (menuOptions.includes(userText)) return;
+
+  await handleUserMessage(ctx, userId, userText);
+});
+
+// Voice Message Handling (STT)
+bot.on('voice', async (ctx) => {
+  const userId = ctx.from.id.toString();
+  ctx.sendChatAction('typing');
+
+  try {
+    const fileId = ctx.message.voice.file_id;
+    const fileLink = await ctx.telegram.getFileLink(fileId);
+    
+    const axios = require('axios');
+    const FormData = require('form-data');
+    
+    const response = await axios({
+      method: 'GET',
+      url: fileLink.href,
+      responseType: 'stream'
+    });
+
+    const formData = new FormData();
+    formData.append('file', response.data, 'audio.ogg');
+    formData.append('model', 'whisper-large-v3');
+
+    const groqRes = await axios.post('https://api.groq.com/openai/v1/audio/transcriptions', formData, {
+      headers: {
+        ...formData.getHeaders(),
+        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`
+      }
+    });
+
+    const userText = groqRes.data.text;
+    if (!userText) {
+      return ctx.reply("❌ មិនអាចស្តាប់សំឡេងបានច្បាស់ទេ។ សូមនិយាយម្តងទៀត!");
+    }
+    
+    await ctx.reply(`🎙 ខ្ញុំស្តាប់បានថា៖\n_"${userText}"_`, { parse_mode: 'Markdown' });
+    
+    // Process text
+    await handleUserMessage(ctx, userId, userText);
+  } catch (error) {
+    console.error("STT Error:", error);
+    ctx.reply("❌ មានបញ្ហាក្នុងការស្តាប់សំឡេង! សូមព្យាយាមម្តងទៀត។");
   }
 });
 
