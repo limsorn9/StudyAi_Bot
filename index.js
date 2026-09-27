@@ -388,7 +388,7 @@ After the grade, provide helpful feedback in Khmer explaining why they got this 
       const apiKey = getNextGeminiKey();
       if (!apiKey) throw new Error("No GEMINI_API_KEYS configured in environment");
       const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
       const prompt = `${systemPrompt}\n\n[Past Conversation]\n${pastContextText}\n\nStudent: ${userText}\nTeacher:`;
       const result = await model.generateContent(prompt);
       aiResponse = result.response.text();
