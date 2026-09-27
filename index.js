@@ -13,28 +13,49 @@ const curriculum = JSON.parse(fs.readFileSync('./curriculum.json', 'utf8'));
 // Initialize Firebase Admin
 let firebaseCreds;
 try {
-  firebaseCreds = JSON.parse(process.env.FIREBASE_CREDENTIALS);
+  if (process.env.FIREBASE_CREDENTIALS) {
+    firebaseCreds = JSON.parse(process.env.FIREBASE_CREDENTIALS);
+  } else {
+    throw new Error("FIREBASE_CREDENTIALS is empty");
+  }
 } catch (e) {
-  console.error("Invalid FIREBASE_CREDENTIALS");
+  console.error("❌ ERROR: FIREBASE_CREDENTIALS មិនត្រឹមត្រូវ ឬមិនមែនជាទម្រង់ JSON ទេ។");
 }
 
-admin.initializeApp({
-  credential: admin.credential.cert(firebaseCreds),
-  databaseURL: process.env.FIREBASE_DB_URL
-});
+try {
+  admin.initializeApp({
+    credential: firebaseCreds ? admin.credential.cert(firebaseCreds) : admin.credential.applicationDefault(),
+    databaseURL: process.env.FIREBASE_DB_URL
+  });
+} catch (e) {
+  console.error("❌ ERROR: Firebase Init Failed:", e.message);
+}
 const db = admin.database();
 
 // Initialize APIs
-const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEYS);
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEYS });
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || "YOUR_OPENAI_KEY" });
+let bot, genAI, groq, openai;
+try {
+  bot = new Telegraf(process.env.TELEGRAM_TOKEN);
+  genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEYS);
+  groq = new Groq({ apiKey: process.env.GROQ_API_KEYS });
+  openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || "YOUR_OPENAI_KEY" });
+} catch (e) {
+  console.error("❌ ERROR: API Init Failed:", e.message);
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(bot.webhookCallback('/webhook'));
-bot.telegram.setWebhook(`${process.env.WebHook_URL}/webhook`);
+try {
+  if (bot) {
+    app.use(bot.webhookCallback('/webhook'));
+    bot.telegram.setWebhook(`${process.env.WebHook_URL}/webhook`).catch(e => {
+      console.error("❌ ERROR: Webhook Failed (តើ WebHook_URL ត្រឹមត្រូវទេ?):", e.message);
+    });
+  }
+} catch (e) {
+  console.error("❌ ERROR setting up webhook:", e.message);
+}
 
 // Helpers
 const setUserState = async (userId, state) => {
