@@ -409,7 +409,10 @@ After the grade, provide helpful feedback in Khmer explaining why they got this 
     await db.ref(`users/${userId}/latestResponse`).set(aiResponse);
     
     // Send AI Response
-    await ctx.reply(aiResponse);
+    await ctx.reply(aiResponse, Markup.inlineKeyboard([
+      [Markup.button.callback('🔊 អានជាសំឡេង (Listen)', `tts_${userId}`)],
+      [Markup.button.callback('💬 បន្តសន្ទនា (Continue Chat)', `continue_chat_${userId}`)]
+    ]));
 
     // Grade Logic
     if (state.startsWith('quiz_')) {
@@ -539,6 +542,14 @@ bot.action(/tts_(.+)/, async (ctx) => {
     console.error("TTS Error:", error);
     ctx.reply("មិនអាចបង្កើតសម្លេងបានទេពេលនេះ។");
   }
+});
+
+bot.action(/continue_chat_(.+)/, async (ctx) => {
+  const userId = ctx.match[1];
+  if (ctx.from.id.toString() !== userId) return ctx.answerCbQuery("អ្នកមិនអាចចុចប៊ូតុងនេះបានទេ។");
+  
+  ctx.answerCbQuery();
+  await ctx.reply("💬 សូមវាយបញ្ចូលសាររបស់អ្នក ឬផ្ញើជាសំឡេងមកកាន់ខ្ញុំ ដើម្បីបន្តការសន្ទនា!");
 });
 
 app.get('/', (req, res) => res.send('StudyAi Curriculum Bot is running!'));
