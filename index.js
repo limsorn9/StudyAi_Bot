@@ -104,6 +104,12 @@ const saveHistory = async (userId, role, text) => {
   });
 };
 
+// Persistent Reply Keyboard Menu
+const mainMenuKeyboard = Markup.keyboard([
+  ['📚 បញ្ជីមេរៀន (Lessons)', '🕰️ ប្រវត្តិសិក្សា'],
+  ['🔄 ប្តូរគ្រូ AI', '❓ ជំនួយ (Help)']
+]).resize();
+
 // Start Command & Curriculum Menu
 bot.start(async (ctx) => {
   const userId = ctx.from.id;
@@ -114,8 +120,62 @@ bot.start(async (ctx) => {
     registeredAt: Date.now()
   });
 
-  await ctx.reply(`សួស្តី ${username}! ស្វាគមន៍មកកាន់ប្រព័ន្ធសិក្សាភាសាអង់គ្លេសខ្នាតស្តង់ដារ ១២ ខែ 📚\n\nនេះគឺជាកម្មវិធីសិក្សាទាំងមូល។ សូមជ្រើសរើសខែដែលអ្នកចង់រៀន៖`,
-    getMonthsKeyboard()
+  // Send the persistent menu first
+  await ctx.reply(`សួស្តី ${username}! ស្វាគមន៍មកកាន់ប្រព័ន្ធសិក្សាភាសាអង់គ្លេសខ្នាតស្តង់ដារ ១២ ខែ 📚`, mainMenuKeyboard);
+  
+  // Then send the inline keyboard for months
+  await ctx.reply(`នេះគឺជាកម្មវិធីសិក្សាទាំងមូល។ សូមជ្រើសរើសខែដែលអ្នកចង់រៀន៖`, getMonthsKeyboard());
+});
+
+// Handle Persistent Menu Button Clicks
+bot.hears('📚 បញ្ជីមេរៀន (Lessons)', async (ctx) => {
+  await ctx.reply("សូមជ្រើសរើសខែដែលអ្នកចង់រៀន៖", getMonthsKeyboard());
+});
+
+bot.hears('🔄 ប្តូរគ្រូ AI', (ctx) => {
+  ctx.reply("សូមជ្រើសរើសគ្រូ AI ដែលអ្នកចង់រៀនជាមួយ៖", 
+    Markup.inlineKeyboard([
+      [Markup.button.callback('🧠 គ្រូ Gemini (ពន្យល់ក្បោះក្បាយ)', 'set_ai_gemini')],
+      [Markup.button.callback('⚡ គ្រូ Groq (ឆ្លើយតបលឿន)', 'set_ai_groq')]
+    ])
+  );
+});
+
+bot.hears('🕰️ ប្រវត្តិសិក្សា', async (ctx) => {
+  const userId = ctx.from.id;
+  const snapshot = await db.ref(`users/${userId}/history`).once('value');
+  const historyData = snapshot.val();
+
+  // In our DB structure history items saved from lesson clicks are keys like "m1_w1_l1"
+  // But standard chat history is also saved under "history" (push). 
+  // Let's filter to only those that have a "title"
+  if (!historyData) {
+    return ctx.reply("📝 អ្នកមិនទាន់បានចូលរៀនមេរៀនណាមួយនៅឡើយទេ។ សូមចុច /start ឬជ្រើសរើសមេរៀន!");
+  }
+
+  const lessons = Object.values(historyData).filter(i => i.title).sort((a, b) => b.timestamp - a.timestamp);
+  
+  if (lessons.length === 0) {
+    return ctx.reply("📝 អ្នកមិនទាន់បានចូលរៀនមេរៀនណាមួយនៅឡើយទេ។ សូមចុច /start ឬជ្រើសរើសមេរៀន!");
+  }
+
+  let msg = "📚 **ប្រវត្តិមេរៀនដែលអ្នកបានរៀនថ្មីៗនេះ៖**\n\n";
+  const limit = Math.min(lessons.length, 10);
+  for (let i = 0; i < limit; i++) {
+    const date = new Date(lessons[i].timestamp).toLocaleString('en-GB', { timeZone: 'Asia/Phnom_Penh' });
+    msg += `✅ ${lessons[i].title}\n🕒 ${date}\n\n`;
+  }
+  if (lessons.length > 10) msg += `...និង ${lessons.length - 10} មេរៀនទៀត។`;
+  ctx.reply(msg, { parse_mode: 'Markdown' });
+});
+
+bot.hears('❓ ជំនួយ (Help)', (ctx) => {
+  ctx.reply("💡 **ជំនួយការប្រើប្រាស់ (Help)**\n\n" +
+    "១. ចុច '📚 បញ្ជីមេរៀន' ដើម្បីជ្រើសរើសខែ និងមេរៀន។\n" +
+    "២. ចុច '🔄 ប្តូរគ្រូ AI' ដើម្បីប្តូរគ្រូ (មាន Gemini និង Groq)។\n" +
+    "៣. ពេលរើសមេរៀនរួច អ្នកអាចចុចប៊ូតុង 🔊 ដើម្បីឱ្យគ្រូ AI អានមេរៀននោះជាសំឡេងបាន។\n" +
+    "៤. អ្នកអាចវាយសួរ ឬផ្ញើជាសំឡេង (Voice Message) ទៅកាន់គ្រូ AI គ្រប់ពេល។",
+    { parse_mode: 'Markdown' }
   );
 });
 
