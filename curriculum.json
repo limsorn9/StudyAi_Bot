@@ -1,0 +1,81 @@
+{
+  "months": [
+    {
+      "id": "m1",
+      "title": "ខែទី ១៖ មូលដ្ឋានគ្រឹះ (Month 1: Basics)",
+      "topics": [
+        {
+          "id": "m1_t1",
+          "title": "ការស្វាគមន៍ និងការណែនាំខ្លួន (Greetings & Introductions)",
+          "content": "📚 មេរៀន៖ ការស្វាគមន៍ និងការណែនាំខ្លួន\n\n🇰🇭 ខ្មែរ ➡️ 🇬🇧 អង់គ្លេស៖\n១. សួស្តី = Hello / Hi\n២. អរុណសួស្តី = Good morning\n៣. សុខសប្បាយជាទេ? = How are you?\n៤. ខ្ញុំសុខសប្បាយ អរគុណ = I am fine, thank you.\n៥. តើអ្នកឈ្មោះអ្វី? = What is your name?\n៦. ខ្ញុំឈ្មោះ... = My name is...\n\n🇬🇧 អង់គ្លេស ➡️ 🇰🇭 ខ្មែរ៖\n1. Nice to meet you. = រីករាយដែលបានជួបអ្នក។\n2. Where are you from? = តើអ្នកមកពីណា?\n3. I am from Cambodia. = ខ្ញុំមកពីប្រទេសកម្ពុជា។\n4. Goodbye / See you later. = លាហើយ / ជួបគ្នាពេលក្រោយ។\n\n💡 វេយ្យាករណ៍ខ្លីៗ (Grammar): ការប្រើប្រាស់ 'Verb to be' (am, is, are) សម្រាប់ប្រាប់ឈ្មោះ និងទីកន្លែង។ ឧទាហរណ៍៖ I am (ខ្ញុំគឺ), You are (អ្នកគឺ), He/She is (គាត់គឺ)។"
+        },
+        {
+          "id": "m1_t2",
+          "title": "លេខ ថ្ងៃ និងខែ (Numbers, Days & Months)",
+          "content": "📚 មេរៀន៖ លេខ ថ្ងៃ និងខែ\n\n🇰🇭 ខ្មែរ ➡️ 🇬🇧 អង់គ្លេស៖\n១. ថ្ងៃចន្ទ ដល់ អាទិត្យ = Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday\n២. ថ្ងៃនេះជាថ្ងៃអ្វី? = What day is it today?\n៣. ថ្ងៃនេះជាថ្ងៃចន្ទ = Today is Monday.\n\n🇬🇧 អង់គ្លេស ➡️ 🇰🇭 ខ្មែរ៖\n1. January, February, March = ខែមករា, កុម្ភៈ, មីនា\n2. When is your birthday? = តើថ្ងៃកំណើតរបស់អ្នកនៅពេលណា?\n3. How much is this? = តើនេះតម្លៃប៉ុន្មាន? (ប្រើជាមួយលេខ)\n\n💡 គន្លឹះ៖ លេខពី 1-10 គឺចាំបាច់បំផុត (One, Two, Three, Four, Five, Six, Seven, Eight, Nine, Ten)។"
+        }
+      ]
+    },
+    {
+      "id": "m2",
+      "title": "ខែទី ២៖ ជីវិតប្រចាំថ្ងៃ (Month 2: Daily Life)",
+      "topics": [
+        {
+          "id": "m2_t1",
+          "title": "ទម្លាប់ប្រចាំថ្ងៃ (Daily Routines)",
+          "content": "📚 មេរៀន៖ ទម្លាប់ប្រចាំថ្ងៃ\n\n🇰🇭 ខ្មែរ ➡️ 🇬🇧 អង់គ្លេស៖\n១. ក្រោកពីគេង = Wake up / Get up\n២. ដុសធ្មេញ = Brush my teeth\n៣. ញ៉ាំអាហារពេលព្រឹក = Have breakfast\n៤. ទៅធ្វើការ/ទៅរៀន = Go to work / Go to school\n\n🇬🇧 អង់គ្លេស ➡️ 🇰🇭 ខ្មែរ៖\n1. I wake up at 6 AM. = ខ្ញុំក្រោកពីគេងម៉ោង ៦ ព្រឹក។\n2. What time do you have lunch? = តើអ្នកញ៉ាំអាហារថ្ងៃត្រង់ម៉ោងប៉ុន្មាន?\n3. I go to bed at 10 PM. = ខ្ញុំចូលគេងនៅម៉ោង ១០ យប់។\n\n💡 វេយ្យាករណ៍ (Present Simple): ប្រើដើម្បីនិយាយពីទម្លាប់ប្រចាំថ្ងៃ (រឿងដែលកើតឡើងជាប្រចាំ)។"
+        }
+      ]
+    },
+    {
+      "id": "m3",
+      "title": "ខែទី ៣៖ គ្រួសារ និងមិត្តភក្តិ (Month 3: Family & Friends)",
+      "topics": []
+    },
+    {
+      "id": "m4",
+      "title": "ខែទី ៤៖ អាហារ និងភេសជ្ជៈ (Month 4: Food & Drinks)",
+      "topics": []
+    },
+    {
+      "id": "m5",
+      "title": "ខែទី ៥៖ ការដើរទិញឥវ៉ាន់ (Month 5: Shopping)",
+      "topics": []
+    },
+    {
+      "id": "m6",
+      "title": "ខែទី ៦៖ ការធ្វើដំណើរ (Month 6: Travel & Transport)",
+      "topics": []
+    },
+    {
+      "id": "m7",
+      "title": "ខែទី ៧៖ សុខភាព និងរាងកាយ (Month 7: Health & Body)",
+      "topics": []
+    },
+    {
+      "id": "m8",
+      "title": "ខែទី ៨៖ ការងារ និងអាជីព (Month 8: Work & Careers)",
+      "topics": []
+    },
+    {
+      "id": "m9",
+      "title": "ខែទី ៩៖ កម្សាន្ត និងចំណង់ចំណូលចិត្ត (Month 9: Hobbies)",
+      "topics": []
+    },
+    {
+      "id": "m10",
+      "title": "ខែទី ១០៖ បរិស្ថាន និងអាកាសធាតុ (Month 10: Environment)",
+      "topics": []
+    },
+    {
+      "id": "m11",
+      "title": "ខែទី ១១៖ បច្ចេកវិទ្យា (Month 11: Technology & Media)",
+      "topics": []
+    },
+    {
+      "id": "m12",
+      "title": "ខែទី ១២៖ ការបង្ហាញមតិ និងការពិភាក្សា (Month 12: Opinions)",
+      "topics": []
+    }
+  ]
+}
