@@ -398,7 +398,7 @@ After the grade, provide helpful feedback in Khmer explaining why they got this 
       const groq = new Groq({ apiKey: apiKey });
       const chatCompletion = await groq.chat.completions.create({
         messages: groqMessages,
-        model: 'llama3-70b-8192',
+        model: 'llama-3.1-70b-versatile',
         temperature: 0.7,
       });
       aiResponse = chatCompletion.choices[0]?.message?.content || "No response";
