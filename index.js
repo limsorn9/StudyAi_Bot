@@ -134,7 +134,7 @@ bot.action(/month_(.+)/, async (ctx) => {
     return ctx.reply(`⚠️ មេរៀនសម្រាប់ "${monthData.title}" កំពុងរៀបចំ និងអាប់ដេតឆាប់ៗនេះ។ សូមរើសខែផ្សេង!`, getMonthsKeyboard());
   }
 
-  const buttons = monthData.topics.map(t => [Markup.button.callback(t.title, `topic_${monthId}_${t.id}`)]);
+  const buttons = monthData.topics.map(t => [Markup.button.callback(t.title, `topic_${monthId}-${t.id}`)]);
   buttons.push([Markup.button.callback('🔙 ត្រឡប់ក្រោយ (Back)', 'back_to_months')]);
 
   await ctx.editMessageText(`📅 ${monthData.title}\nសូមជ្រើសរើសមេរៀនលម្អិត៖`, Markup.inlineKeyboard(buttons));
@@ -145,13 +145,14 @@ bot.action('back_to_months', async (ctx) => {
 });
 
 // Handle Topic/Lesson Selection
-bot.action(/topic_(.+)_(.+)/, async (ctx) => {
+bot.action(/topic_([^-]+)-(.+)/, async (ctx) => {
   const monthId = ctx.match[1];
   const topicId = ctx.match[2];
   
   const monthData = curriculum.months.find(m => m.id === monthId);
-  const topicData = monthData.topics.find(t => t.id === topicId);
+  if (!monthData) return ctx.answerCbQuery("រកមិនឃើញទិន្នន័យខែ");
   
+  const topicData = monthData.topics.find(t => t.id === topicId);
   if (!topicData) return ctx.answerCbQuery("រកមិនឃើញមេរៀន");
 
   const userId = ctx.from.id;
