@@ -45,11 +45,29 @@ try {
 const db = getDatabase(appInstance);
 
 // Initialize APIs
-let bot, genAI, groq, openai;
+let bot, openai;
+
+// Parse API Keys
+const geminiKeys = (process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || "").split(',').map(k => k.trim()).filter(k => k);
+let geminiKeyIndex = 0;
+const getNextGeminiKey = () => {
+  if (geminiKeys.length === 0) return null;
+  const key = geminiKeys[geminiKeyIndex % geminiKeys.length];
+  geminiKeyIndex++;
+  return key;
+};
+
+const groqKeys = (process.env.GROQ_API_KEYS || process.env.GROQ_API_KEY || "").split(',').map(k => k.trim()).filter(k => k);
+let groqKeyIndex = 0;
+const getNextGroqKey = () => {
+  if (groqKeys.length === 0) return null;
+  const key = groqKeys[groqKeyIndex % groqKeys.length];
+  groqKeyIndex++;
+  return key;
+};
+
 try {
   bot = new Telegraf(process.env.TELEGRAM_TOKEN);
-  genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEYS);
-  groq = new Groq({ apiKey: process.env.GROQ_API_KEYS });
   openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || "YOUR_OPENAI_KEY" });
 } catch (e) {
   console.error("❌ ERROR: API Init Failed:", e.message);
@@ -367,11 +385,17 @@ After the grade, provide helpful feedback in Khmer explaining why they got this 
   try {
     let aiResponse = "";
     if (aiType === 'gemini') {
+      const apiKey = getNextGeminiKey();
+      if (!apiKey) throw new Error("No GEMINI_API_KEYS configured in environment");
+      const genAI = new GoogleGenerativeAI(apiKey);
       const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
       const prompt = `${systemPrompt}\n\n[Past Conversation]\n${pastContextText}\n\nStudent: ${userText}\nTeacher:`;
       const result = await model.generateContent(prompt);
       aiResponse = result.response.text();
     } else if (aiType === 'groq') {
+      const apiKey = getNextGroqKey();
+      if (!apiKey) throw new Error("No GROQ_API_KEYS configured in environment");
+      const groq = new Groq({ apiKey: apiKey });
       const chatCompletion = await groq.chat.completions.create({
         messages: groqMessages,
         model: 'llama3-70b-8192',
@@ -453,10 +477,13 @@ bot.on('voice', async (ctx) => {
     formData.append('file', response.data, 'audio.ogg');
     formData.append('model', 'whisper-large-v3');
 
+    const apiKey = getNextGroqKey();
+    if (!apiKey) return ctx.reply("❌ គ្មាន GROQ_API_KEYS ដែលត្រឹមត្រូវទេ!");
+
     const groqRes = await axios.post('https://api.groq.com/openai/v1/audio/transcriptions', formData, {
       headers: {
         ...formData.getHeaders(),
-        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`
+        'Authorization': `Bearer ${apiKey}`
       }
     });
 
