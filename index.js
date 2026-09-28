@@ -516,15 +516,28 @@ After the grade, provide helpful feedback in Khmer explaining why they got this 
       }
       if (lastError && !success) throw lastError;
     } else if (aiType === 'groq') {
-      const apiKey = getNextGroqKey();
-      if (!apiKey) throw new Error("No GROQ_API_KEYS configured in environment");
-      const groq = new Groq({ apiKey: apiKey });
-      const chatCompletion = await groq.chat.completions.create({
-        messages: groqMessages,
-        model: 'llama-3.3-70b-versatile',
-        temperature: 0.7,
-      });
-      aiResponse = chatCompletion.choices[0]?.message?.content || "No response";
+      let lastError = null;
+      let success = false;
+      for (let i = 0; i < (groqKeys.length || 1); i++) {
+        try {
+          const apiKey = getNextGroqKey();
+          if (!apiKey) throw new Error("No GROQ_API_KEYS configured in environment");
+          const groq = new Groq({ apiKey: apiKey });
+          const chatCompletion = await groq.chat.completions.create({
+            messages: groqMessages,
+            model: 'llama-3.3-70b-versatile',
+            temperature: 0.7,
+          });
+          aiResponse = chatCompletion.choices[0]?.message?.content || "No response";
+          lastError = null;
+          success = true;
+          break; // Break loop on success
+        } catch (error) {
+          lastError = error;
+          console.warn(`Groq key failed: ${error.message}. Retrying...`);
+        }
+      }
+      if (lastError && !success) throw lastError;
     }
 
     await saveHistory(userId, 'user', userText); // Saved after fetching history
