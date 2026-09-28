@@ -161,23 +161,20 @@ bot.hears('🔄 ប្តូរគ្រូ AI', (ctx) => {
 
 bot.hears('🕰️ ប្រវត្តិសិក្សា', async (ctx) => {
   const userId = ctx.from.id;
-  const snapshot = await db.ref(`users/${userId}/history`).once('value');
-  const historyData = snapshot.val();
+  const snapshot = await db.ref(`users/${userId}/progress`).once('value');
+  const progressData = snapshot.val();
 
-  // In our DB structure history items saved from lesson clicks are keys like "m1_w1_l1"
-  // But standard chat history is also saved under "history" (push). 
-  // Let's filter to only those that have a "title"
-  if (!historyData) {
-    return ctx.reply("📝 អ្នកមិនទាន់បានចូលរៀនមេរៀនណាមួយនៅឡើយទេ។ សូមចុច /start ឬជ្រើសរើសមេរៀន!");
+  if (!progressData) {
+    return ctx.reply("📝 អ្នកមិនទាន់មានប្រវត្តិប្រឡងបញ្ជាក់សមត្ថភាពនៅឡើយទេ។ សូមជ្រើសរើសមេរៀនដើម្បីចាប់ផ្តើមរៀន និងប្រឡង!");
   }
 
-  const lessons = Object.values(historyData).filter(i => i.title).sort((a, b) => b.timestamp - a.timestamp);
+  const lessons = Object.values(progressData).sort((a, b) => b.timestamp - a.timestamp);
   
   if (lessons.length === 0) {
-    return ctx.reply("📝 អ្នកមិនទាន់បានចូលរៀនមេរៀនណាមួយនៅឡើយទេ។ សូមចុច /start ឬជ្រើសរើសមេរៀន!");
+    return ctx.reply("📝 អ្នកមិនទាន់មានប្រវត្តិប្រឡងបញ្ជាក់សមត្ថភាពនៅឡើយទេ។ សូមជ្រើសរើសមេរៀនដើម្បីចាប់ផ្តើមរៀន និងប្រឡង!");
   }
 
-  let msg = "📚 **ប្រវត្តិមេរៀនដែលអ្នកបានរៀនថ្មីៗនេះ៖**\n\n";
+  let msg = "📚 **ប្រវត្តិប្រឡងមេរៀនដែលអ្នកបានធ្វើថ្មីៗនេះ៖**\n\n";
   const limit = Math.min(lessons.length, 10);
   for (let i = 0; i < limit; i++) {
     const date = new Date(lessons[i].timestamp).toLocaleString('en-GB', { timeZone: 'Asia/Phnom_Penh' });
@@ -449,29 +446,29 @@ After the grade, provide helpful feedback in Khmer explaining why they got this 
       [Markup.button.callback('💬 បន្តសន្ទនា (Continue Chat)', `continue_chat_${userId}`)]
     ]));
 
-    // Grade Logic
     if (state.startsWith('quiz_')) {
       const gradeMatch = aiResponse.match(/GRADE:\s*([ABCF])/i);
       if (gradeMatch) {
         const grade = gradeMatch[1].toUpperCase();
-        if (['A', 'B', 'C'].includes(grade)) {
-          const lessonKey = state.replace('quiz_', ''); // e.g. m1_w1_l1
-          const parts = lessonKey.split('_');
-          const monthData = curriculum.months.find(m => m.id === parts[0]);
-          const weekData = monthData?.weeks.find(w => w.id === parts[1]);
-          const lessonData = weekData?.lessons.find(l => l.id === parts[2]);
+        const lessonKey = state.replace('quiz_', ''); // e.g. m1_w1_l1
+        const parts = lessonKey.split('_');
+        const monthData = curriculum.months.find(m => m.id === parts[0]);
+        const weekData = monthData?.weeks.find(w => w.id === parts[1]);
+        const lessonData = weekData?.lessons.find(l => l.id === parts[2]);
 
-          if (lessonData) {
-            await db.ref(`users/${userId}/history/${lessonKey}`).set({
-              title: `${monthData.title} > ${weekData.title} > ${lessonData.title}`,
-              grade: grade,
-              timestamp: Date.now()
-            });
-            await ctx.reply(`🎉 អបអរសាទរ! អ្នកបានប្រឡងជាប់មេរៀននេះជាមួយនឹងនិទ្ទេស **${grade}**! ប្រវត្តិសិក្សារបស់អ្នកត្រូវបានកត់ត្រាទុកជោគជ័យ។`, { parse_mode: 'Markdown' });
+        if (lessonData) {
+          await db.ref(`users/${userId}/progress/${lessonKey}`).set({
+            title: `${monthData.title} > ${weekData.title} > ${lessonData.title}`,
+            grade: grade,
+            timestamp: Date.now()
+          });
+
+          if (['A', 'B', 'C'].includes(grade)) {
+            await ctx.reply(`🎉 អបអរសាទរ! អ្នកបានប្រឡងជាប់មេរៀននេះជាមួយនឹងនិទ្ទេស **${grade}**! ពិន្ទុរបស់អ្នកត្រូវបានកត់ត្រាទុកជោគជ័យ។`, { parse_mode: 'Markdown' });
             await setUserState(userId, `learning_${lessonKey}`); // Reset back to learning state
+          } else {
+            await ctx.reply(`❌ អ្នកទទួលបាននិទ្ទេស **F** (មិនទាន់ជាប់ទេ)។ ពិន្ទុត្រូវបានកត់ត្រា។ សូមអានមេរៀនសិន រួចសាកល្បងប្រឡងម្ដងទៀត!`, { parse_mode: 'Markdown' });
           }
-        } else {
-          await ctx.reply(`❌ អ្នកទទួលបាននិទ្ទេស **F** (មិនទាន់ជាប់ទេ)។ សូមសាកល្បងម្ដងទៀត!`, { parse_mode: 'Markdown' });
         }
       }
     }
