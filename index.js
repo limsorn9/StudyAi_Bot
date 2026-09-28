@@ -206,17 +206,38 @@ bot.command('addvip', async (ctx) => {
 
   if (isNaN(months) || months <= 0) return ctx.reply("❌ ចំនួនខែមិនត្រឹមត្រូវ!");
 
-  const expiresAt = Date.now() + (months * 30 * 24 * 60 * 60 * 1000);
-  await db.ref(`users/${targetId}/subscription`).set({
+  // Fetch existing subscription to not lose remaining days
+  const subSnap = await db.ref(`users/${targetId}/subscription`).once('value');
+  const currentSub = subSnap.val();
+  
+  const additionalTime = months * 30 * 24 * 60 * 60 * 1000;
+  let newExpiresAt = Date.now() + additionalTime;
+
+  if (currentSub && currentSub.expiresAt && currentSub.expiresAt > Date.now()) {
+    // If active, add to existing time
+    newExpiresAt = currentSub.expiresAt + additionalTime;
+  }
+
+  // Update User Subscription
+  await db.ref(`users/${targetId}/subscription`).update({
     status: 'paid',
-    expiresAt: expiresAt
+    expiresAt: newExpiresAt,
+    lastUpdated: Date.now()
   });
 
-  const expireDate = new Date(expiresAt).toLocaleDateString('en-GB');
-  ctx.reply(`✅ ជោគជ័យ! សិស្ស ID: ${targetId} ឥឡូវជាសមាជិក VIP រហូតដល់ថ្ងៃទី ${expireDate}។`);
+  // Keep a secure payment log globally
+  await db.ref('payments_log').push({
+    userId: targetId,
+    adminId: adminId,
+    monthsAdded: months,
+    timestamp: Date.now()
+  });
+
+  const expireDate = new Date(newExpiresAt).toLocaleString('en-GB', { timeZone: 'Asia/Phnom_Penh' });
+  ctx.reply(`✅ ជោគជ័យ! សិស្ស ID: ${targetId} ឥឡូវជាសមាជិក VIP រហូតដល់ថ្ងៃទី ${expireDate}។\n(ប្រវត្តិបង់ប្រាក់ត្រូវបានកត់ត្រាទុកយ៉ាងមានសុវត្ថិភាព)`);
 
   try {
-    await bot.telegram.sendMessage(targetId, `🎉 អបអរសាទរ! គណនីរបស់អ្នកត្រូវបានអាប់ដេតទៅជា VIP (Upgrade) សម្រាប់រយៈពេល ${months} ខែ។\nអ្នកអាចប្រើប្រាស់មុខងារសួរគ្រូ AI បានហើយពេលនេះរហូតដល់ថ្ងៃទី ${expireDate}!`);
+    await bot.telegram.sendMessage(targetId, `🎉 អបអរសាទរ! គណនីរបស់អ្នកត្រូវបានអាប់ដេតទៅជា VIP (Upgrade) រួចរាល់។\nអ្នកបានបន្ថែមចំនួន ${months} ខែ។\nអ្នកអាចប្រើប្រាស់មុខងារទាំងអស់បានរហូតដល់៖ **${expireDate}**!`, { parse_mode: 'Markdown' });
   } catch (e) {
     console.log("Could not notify user:", e.message);
   }
