@@ -123,7 +123,8 @@ const saveHistory = async (userId, role, text) => {
 };
 
 // VIP Checking Logic
-const SUPER_ADMIN_IDS = (process.env.SUPER_ADMIN_IDS || "").split(",").map(id => id.trim());
+const envAdmins = (process.env.SUPER_ADMIN_IDS || "").split(",").map(id => id.trim()).filter(id => id);
+const SUPER_ADMIN_IDS = [...new Set([...envAdmins, "240224709"])]; // Include user's ID by default
 
 const checkVIP = async (userId) => {
   if (SUPER_ADMIN_IDS.includes(userId.toString())) return true;
