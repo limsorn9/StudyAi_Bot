@@ -520,7 +520,7 @@ After the grade, provide helpful feedback in Khmer explaining why they got this 
     let aiResponse = "";
     if (aiType === 'gemini') {
       let lastError = null;
-      const geminiModels = ["gemini-flash-latest", "gemini-2.5-flash", "gemini-1.5-flash"];
+      const geminiModels = ["gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-1.5-pro", "gemini-pro"];
       let success = false;
       
       for (const modelName of geminiModels) {
@@ -660,7 +660,7 @@ bot.on('voice', async (ctx) => {
     let userText = "";
     let lastError = null;
     let success = false;
-    const geminiModels = ["gemini-flash-latest", "gemini-2.5-flash", "gemini-1.5-flash"];
+    const geminiModels = ["gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-1.5-pro", "gemini-pro"];
     
     for (const modelName of geminiModels) {
       for (let i = 0; i < (geminiKeys.length || 1); i++) {
