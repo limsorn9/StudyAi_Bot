@@ -86,7 +86,6 @@ try {
     // Set Telegram Menu Commands
     bot.telegram.setMyCommands([
       { command: 'start', description: '📚 ចាប់ផ្តើមរៀន (Start Learning)' },
-      { command: 'switch_ai', description: '🔄 ប្តូរគ្រូ AI (Switch AI Teacher)' },
       { command: 'history', description: '🕰️ ប្រវត្តិមេរៀន (Learning History)' },
       { command: 'help', description: '❓ ជំនួយ (Help)' }
     ]);
@@ -166,8 +165,7 @@ const generateAndSendTTS = async (ctx, text) => {
 // Persistent Reply Keyboard Menu
 const mainMenuKeyboard = Markup.keyboard([
   ['📚 បញ្ជីមេរៀន (Lessons)', '🕰️ ប្រវត្តិសិក្សា'],
-  ['🔄 ប្តូរគ្រូ AI', '💎 គណនី VIP (Upgrade)'],
-  ['❓ ជំនួយ (Help)']
+  ['💎 គណនី VIP (Upgrade)', '❓ ជំនួយ (Help)']
 ]).resize();
 
 // Start Command & Curriculum Menu
@@ -192,14 +190,7 @@ bot.hears('📚 បញ្ជីមេរៀន (Lessons)', async (ctx) => {
   await ctx.reply("សូមជ្រើសរើសខែដែលអ្នកចង់រៀន៖", getMonthsKeyboard());
 });
 
-bot.hears('🔄 ប្តូរគ្រូ AI', (ctx) => {
-  ctx.reply("សូមជ្រើសរើសគ្រូ AI ដែលអ្នកចង់រៀនជាមួយ៖", 
-    Markup.inlineKeyboard([
-      [Markup.button.callback('🧠 គ្រូ Gemini (ពន្យល់ក្បោះក្បាយ)', 'set_ai_gemini')],
-      [Markup.button.callback('⚡ គ្រូ Groq (ឆ្លើយតបលឿន)', 'set_ai_groq')]
-    ])
-  );
-});
+
 
 bot.hears('💎 គណនី VIP (Upgrade)', (ctx) => {
   const userId = ctx.from.id;
@@ -316,7 +307,6 @@ function getMonthsKeyboard() {
   for(let i=0; i<buttons.length; i+=3) {
     rows.push(buttons.slice(i, i+3));
   }
-  rows.push([Markup.button.callback('⚙️ ផ្លាស់ប្តូរគ្រូ AI', 'switch_ai')]);
   return Markup.inlineKeyboard(rows);
 }
 
@@ -391,25 +381,6 @@ bot.action(/lesson_([^-]+)-([^-]+)-(.+)/, async (ctx) => {
   await ctx.reply(`💬 គ្រូ AI ជំនាញផ្នែក "${lessonData.title.split(':')[1].trim()}" នៅទីនេះហើយ! បើមានចម្ងល់សូមឆាតសួរ។`);
 });
 
-// Switch AI
-bot.action('switch_ai', async (ctx) => {
-  await ctx.reply("សូមជ្រើសរើសគ្រូ AI ដែលអ្នកចង់រៀនជាមួយ៖", 
-    Markup.inlineKeyboard([
-      [Markup.button.callback('🧠 គ្រូ Gemini (ពន្យល់ក្បោះក្បាយ)', 'set_ai_gemini')],
-      [Markup.button.callback('⚡ គ្រូ Groq (ឆ្លើយតបលឿន)', 'set_ai_groq')]
-    ])
-  );
-});
-
-bot.action('set_ai_gemini', async (ctx) => {
-  await setUserAI(ctx.from.id, 'gemini');
-  await ctx.reply("✅ គ្រូ Gemini ត្រូវបានកំណត់! (វាយ /start ដើម្បីទៅកាន់មេរៀន)");
-});
-
-bot.action('set_ai_groq', async (ctx) => {
-  await setUserAI(ctx.from.id, 'groq');
-  await ctx.reply("✅ គ្រូ Groq ត្រូវបានកំណត់! (វាយ /start ដើម្បីទៅកាន់មេរៀន)");
-});
 
 // Check History
 bot.command('history', async (ctx) => {
@@ -462,7 +433,7 @@ async function handleUserMessage(ctx, userId, userText) {
   }
 
   const state = await getUserState(userId);
-  const aiType = await getUserAI(userId);
+  const aiType = 'groq'; // Force Groq for text conversation (Gemini is still used for STT Voice-to-Text)
 
   const waitMsg = await ctx.reply("⏳ គ្រូសនកំពុងគិត និងរៀបចំការឆ្លើយតប សូមរង់ចាំបន្តិចណា៎...");
   ctx.sendChatAction('typing');
