@@ -733,6 +733,119 @@ bot.action(/continue_chat_(.+)/, async (ctx) => {
   await ctx.reply("💬 សូមវាយបញ្ចូលសាររបស់អ្នក ឬផ្ញើជាសំឡេងមកកាន់ខ្ញុំ ដើម្បីបន្តការសន្ទនា!");
 });
 
+// Handling receipt photos
+bot.on('photo', async (ctx) => {
+  const userId = ctx.from.id.toString();
+  const photo = ctx.message.photo[ctx.message.photo.length - 1]; // highest resolution
+  const fileUniqueId = photo.file_unique_id;
+
+  // Check if this specific photo was already submitted
+  const snap = await db.ref(`receipts/${fileUniqueId}`).once('value');
+  if (snap.exists()) {
+    return ctx.reply("⚠️ វិក្កយបត្រនេះត្រូវបានផ្ញើម្ដងរួចមកហើយ! សូមកុំផ្ញើស្ទួន។");
+  }
+
+  // Save to prevent duplicate
+  await db.ref(`receipts/${fileUniqueId}`).set({
+    userId: userId,
+    timestamp: Date.now()
+  });
+
+  await ctx.reply("✅ វិក្កយបត្ររបស់អ្នកត្រូវបានបញ្ជូនទៅកាន់ Admin រួចរាល់! សូមរង់ចាំការពិនិត្យយល់ព្រមបន្តិចណា៎។");
+
+  const caption = `🧾 **វិក្កយបត្រថ្មីពីសិស្ស!**
+👤 ឈ្មោះ៖ ${ctx.from.first_name || 'No Name'}
+🆔 ID៖ \`${userId}\`
+
+តើអ្នកចង់អនុម័តប៉ុន្មានខែ?`;
+
+  const keyboard = Markup.inlineKeyboard([
+    [
+      Markup.button.callback("✅ 1 ខែ (3$)", `approve_1_${userId}`),
+      Markup.button.callback("✅ 12 ខែ (30$)", `approve_12_${userId}`)
+    ],
+    [Markup.button.callback("❌ បដិសេធ (Reject)", `reject_${userId}`)]
+  ]);
+
+  for (const adminId of SUPER_ADMIN_IDS) {
+    try {
+      await bot.telegram.sendPhoto(adminId, photo.file_id, {
+        caption: caption,
+        parse_mode: 'Markdown',
+        reply_markup: keyboard.reply_markup
+      });
+    } catch (error) {
+      console.warn(`Could not forward receipt to admin ${adminId}:`, error.message);
+    }
+  }
+});
+
+// Admin Approve Action
+bot.action(/approve_(\d+)_(\d+)/, async (ctx) => {
+  const adminId = ctx.from.id.toString();
+  if (!SUPER_ADMIN_IDS.includes(adminId)) return ctx.answerCbQuery("⛔ អ្នកគ្មានសិទ្ធិទេ។", { show_alert: true });
+
+  const months = parseInt(ctx.match[1]);
+  const targetId = ctx.match[2];
+
+  // Fetch existing sub
+  const subSnap = await db.ref(`users/${targetId}/subscription`).once('value');
+  const currentSub = subSnap.val();
+  const additionalTime = months * 30 * 24 * 60 * 60 * 1000;
+  let newExpiresAt = Date.now() + additionalTime;
+
+  if (currentSub && currentSub.expiresAt && currentSub.expiresAt > Date.now()) {
+    newExpiresAt = currentSub.expiresAt + additionalTime;
+  }
+
+  await db.ref(`users/${targetId}/subscription`).update({
+    status: 'paid',
+    expiresAt: newExpiresAt,
+    lastUpdated: Date.now()
+  });
+
+  await db.ref('payments_log').push({
+    userId: targetId,
+    adminId: adminId,
+    monthsAdded: months,
+    timestamp: Date.now()
+  });
+
+  const expireDate = new Date(newExpiresAt).toLocaleString('en-GB', { timeZone: 'Asia/Phnom_Penh' });
+
+  // Update Admin's Message
+  await ctx.editMessageCaption(`✅ **បានអនុម័ត (Approved)!**
+👤 សិស្ស ID: \`${targetId}\`
+📅 ទទួលបាន: ${months} ខែ
+⌛ ផុតកំណត់: ${expireDate}
+👨‍💼 អនុម័តដោយ Admin ID: ${adminId}`, { parse_mode: 'Markdown' });
+
+  // Notify User
+  try {
+    await bot.telegram.sendMessage(targetId, `🎉 អបអរសាទរ! វិក្កយបត្ររបស់អ្នកត្រូវបាន **អនុម័ត (Approved)** ដោយ Admin។\nអ្នកទទួលបាន **${months} ខែ** បន្ថែម។\nឥឡូវនេះអ្នកអាចប្រើប្រាស់មុខងារសួរគ្រូ AI បានហើយរហូតដល់ថ្ងៃទី **${expireDate}**!`, { parse_mode: 'Markdown' });
+  } catch (e) {
+    console.log("Could not notify user:", e.message);
+  }
+});
+
+// Admin Reject Action
+bot.action(/reject_(\d+)/, async (ctx) => {
+  const adminId = ctx.from.id.toString();
+  if (!SUPER_ADMIN_IDS.includes(adminId)) return ctx.answerCbQuery("⛔ អ្នកគ្មានសិទ្ធិទេ។", { show_alert: true });
+
+  const targetId = ctx.match[1];
+
+  await ctx.editMessageCaption(`❌ **បានបដិសេធ (Rejected)**
+👤 សិស្ស ID: \`${targetId}\`
+👨‍💼 បដិសេធដោយ Admin ID: ${adminId}`, { parse_mode: 'Markdown' });
+
+  try {
+    await bot.telegram.sendMessage(targetId, `❌ សុំទោស! វិក្កយបត្របង់ប្រាក់របស់អ្នកត្រូវបាន **បដិសេធ (Rejected)** ដោយ Admin។\nសូមពិនិត្យមើលឡើងវិញ ឬទាក់ទងមក Admin ផ្ទាល់។`, { parse_mode: 'Markdown' });
+  } catch (e) {
+    console.log("Could not notify user:", e.message);
+  }
+});
+
 app.get('/', (req, res) => res.send('StudyAi Curriculum Bot is running!'));
 
 app.listen(PORT, () => {
