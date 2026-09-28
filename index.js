@@ -497,28 +497,48 @@ bot.on('voice', async (ctx) => {
     if (!apiKey) return ctx.reply("❌ គ្មាន GEMINI_API_KEYS ដែលត្រឹមត្រូវទេ!");
 
     const fs = require('fs');
-    const writer = fs.createWriteStream('temp_audio.ogg');
+    const tempAudioPath = `temp_audio_${userId}.ogg`;
+    const writer = fs.createWriteStream(tempAudioPath);
     response.data.pipe(writer);
     await new Promise((resolve, reject) => {
       writer.on('finish', resolve);
       writer.on('error', reject);
     });
-    const audioBase64 = fs.readFileSync('temp_audio.ogg').toString('base64');
     
     const { GoogleGenerativeAI } = require("@google/generative-ai");
+    const { GoogleAIFileManager } = require("@google/generative-ai/server");
     const genAI = new GoogleGenerativeAI(apiKey);
+    const fileManager = new GoogleAIFileManager(apiKey);
     const model = genAI.getGenerativeModel({ model: "gemini-pro-latest" });
     
-    const promptText = "Please transcribe this audio exactly as it is spoken. If it is in Khmer, transcribe it in Khmer. Do not translate. Output ONLY the transcribed text.";
-    const audioPart = {
-      inlineData: {
-        data: audioBase64,
-        mimeType: "audio/ogg"
-      }
-    };
+    // Upload audio file using File API
+    const uploadResult = await fileManager.uploadFile(tempAudioPath, {
+      mimeType: "audio/ogg",
+      displayName: `Voice_${userId}`,
+    });
     
-    const result = await model.generateContent([promptText, audioPart]);
+    const promptText = "Please transcribe this audio exactly as it is spoken. If it is in Khmer, transcribe it in Khmer. Do not translate. Output ONLY the transcribed text.";
+    const result = await model.generateContent([
+      promptText,
+      {
+        fileData: {
+          fileUri: uploadResult.file.uri,
+          mimeType: uploadResult.file.mimeType
+        }
+      }
+    ]);
+    
     const userText = result.response.text().trim();
+    
+    // Clean up Gemini Server File
+    try {
+      await fileManager.deleteFile(uploadResult.file.name);
+    } catch (cleanupError) {
+      console.warn("Failed to delete Gemini file:", cleanupError);
+    }
+    
+    // Clean up local file
+    if (fs.existsSync(tempAudioPath)) fs.unlinkSync(tempAudioPath);
     
     if (!userText) {
       return ctx.reply("❌ មិនអាចស្តាប់សំឡេងបានច្បាស់ទេ។ សូមនិយាយម្តងទៀត!");
