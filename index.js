@@ -464,6 +464,7 @@ async function handleUserMessage(ctx, userId, userText) {
   const state = await getUserState(userId);
   const aiType = await getUserAI(userId);
 
+  const waitMsg = await ctx.reply("⏳ គ្រូសនកំពុងគិត និងរៀបចំការឆ្លើយតប សូមរង់ចាំបន្តិចណា៎...");
   ctx.sendChatAction('typing');
 
   let systemPrompt = "You are a friendly, highly skilled English teacher for Cambodian students. Your name is Teacher Sorn (គ្រូសន). You speak both English and Khmer perfectly. Always encourage the student and refer to yourself as 'គ្រូសន' (Teacher Sorn) in Khmer conversations. Answer questions clearly using Khmer for explanations and English for examples.";
@@ -559,6 +560,11 @@ After the grade, provide helpful feedback in Khmer explaining why they got this 
     await saveHistory(userId, 'ai', aiResponse);
     await db.ref(`users/${userId}/latestResponse`).set(aiResponse);
     
+    // Delete waiting message
+    try {
+      await ctx.telegram.deleteMessage(ctx.chat.id, waitMsg.message_id);
+    } catch (e) { }
+
     // Send AI Response
     await ctx.reply(aiResponse, Markup.inlineKeyboard([
       [Markup.button.callback('💬 បន្តសន្ទនា (Continue Chat)', `continue_chat_${userId}`)]
@@ -594,6 +600,9 @@ After the grade, provide helpful feedback in Khmer explaining why they got this 
       }
     }
   } catch (error) {
+    try {
+      await ctx.telegram.deleteMessage(ctx.chat.id, waitMsg.message_id);
+    } catch (e) { }
     console.error("AI Error:", error);
     ctx.reply(`សុំទោស មានបញ្ហាបច្ចេកទេសបន្តិច! សូមពិនិត្យមើលការភ្ជាប់ API។\n\n🔍 **កំណត់ត្រាបញ្ហា (Error):** ${error.message}`);
   }
@@ -619,6 +628,7 @@ bot.on('voice', async (ctx) => {
     return ctx.reply("🔒 **គណនីរបស់អ្នកមិនទាន់បានបង់ប្រាក់ទេ (Free Account)**\nអ្នកមិនអាចផ្ញើសារជាសំឡេងបានទេ។ សូមដំឡើងទៅគណនី VIP (Upgrade) ដើម្បីប្រើប្រាស់មុខងារនេះ។", { parse_mode: 'Markdown' });
   }
 
+  const waitMsg = await ctx.reply("⏳ គ្រូសនកំពុងស្តាប់សំឡេង សូមរង់ចាំបន្តិចណា៎...");
   ctx.sendChatAction('typing');
 
   try {
@@ -704,14 +714,17 @@ bot.on('voice', async (ctx) => {
     if (lastError && !success) throw lastError;
     
     if (!userText) {
+      try { await ctx.telegram.deleteMessage(ctx.chat.id, waitMsg.message_id); } catch(e){}
       return ctx.reply("❌ មិនអាចស្តាប់សំឡេងបានច្បាស់ទេ។ សូមនិយាយម្តងទៀត!");
     }
     
+    try { await ctx.telegram.deleteMessage(ctx.chat.id, waitMsg.message_id); } catch(e){}
     await ctx.reply(`🎙 ខ្ញុំស្តាប់បានថា៖\n_"${userText}"_`, { parse_mode: 'Markdown' });
     
     // Process text
     await handleUserMessage(ctx, userId, userText);
   } catch (error) {
+    try { await ctx.telegram.deleteMessage(ctx.chat.id, waitMsg.message_id); } catch(e){}
     console.error("STT Error:", error);
     ctx.reply("❌ មានបញ្ហាក្នុងការស្តាប់សំឡេង! សូមព្យាយាមម្តងទៀត។");
   }
