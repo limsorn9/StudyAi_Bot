@@ -122,10 +122,22 @@ const saveHistory = async (userId, role, text) => {
   });
 };
 
+// VIP Checking Logic
+const SUPER_ADMIN_IDS = (process.env.SUPER_ADMIN_IDS || "").split(",").map(id => id.trim());
+
+const checkVIP = async (userId) => {
+  if (SUPER_ADMIN_IDS.includes(userId.toString())) return true;
+  const snap = await db.ref(`users/${userId}/subscription/expiresAt`).once('value');
+  const expiresAt = snap.val();
+  if (expiresAt && expiresAt > Date.now()) return true;
+  return false;
+};
+
 // Persistent Reply Keyboard Menu
 const mainMenuKeyboard = Markup.keyboard([
   ['📚 បញ្ជីមេរៀន (Lessons)', '🕰️ ប្រវត្តិសិក្សា'],
-  ['🔄 ប្តូរគ្រូ AI', '❓ ជំនួយ (Help)']
+  ['🔄 ប្តូរគ្រូ AI', '💎 គណនី VIP (Upgrade)'],
+  ['❓ ជំនួយ (Help)']
 ]).resize();
 
 // Start Command & Curriculum Menu
@@ -157,6 +169,57 @@ bot.hears('🔄 ប្តូរគ្រូ AI', (ctx) => {
       [Markup.button.callback('⚡ គ្រូ Groq (ឆ្លើយតបលឿន)', 'set_ai_groq')]
     ])
   );
+});
+
+bot.hears('💎 គណនី VIP (Upgrade)', (ctx) => {
+  const userId = ctx.from.id;
+  const msg = `💎 **គណនី VIP (Upgrade)** 💎
+
+បង់ប្រាក់ដើម្បីទទួលបានសិទ្ធិពិសេស៖
+✅ សួរគ្រូ AI បានដោយសេរី (គ្មានដែនកំណត់)
+✅ អាចផ្ញើជាសំឡេងឲ្យគ្រូ AI ស្តាប់ និងកែតម្រូវ
+✅ ធ្វើតេស្តប្រឡងយកពិន្ទុ
+
+**តម្លៃពិសេស៖**
+👉 1 ខែ = 3$
+👉 1 ឆ្នាំ = 30$
+
+🏦 **ព័ត៌មានបង់ប្រាក់ (ACLEDA Bank / KHQR):**
+ឈ្មោះគណនី៖ **LIM SORN**
+*(អ្នកអាចស្កេន KHQR ខាងលើ ឬខាងក្រោមដើម្បីបង់ប្រាក់)*
+
+📲 បន្ទាប់ពីបង់ប្រាក់រួច សូមផ្ញើវិក្កយបត្រ (Screenshot) មកកាន់ Admin៖ @limsorn9
+រួចប្រាប់លេខ ID របស់អ្នកគឺ៖ \`${userId}\``;
+  
+  ctx.reply(msg, { parse_mode: 'Markdown' });
+});
+
+bot.command('addvip', async (ctx) => {
+  const adminId = ctx.from.id.toString();
+  if (!SUPER_ADMIN_IDS.includes(adminId)) return ctx.reply("⛔ អ្នកគ្មានសិទ្ធិប្រើប្រាស់ Command នេះទេ។");
+
+  const args = ctx.message.text.split(' ');
+  if (args.length !== 3) return ctx.reply("❌ ទម្រង់មិនត្រឹមត្រូវ! សូមវាយ៖ `/addvip [លេខIDសិស្ស] [ចំនួនខែ]`", { parse_mode: 'Markdown' });
+
+  const targetId = args[1];
+  const months = parseInt(args[2]);
+
+  if (isNaN(months) || months <= 0) return ctx.reply("❌ ចំនួនខែមិនត្រឹមត្រូវ!");
+
+  const expiresAt = Date.now() + (months * 30 * 24 * 60 * 60 * 1000);
+  await db.ref(`users/${targetId}/subscription`).set({
+    status: 'paid',
+    expiresAt: expiresAt
+  });
+
+  const expireDate = new Date(expiresAt).toLocaleDateString('en-GB');
+  ctx.reply(`✅ ជោគជ័យ! សិស្ស ID: ${targetId} ឥឡូវជាសមាជិក VIP រហូតដល់ថ្ងៃទី ${expireDate}។`);
+
+  try {
+    await bot.telegram.sendMessage(targetId, `🎉 អបអរសាទរ! គណនីរបស់អ្នកត្រូវបានអាប់ដេតទៅជា VIP (Upgrade) សម្រាប់រយៈពេល ${months} ខែ។\nអ្នកអាចប្រើប្រាស់មុខងារសួរគ្រូ AI បានហើយពេលនេះរហូតដល់ថ្ងៃទី ${expireDate}!`);
+  } catch (e) {
+    console.log("Could not notify user:", e.message);
+  }
 });
 
 bot.hears('🕰️ ប្រវត្តិសិក្សា', async (ctx) => {
@@ -342,6 +405,11 @@ bot.command('testapi', async (ctx) => {
 });
 
 async function handleUserMessage(ctx, userId, userText) {
+  const isVIP = await checkVIP(userId);
+  if (!isVIP) {
+    return ctx.reply("🔒 **គណនីរបស់អ្នកមិនទាន់បានបង់ប្រាក់ទេ (Free Account)**\nអ្នកអាចត្រឹមតែអានមេរៀនដែលមានស្រាប់ប៉ុណ្ណោះ។ ដើម្បីសួរគ្រូ AI និងធ្វើតេស្ត សូមដំឡើងទៅគណនី VIP (Upgrade)។\n\nសូមចុចប៊ូតុង **💎 គណនី VIP (Upgrade)** ខាងក្រោមនេះ។", { parse_mode: 'Markdown' });
+  }
+
   const state = await getUserState(userId);
   const aiType = await getUserAI(userId);
 
@@ -493,6 +561,11 @@ bot.on('text', async (ctx) => {
 // Voice Message Handling (STT)
 bot.on('voice', async (ctx) => {
   const userId = ctx.from.id.toString();
+  const isVIP = await checkVIP(userId);
+  if (!isVIP) {
+    return ctx.reply("🔒 **គណនីរបស់អ្នកមិនទាន់បានបង់ប្រាក់ទេ (Free Account)**\nអ្នកមិនអាចផ្ញើសារជាសំឡេងបានទេ។ សូមដំឡើងទៅគណនី VIP (Upgrade) ដើម្បីប្រើប្រាស់មុខងារនេះ។", { parse_mode: 'Markdown' });
+  }
+
   ctx.sendChatAction('typing');
 
   try {
