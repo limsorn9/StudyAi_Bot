@@ -405,7 +405,7 @@ After the grade, provide helpful feedback in Khmer explaining why they got this 
       const apiKey = getNextGeminiKey();
       if (!apiKey) throw new Error("No GEMINI_API_KEYS configured in environment");
       const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: "gemini-pro-latest" });
+      const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
       const prompt = `${systemPrompt}\n\n[Past Conversation]\n${pastContextText}\n\nStudent: ${userText}\nTeacher:`;
       const result = await model.generateContent(prompt);
       aiResponse = result.response.text();
@@ -509,7 +509,7 @@ bot.on('voice', async (ctx) => {
     const { GoogleAIFileManager } = require("@google/generative-ai/server");
     const genAI = new GoogleGenerativeAI(apiKey);
     const fileManager = new GoogleAIFileManager(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-pro-latest" });
+    const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
     
     // Upload audio file using File API
     const uploadResult = await fileManager.uploadFile(tempAudioPath, {
