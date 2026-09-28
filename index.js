@@ -366,7 +366,7 @@ After the grade, provide helpful feedback in Khmer explaining why they got this 
   }
 
   // Fetch recent chat history
-  const snap = await db.ref(`users/${userId}/history`).orderByChild('timestamp').limitToLast(12).once('value');
+  const snap = await db.ref(`users/${userId}/history`).limitToLast(12).once('value');
   const historyItems = snap.val();
   let pastContextText = "";
   let groqMessages = [{ role: 'system', content: systemPrompt }];
