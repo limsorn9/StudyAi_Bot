@@ -27,16 +27,7 @@ const adjectiveCategories = [
   { name: 'លក្ខណៈបុគ្គលិកលក្ខណៈ (Personality)', words: ['ឆ្លាត = Smart/Clever', 'ល្ងង់ = Stupid', 'រួសរាយ = Friendly', 'ខ្មាស់អៀន = Shy', 'ក្លាហាន = Brave', 'កំសាក = Cowardly', 'ឧស្សាហ៍ = Hardworking', 'ខ្ជិល = Lazy', 'ចិត្តល្អ = Kind', 'កាច = Mean/Fierce'] }
 ];
 
-const grammarRules = [
-  { topic: "To Be (am, is, are)", kh: "ការប្រើប្រាស់ To Be សម្រាប់ប្រាប់ពីស្ថានភាព ឬអត្តសញ្ញាណ។\n💡 ទម្រង់: S + am/is/are + Noun/Adj\n- I am happy. (ខ្ញុំសប្បាយចិត្ត)\n- She is a doctor. (នាងគឺជាគ្រូពេទ្យ)\n- They are students. (ពួកគេគឺជាសិស្ស)" },
-  { topic: "Present Simple Tense", kh: "ការប្រើប្រាស់ Present Simple សម្រាប់ទម្លាប់ ឬការពិត។\n💡 ទម្រង់: S + V1 (s/es)\n- I play football. (ខ្ញុំលេងបាល់ទាត់)\n- He goes to school. (គាត់ទៅសាលារៀន)\n- The sun rises in the east. (ព្រះអាទិត្យរះនៅទិសខាងកើត)" },
-  { topic: "Present Continuous", kh: "ប្រើសម្រាប់សកម្មភាពកំពុងកើតឡើង។\n💡 ទម្រង់: S + am/is/are + V-ing\n- I am eating. (ខ្ញុំកំពុងញ៉ាំ)\n- She is reading a book. (នាងកំពុងអានសៀវភៅ)" },
-  { topic: "Past Simple", kh: "ប្រើសម្រាប់សកម្មភាពដែលបានបញ្ចប់ក្នុងអតីតកាល។\n💡 ទម្រង់: S + V2/ed\n- I went to the market yesterday. (ខ្ញុំបានទៅផ្សារកាលពីម្សិលមិញ)\n- We played game last night. (ពួកយើងបានលេងហ្គេមកាលពីយប់មិញ)" },
-  { topic: "Future Simple", kh: "ប្រើសម្រាប់និយាយអំពីអនាគត។\n💡 ទម្រង់: S + will + V1\n- I will go to work tomorrow. (ខ្ញុំនឹងទៅធ្វើការនៅថ្ងៃស្អែក)\n- She will buy a car. (នាងនឹងទិញឡានមួយ)" },
-  { topic: "Pronouns (សព្វនាម)", kh: "I (ខ្ញុំ), You (អ្នក), We (ពួកយើង), They (ពួកគេ), He (គាត់), She (នាង), It (វា)។\n- I love you. (ខ្ញុំស្រលាញ់អ្នក)\n- He is my friend. (គាត់គឺជាមិត្តរបស់ខ្ញុំ)" },
-  { topic: "Articles (a, an, the)", kh: "A / An ប្រើជាមួយនាមរាប់បានឯកវចនៈ។ The ប្រើសម្រាប់នាមច្បាស់លាស់។\n- A cat (ឆ្មាមួយ)\n- An apple (ផ្លែប៉ោមមួយ)\n- The sun (ព្រះអាទិត្យ)" },
-  { topic: "Prepositions (ធ្នាក់)", kh: "In (ក្នុង), On (លើ), At (នៅ)។\n- In the box (នៅក្នុងប្រអប់)\n- On the table (នៅលើតុ)\n- At home (នៅផ្ទះ)" }
-];
+const grammarRules = require('./grammar_data.js');
 
 const conversations = [
   { title: "ការណែនាំខ្លួន (Introductions)", script: "A: Hello, my name is John. What is your name?\n(សួស្តី ខ្ញុំឈ្មោះចន។ តើអ្នកឈ្មោះអ្វី?)\nB: Hi John, I am Anna. Nice to meet you.\n(សួស្តីចន ខ្ញុំគឺអាន់ណា។ រីករាយដែលបានស្គាល់អ្នក។)" },
