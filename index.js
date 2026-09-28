@@ -211,8 +211,13 @@ bot.hears('💎 គណនី VIP (Upgrade)', (ctx) => {
 
 📲 បន្ទាប់ពីបង់ប្រាក់រួច សូមផ្ញើវិក្កយបត្រ (Screenshot) មកកាន់ Admin៖ @limsorn9
 រួចប្រាប់លេខ ID របស់អ្នកគឺ៖ \`${userId}\``;
-  
-  ctx.reply(msg, { parse_mode: 'Markdown' });
+  if (fs.existsSync('./khqr.jpg')) {
+    ctx.replyWithPhoto({ source: './khqr.jpg' }, { caption: msg, parse_mode: 'Markdown' });
+  } else if (fs.existsSync('./khqr.png')) {
+    ctx.replyWithPhoto({ source: './khqr.png' }, { caption: msg, parse_mode: 'Markdown' });
+  } else {
+    ctx.reply(msg + "\n\n*(ចំណាំ៖ រូបភាព KHQR មិនទាន់ត្រូវបានដាក់បញ្ចូលក្នុងប្រព័ន្ធទេ សូមលោកគ្រូដាក់រូបភាព khqr.jpg ចូលក្នុង Folder ដើម)*", { parse_mode: 'Markdown' });
+  }
 });
 
 bot.command('addvip', async (ctx) => {
