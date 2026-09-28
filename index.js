@@ -567,11 +567,11 @@ After the grade, provide helpful feedback in Khmer explaining why they got this 
 
     // Send AI Response
     await ctx.reply(aiResponse, Markup.inlineKeyboard([
-      [Markup.button.callback('💬 បន្តសន្ទនា (Continue Chat)', `continue_chat_${userId}`)]
+      [
+        Markup.button.callback('💬 បន្តសន្ទនា', `continue_chat_${userId}`),
+        Markup.button.callback('🔊 ស្ដាប់សម្លេង', `tts_${userId}`)
+      ]
     ]));
-
-    // Auto-generate Voice
-    await generateAndSendTTS(ctx, aiResponse);
 
     if (state.startsWith('quiz_')) {
       const gradeMatch = aiResponse.match(/GRADE:\s*([ABCF])/i);
