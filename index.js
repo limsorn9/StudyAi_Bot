@@ -403,23 +403,30 @@ After the grade, provide helpful feedback in Khmer explaining why they got this 
     let aiResponse = "";
     if (aiType === 'gemini') {
       let lastError = null;
-      for (let i = 0; i < (geminiKeys.length || 1); i++) {
-        try {
-          const apiKey = getNextGeminiKey();
-          if (!apiKey) throw new Error("No GEMINI_API_KEYS configured in environment");
-          const genAI = new GoogleGenerativeAI(apiKey);
-          const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
-          const prompt = `${systemPrompt}\n\n[Past Conversation]\n${pastContextText}\n\nStudent: ${userText}\nTeacher:`;
-          const result = await model.generateContent(prompt);
-          aiResponse = result.response.text();
-          lastError = null;
-          break; // Success
-        } catch (error) {
-          lastError = error;
-          console.warn(`Gemini key failed: ${error.message}. Retrying...`);
+      const geminiModels = ["gemini-flash-latest", "gemini-2.5-flash", "gemini-1.5-flash"];
+      let success = false;
+      
+      for (const modelName of geminiModels) {
+        for (let i = 0; i < (geminiKeys.length || 1); i++) {
+          try {
+            const apiKey = getNextGeminiKey();
+            if (!apiKey) throw new Error("No GEMINI_API_KEYS configured in environment");
+            const genAI = new GoogleGenerativeAI(apiKey);
+            const model = genAI.getGenerativeModel({ model: modelName });
+            const prompt = `${systemPrompt}\n\n[Past Conversation]\n${pastContextText}\n\nStudent: ${userText}\nTeacher:`;
+            const result = await model.generateContent(prompt);
+            aiResponse = result.response.text();
+            lastError = null;
+            success = true;
+            break; // Break key loop
+          } catch (error) {
+            lastError = error;
+            console.warn(`Gemini (${modelName}) key failed: ${error.message}. Retrying...`);
+          }
         }
+        if (success) break; // Break model loop
       }
-      if (lastError) throw lastError;
+      if (lastError && !success) throw lastError;
     } else if (aiType === 'groq') {
       const apiKey = getNextGroqKey();
       if (!apiKey) throw new Error("No GROQ_API_KEYS configured in environment");
@@ -519,53 +526,59 @@ bot.on('voice', async (ctx) => {
     
     let userText = "";
     let lastError = null;
+    let success = false;
+    const geminiModels = ["gemini-flash-latest", "gemini-2.5-flash", "gemini-1.5-flash"];
     
-    for (let i = 0; i < (geminiKeys.length || 1); i++) {
-      try {
-        const apiKey = getNextGeminiKey();
-        if (!apiKey) throw new Error("No GEMINI_API_KEYS configured in environment");
-        const genAI = new GoogleGenerativeAI(apiKey);
-        const fileManager = new GoogleAIFileManager(apiKey);
-        const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
-        
-        // Upload audio file using File API
-        const uploadResult = await fileManager.uploadFile(tempAudioPath, {
-          mimeType: "audio/ogg",
-          displayName: `Voice_${userId}`,
-        });
-        
-        const promptText = "Please transcribe this audio exactly as it is spoken. If it is in Khmer, transcribe it in Khmer. Do not translate. Output ONLY the transcribed text.";
-        const result = await model.generateContent([
-          promptText,
-          {
-            fileData: {
-              fileUri: uploadResult.file.uri,
-              mimeType: uploadResult.file.mimeType
-            }
-          }
-        ]);
-        
-        userText = result.response.text().trim();
-        
-        // Clean up Gemini Server File
+    for (const modelName of geminiModels) {
+      for (let i = 0; i < (geminiKeys.length || 1); i++) {
         try {
-          await fileManager.deleteFile(uploadResult.file.name);
-        } catch (cleanupError) {
-          console.warn("Failed to delete Gemini file:", cleanupError);
+          const apiKey = getNextGeminiKey();
+          if (!apiKey) throw new Error("No GEMINI_API_KEYS configured in environment");
+          const genAI = new GoogleGenerativeAI(apiKey);
+          const fileManager = new GoogleAIFileManager(apiKey);
+          const model = genAI.getGenerativeModel({ model: modelName });
+          
+          // Upload audio file using File API
+          const uploadResult = await fileManager.uploadFile(tempAudioPath, {
+            mimeType: "audio/ogg",
+            displayName: `Voice_${userId}`,
+          });
+          
+          const promptText = "Please transcribe this audio exactly as it is spoken. If it is in Khmer, transcribe it in Khmer. Do not translate. Output ONLY the transcribed text.";
+          const result = await model.generateContent([
+            promptText,
+            {
+              fileData: {
+                fileUri: uploadResult.file.uri,
+                mimeType: uploadResult.file.mimeType
+              }
+            }
+          ]);
+          
+          userText = result.response.text().trim();
+          
+          // Clean up Gemini Server File
+          try {
+            await fileManager.deleteFile(uploadResult.file.name);
+          } catch (cleanupError) {
+            console.warn("Failed to delete Gemini file:", cleanupError);
+          }
+          
+          lastError = null;
+          success = true;
+          break; // Success
+        } catch (error) {
+          lastError = error;
+          console.warn(`Gemini STT (${modelName}) key failed: ${error.message}. Retrying...`);
         }
-        
-        lastError = null;
-        break; // Success
-      } catch (error) {
-        lastError = error;
-        console.warn(`Gemini STT key failed: ${error.message}. Retrying...`);
       }
+      if (success) break;
     }
     
     // Clean up local file
     if (fs.existsSync(tempAudioPath)) fs.unlinkSync(tempAudioPath);
     
-    if (lastError) throw lastError;
+    if (lastError && !success) throw lastError;
     
     if (!userText) {
       return ctx.reply("❌ មិនអាចស្តាប់សំឡេងបានច្បាស់ទេ។ សូមនិយាយម្តងទៀត!");
