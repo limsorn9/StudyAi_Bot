@@ -402,13 +402,24 @@ After the grade, provide helpful feedback in Khmer explaining why they got this 
   try {
     let aiResponse = "";
     if (aiType === 'gemini') {
-      const apiKey = getNextGeminiKey();
-      if (!apiKey) throw new Error("No GEMINI_API_KEYS configured in environment");
-      const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
-      const prompt = `${systemPrompt}\n\n[Past Conversation]\n${pastContextText}\n\nStudent: ${userText}\nTeacher:`;
-      const result = await model.generateContent(prompt);
-      aiResponse = result.response.text();
+      let lastError = null;
+      for (let i = 0; i < (geminiKeys.length || 1); i++) {
+        try {
+          const apiKey = getNextGeminiKey();
+          if (!apiKey) throw new Error("No GEMINI_API_KEYS configured in environment");
+          const genAI = new GoogleGenerativeAI(apiKey);
+          const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+          const prompt = `${systemPrompt}\n\n[Past Conversation]\n${pastContextText}\n\nStudent: ${userText}\nTeacher:`;
+          const result = await model.generateContent(prompt);
+          aiResponse = result.response.text();
+          lastError = null;
+          break; // Success
+        } catch (error) {
+          lastError = error;
+          console.warn(`Gemini key failed: ${error.message}. Retrying...`);
+        }
+      }
+      if (lastError) throw lastError;
     } else if (aiType === 'groq') {
       const apiKey = getNextGroqKey();
       if (!apiKey) throw new Error("No GROQ_API_KEYS configured in environment");
@@ -493,8 +504,6 @@ bot.on('voice', async (ctx) => {
       responseType: 'stream'
     });
 
-    const apiKey = getNextGeminiKey();
-    if (!apiKey) return ctx.reply("❌ គ្មាន GEMINI_API_KEYS ដែលត្រឹមត្រូវទេ!");
 
     const fs = require('fs');
     const tempAudioPath = `temp_audio_${userId}.ogg`;
@@ -507,38 +516,56 @@ bot.on('voice', async (ctx) => {
     
     const { GoogleGenerativeAI } = require("@google/generative-ai");
     const { GoogleAIFileManager } = require("@google/generative-ai/server");
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const fileManager = new GoogleAIFileManager(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
     
-    // Upload audio file using File API
-    const uploadResult = await fileManager.uploadFile(tempAudioPath, {
-      mimeType: "audio/ogg",
-      displayName: `Voice_${userId}`,
-    });
+    let userText = "";
+    let lastError = null;
     
-    const promptText = "Please transcribe this audio exactly as it is spoken. If it is in Khmer, transcribe it in Khmer. Do not translate. Output ONLY the transcribed text.";
-    const result = await model.generateContent([
-      promptText,
-      {
-        fileData: {
-          fileUri: uploadResult.file.uri,
-          mimeType: uploadResult.file.mimeType
+    for (let i = 0; i < (geminiKeys.length || 1); i++) {
+      try {
+        const apiKey = getNextGeminiKey();
+        if (!apiKey) throw new Error("No GEMINI_API_KEYS configured in environment");
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const fileManager = new GoogleAIFileManager(apiKey);
+        const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+        
+        // Upload audio file using File API
+        const uploadResult = await fileManager.uploadFile(tempAudioPath, {
+          mimeType: "audio/ogg",
+          displayName: `Voice_${userId}`,
+        });
+        
+        const promptText = "Please transcribe this audio exactly as it is spoken. If it is in Khmer, transcribe it in Khmer. Do not translate. Output ONLY the transcribed text.";
+        const result = await model.generateContent([
+          promptText,
+          {
+            fileData: {
+              fileUri: uploadResult.file.uri,
+              mimeType: uploadResult.file.mimeType
+            }
+          }
+        ]);
+        
+        userText = result.response.text().trim();
+        
+        // Clean up Gemini Server File
+        try {
+          await fileManager.deleteFile(uploadResult.file.name);
+        } catch (cleanupError) {
+          console.warn("Failed to delete Gemini file:", cleanupError);
         }
+        
+        lastError = null;
+        break; // Success
+      } catch (error) {
+        lastError = error;
+        console.warn(`Gemini STT key failed: ${error.message}. Retrying...`);
       }
-    ]);
-    
-    const userText = result.response.text().trim();
-    
-    // Clean up Gemini Server File
-    try {
-      await fileManager.deleteFile(uploadResult.file.name);
-    } catch (cleanupError) {
-      console.warn("Failed to delete Gemini file:", cleanupError);
     }
     
     // Clean up local file
     if (fs.existsSync(tempAudioPath)) fs.unlinkSync(tempAudioPath);
+    
+    if (lastError) throw lastError;
     
     if (!userText) {
       return ctx.reply("❌ មិនអាចស្តាប់សំឡេងបានច្បាស់ទេ។ សូមនិយាយម្តងទៀត!");
