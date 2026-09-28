@@ -426,6 +426,25 @@ bot.command('testapi', async (ctx) => {
   }
 });
 
+bot.command('testgroq', async (ctx) => {
+  try {
+    const apiKey = getNextGroqKey();
+    if (!apiKey) return ctx.reply("No Groq API key found.");
+    
+    ctx.reply("Testing Groq API key: " + apiKey.substring(0, 8) + "...");
+    
+    const axios = require('axios');
+    const response = await axios.get('https://api.groq.com/openai/v1/models', {
+      headers: { Authorization: `Bearer ${apiKey}` }
+    });
+    
+    const models = response.data.data.map(m => `- ${m.id}`).join('\n');
+    ctx.reply(`✅ Groq Available Models:\n${models.substring(0, 3000)}`);
+  } catch (error) {
+    ctx.reply("❌ Error testing Groq API: " + (error.response?.data?.error?.message || error.message));
+  }
+});
+
 async function handleUserMessage(ctx, userId, userText) {
   const isVIP = await checkVIP(userId);
   if (!isVIP) {
