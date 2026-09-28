@@ -134,6 +134,35 @@ const checkVIP = async (userId) => {
   return false;
 };
 
+// TTS Helper Function
+const generateAndSendTTS = async (ctx, text) => {
+  if (!text) return;
+  try {
+    ctx.sendChatAction('record_voice');
+    // Clean text to avoid TTS reading emojis heavily and markdown symbols
+    let cleanText = text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '');
+    cleanText = cleanText.replace(/[*_#]/g, ''); 
+    
+    const { MsEdgeTTS, OUTPUT_FORMAT } = require("msedge-tts");
+    const edgeTts = new MsEdgeTTS();
+    await edgeTts.setMetadata("km-KH-SreymomNeural", OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
+    
+    const { audioStream } = edgeTts.toStream(cleanText.substring(0, 4000));
+    const chunks = [];
+    
+    await new Promise((resolve, reject) => {
+      audioStream.on('data', (chunk) => chunks.push(chunk));
+      audioStream.on('end', resolve);
+      audioStream.on('error', reject);
+    });
+
+    const buffer = Buffer.concat(chunks);
+    await ctx.replyWithVoice({ source: buffer });
+  } catch (error) {
+    console.error("Auto TTS Error:", error);
+  }
+};
+
 // Persistent Reply Keyboard Menu
 const mainMenuKeyboard = Markup.keyboard([
   ['📚 បញ្ជីមេរៀន (Lessons)', '🕰️ ប្រវត្តិសិក្សា'],
@@ -532,9 +561,11 @@ After the grade, provide helpful feedback in Khmer explaining why they got this 
     
     // Send AI Response
     await ctx.reply(aiResponse, Markup.inlineKeyboard([
-      [Markup.button.callback('🔊 អានជាសំឡេង (Listen)', `tts_${userId}`)],
       [Markup.button.callback('💬 បន្តសន្ទនា (Continue Chat)', `continue_chat_${userId}`)]
     ]));
+
+    // Auto-generate Voice
+    await generateAndSendTTS(ctx, aiResponse);
 
     if (state.startsWith('quiz_')) {
       const gradeMatch = aiResponse.match(/GRADE:\s*([ABCF])/i);
