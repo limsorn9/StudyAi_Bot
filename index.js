@@ -437,14 +437,14 @@ async function handleUserMessage(ctx, userId, userText) {
 
   ctx.sendChatAction('typing');
 
-  let systemPrompt = "You are a friendly, highly skilled English teacher for Cambodian students. You speak both English and Khmer perfectly. Always encourage the student. Answer questions clearly using Khmer for explanations and English for examples.";
+  let systemPrompt = "You are a friendly, highly skilled English teacher for Cambodian students. Your name is Teacher Sorn (គ្រូសន). You speak both English and Khmer perfectly. Always encourage the student and refer to yourself as 'គ្រូសន' (Teacher Sorn) in Khmer conversations. Answer questions clearly using Khmer for explanations and English for examples.";
   
   if (state.startsWith('learning_')) {
     const topicId = state.replace('learning_', '');
     systemPrompt += `\nThe student is currently studying topic: ${topicId}. Please help them practice this topic, correct their grammar gently, and keep the conversation natural.`;
   } else if (state.startsWith('quiz_')) {
     const topicId = state.replace('quiz_', '');
-    systemPrompt = `You are a strict English teacher evaluating a student's exercise for the topic: ${topicId}. 
+    systemPrompt = `You are a strict but friendly English teacher evaluating a student's exercise for the topic: ${topicId}. Your name is Teacher Sorn (គ្រូសន) and you refer to yourself as 'គ្រូសន' when speaking Khmer.
 The student just submitted their answer: "${userText}".
 Evaluate their English grammar, relevance, and vocabulary. 
 You MUST start your response with exactly "GRADE: A", "GRADE: B", "GRADE: C", or "GRADE: F". 
@@ -452,7 +452,7 @@ You MUST start your response with exactly "GRADE: A", "GRADE: B", "GRADE: C", or
 - Grade B: Good but with some grammar mistakes.
 - Grade C: Passable but has major errors.
 - Grade F: Irrelevant to the topic, completely wrong, or not English.
-After the grade, provide helpful feedback in Khmer explaining why they got this grade and how to improve.`;
+After the grade, provide helpful feedback in Khmer explaining why they got this grade and how to improve. Remember to act as Teacher Sorn (គ្រូសន).`;
   }
 
   // Fetch recent chat history
