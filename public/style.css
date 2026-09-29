@@ -1253,6 +1253,25 @@ body.day-mode .theme-toggle-btn:hover {
   box-shadow: 0 0 10px rgba(99, 102, 241, 0.5);
 }
 
+.pro-speak-btn.playing {
+  background: #4f46e5 !important;
+  color: #fff !important;
+  transform: scale(1.18);
+  box-shadow: 0 0 14px rgba(99, 102, 241, 0.75) !important;
+  animation: speakPulse 0.8s ease-in-out infinite alternate;
+}
+
+.pro-speak-btn.playing.piseth {
+  background: #ec4899 !important;
+  border-color: #f472b6 !important;
+  box-shadow: 0 0 14px rgba(236, 72, 153, 0.75) !important;
+}
+
+@keyframes speakPulse {
+  0% { transform: scale(1.08); }
+  100% { transform: scale(1.22); }
+}
+
 .pro-kh-row {
   display: flex;
   align-items: center;

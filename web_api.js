@@ -2697,7 +2697,8 @@ Provide practical English pronunciation coaching:
 
       // Check for Khmer unicode characters (\u1780-\u17FF)
       const hasKhmer = /[\u1780-\u17FF]/.test(cleanText);
-      const isPureEnglish = (lang === 'en' && !hasKhmer) || (!hasKhmer && /[a-zA-Z]{3,}/.test(cleanText));
+      const hasEnglish = /[a-zA-Z]/.test(cleanText);
+      const isPureEnglish = !hasKhmer && (lang === 'en' || hasEnglish);
       
       // Female voice for Teacher Piseth (អ្នកគ្រូពិសិដ្ឋ) vs Male voice for Teacher Sorn (គ្រូសន)
       const isPisethTutor = tutor === 'piseth';

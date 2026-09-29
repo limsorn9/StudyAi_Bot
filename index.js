@@ -1402,6 +1402,17 @@ bot.action(/beginner_lesson_(.+)_(.+)/, async (ctx) => {
     `📖 *${lesson.title}*\n\n` +
     lesson.content;
 
+  // Store the lesson text for TTS & set current tutor to Teacher Piseth (Female Voice)
+  await db.ref(`users/${userId}/latestResponse`).set(lesson.content);
+  await db.ref(`users/${userId}/currentTutor`).set('piseth');
+
+  const isVIP = await checkVIP(userId);
+  const keyboard = [
+    [Markup.button.callback(isVIP ? '🔊 ស្តាប់អ្នកគ្រូអាន (TTS)' : '🔒 🔊 ស្តាប់អ្នកគ្រូអាន (VIP)', `tts_${userId}`)],
+    [Markup.button.callback('🔙 សប្តាហ៍នេះ', `beginner_week_${weekId}`)],
+    [Markup.button.callback('👩‍🏫 បញ្ជីថ្នាក់ដំបូង', 'beginner_menu')]
+  ];
+
   const maxLen = 3900;
   if (text.length > maxLen) {
     const part1 = text.substring(0, maxLen);
@@ -1409,18 +1420,12 @@ bot.action(/beginner_lesson_(.+)_(.+)/, async (ctx) => {
     await ctx.reply(part1, { parse_mode: 'Markdown' });
     await ctx.reply(part2, {
       parse_mode: 'Markdown',
-      ...Markup.inlineKeyboard([
-        [Markup.button.callback('🔙 សប្តាហ៍នេះ', `beginner_week_${weekId}`)],
-        [Markup.button.callback('👩‍🏫 បញ្ជីថ្នាក់ដំបូង', 'beginner_menu')]
-      ])
+      ...Markup.inlineKeyboard(keyboard)
     });
   } else {
     await ctx.reply(text, {
       parse_mode: 'Markdown',
-      ...Markup.inlineKeyboard([
-        [Markup.button.callback('🔙 សប្តាហ៍នេះ', `beginner_week_${weekId}`)],
-        [Markup.button.callback('👩‍🏫 បញ្ជីថ្នាក់ដំបូង', 'beginner_menu')]
-      ])
+      ...Markup.inlineKeyboard(keyboard)
     });
   }
 });
@@ -1460,8 +1465,9 @@ async function displayLessonContent(ctx, monthId, weekId, lessonId, userId) {
 
   await setUserState(userId, `learning_${monthId}_${weekId}_${lessonId}`);
 
-  // Store the lesson text for TTS
+  // Store the lesson text for TTS & set current tutor to Teacher Sorn (Male Voice)
   await db.ref(`users/${userId}/latestResponse`).set(lessonData.content);
+  await db.ref(`users/${userId}/currentTutor`).set('sorn');
 
   // Record History
   await db.ref(`users/${userId}/history/${monthId}_${weekId}_${lessonId}`).set({
@@ -3438,9 +3444,12 @@ bot.action(/tts_(.+)/, async (ctx) => {
     text = text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '');
 
     const { MsEdgeTTS, OUTPUT_FORMAT } = require("msedge-tts");
-    const edgeTts = new MsEdgeTTS();
+    const tutorSnap = await db.ref(`users/${userId}/currentTutor`).once('value');
+    const isPiseth = tutorSnap.val() === 'piseth' || text.includes('អ្នកគ្រូពិសិដ្ឋ') || text.includes('Teacher Piseth') || text.includes('ថ្នាក់ដំបូង');
     const hasKhmer = /[\u1780-\u17FF]/.test(text);
-    const selectedVoice = hasKhmer ? "km-KH-PisethNeural" : "en-US-GuyNeural";
+    const selectedVoice = isPiseth 
+      ? (hasKhmer ? "km-KH-SreymomNeural" : "en-US-JennyNeural")
+      : (hasKhmer ? "km-KH-PisethNeural" : "en-US-GuyNeural");
     await edgeTts.setMetadata(selectedVoice, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
     
     // Generate Audio Stream

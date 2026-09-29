@@ -544,16 +544,120 @@ function renderCurriculumWeeks() {
   `).join('');
 }
 
-function speakEnglish(text) {
+// Global Audio Cache for Word & Expression clicks
+const wordAudioCache = new Map();
+let currentWordAudio = null;
+let currentActiveWordBtn = null;
+
+async function speakEnglish(text, btnElement, customTutor) {
   if (!text) return;
   const clean = text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')
                     .replace(/[()"]/g, '').trim();
+  if (!clean) return;
+
+  // Determine tutor: beginner class / beginner course uses Teacher Piseth (Female Voice)
+  const isBeginner = STATE.currentLesson?.monthId === 'beginner' || STATE.courseLevel === 'beginner' || STATE.activeTutor === 'piseth';
+  const tutor = customTutor || (isBeginner ? 'piseth' : (STATE.activeTutor || 'sorn'));
+  const hasKhmer = /[\u1780-\u17FF]/.test(clean);
+  const lang = hasKhmer ? 'km' : 'en';
+
+  const cacheKey = `${tutor}_${lang}_${clean}`;
+
+  // Reset previously playing button style
+  if (currentActiveWordBtn && currentActiveWordBtn !== btnElement) {
+    currentActiveWordBtn.classList.remove('playing', 'piseth');
+  }
+
+  // Stop any currently playing word audio
+  if (currentWordAudio) {
+    try {
+      currentWordAudio.pause();
+      currentWordAudio.currentTime = 0;
+    } catch (e) {}
+    currentWordAudio = null;
+  }
+
+  const setBtnPlaying = () => {
+    if (btnElement) {
+      currentActiveWordBtn = btnElement;
+      btnElement.classList.add('playing');
+      if (tutor === 'piseth') btnElement.classList.add('piseth');
+    }
+  };
+
+  const clearBtnPlaying = () => {
+    if (btnElement) {
+      btnElement.classList.remove('playing', 'piseth');
+      if (currentActiveWordBtn === btnElement) currentActiveWordBtn = null;
+    }
+  };
+
+  // 1. Play from local cache if already fetched
+  if (wordAudioCache.has(cacheKey)) {
+    const audioUrl = wordAudioCache.get(cacheKey);
+    currentWordAudio = new Audio(audioUrl);
+    setBtnPlaying();
+    currentWordAudio.onended = clearBtnPlaying;
+    currentWordAudio.onerror = clearBtnPlaying;
+    currentWordAudio.play().catch(e => {
+      clearBtnPlaying();
+      console.warn('Word audio cached playback error:', e);
+    });
+    return;
+  }
+
+  // 2. Fetch high quality neural voice from Edge TTS API
+  try {
+    setBtnPlaying();
+    const res = await fetch('/api/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text: clean,
+        lang: lang,
+        tutor: tutor
+      })
+    });
+
+    if (res.ok) {
+      const blob = await res.blob();
+      const audioUrl = URL.createObjectURL(blob);
+      wordAudioCache.set(cacheKey, audioUrl);
+      currentWordAudio = new Audio(audioUrl);
+      currentWordAudio.onended = clearBtnPlaying;
+      currentWordAudio.onerror = clearBtnPlaying;
+      currentWordAudio.play().catch(e => {
+        clearBtnPlaying();
+        console.warn('Word audio playback error:', e);
+      });
+      return;
+    }
+  } catch (err) {
+    console.warn('Server TTS failed for word, fallback to speech synthesis:', err);
+  }
+
+  // 3. Fallback to Browser SpeechSynthesis with Female voice preference
   if ('speechSynthesis' in window) {
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(clean);
-    u.lang = 'en-US';
+    u.lang = hasKhmer ? 'km-KH' : 'en-US';
     u.rate = 0.88;
+
+    if (tutor === 'piseth') {
+      const voices = window.speechSynthesis.getVoices();
+      const femaleVoice = voices.find(v => 
+        (v.lang.startsWith('en') || (hasKhmer && v.lang.startsWith('km'))) &&
+        (v.name.includes('Female') || v.name.includes('Jenny') || v.name.includes('Zira') || 
+         v.name.includes('Samantha') || v.name.includes('Victoria') || v.name.includes('Karen') || 
+         v.name.includes('Natural') || v.name.includes('Google US English'))
+      );
+      if (femaleVoice) u.voice = femaleVoice;
+    }
+    u.onend = clearBtnPlaying;
+    u.onerror = clearBtnPlaying;
     window.speechSynthesis.speak(u);
+  } else {
+    clearBtnPlaying();
   }
 }
 
@@ -635,7 +739,7 @@ function renderProfessionalLessonHTML(rawText) {
                       <span class="pro-flag">🇬🇧</span>
                       <span class="pro-en-text">${en}</span>
                     </div>
-                    <button class="pro-speak-btn" onclick="speakEnglish('${escapeAttr(en)}')" title="ស្តាប់ការបញ្ចេញសំឡេង">🔊</button>
+                    <button class="pro-speak-btn" onclick="speakEnglish('${escapeAttr(en)}', this)" title="ស្តាប់ការបញ្ចេញសំឡេង">🔊</button>
                   </div>
                   <div class="pro-kh-row">
                     <span class="pro-flag">🇰🇭</span>
@@ -685,7 +789,7 @@ function renderProfessionalLessonHTML(rawText) {
                     <span class="pro-flag">🇬🇧</span>
                     <span class="pro-en-text">${currentEn}</span>
                   </div>
-                  <button class="pro-speak-btn" onclick="speakEnglish('${escapeAttr(currentEn)}')" title="ស្តាប់ការបញ្ចេញសំឡេង">🔊</button>
+                  <button class="pro-speak-btn" onclick="speakEnglish('${escapeAttr(currentEn)}', this)" title="ស្តាប់ការបញ្ចេញសំឡេង">🔊</button>
                 </div>
                 <div class="pro-kh-row">
                   <span class="pro-flag">🇰🇭</span>
@@ -737,7 +841,7 @@ function renderProfessionalLessonHTML(rawText) {
                 <div class="pro-dialogue-bubble">
                   <div class="pro-en-row">
                     <span class="pro-en-text">"${turnEn}"</span>
-                    <button class="pro-speak-btn" onclick="speakEnglish('${escapeAttr(turnEn)}')" title="ស្តាប់សំឡេង">🔊</button>
+                    <button class="pro-speak-btn" onclick="speakEnglish('${escapeAttr(turnEn)}', this)" title="ស្តាប់សំឡេង">🔊</button>
                   </div>
                   <div class="pro-kh-row">
                     <span class="pro-kh-text">${turnKh}</span>
@@ -1239,7 +1343,7 @@ async function toggleLessonAudio() {
       body: JSON.stringify({ 
         text: STATE.currentLesson.content, 
         lang: 'en',
-        tutor: STATE.activeTutor || 'sorn'
+        tutor: (STATE.currentLesson?.monthId === 'beginner' || STATE.activeTutor === 'piseth') ? 'piseth' : 'sorn'
       })
     });
 
@@ -1462,7 +1566,7 @@ async function playTTS(text, btnElement) {
       body: JSON.stringify({
         text: cleanSpeechText,
         lang: lang,
-        tutor: STATE.activeTutor || 'sorn'
+        tutor: (STATE.currentLesson?.monthId === 'beginner' || STATE.courseLevel === 'beginner' || STATE.activeTutor === 'piseth') ? 'piseth' : (STATE.activeTutor || 'sorn')
       })
     });
 
@@ -2696,20 +2800,10 @@ function filterVerbs() {
   renderVerbsTable(group, q);
 }
 
-async function playSingleWordAudio(word) {
-  try {
-    const res = await fetch('/api/tts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: word, lang: 'en' })
-    });
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const audio = new Audio(url);
-    audio.play();
-  } catch (e) {
-    console.error(e);
-  }
+async function playSingleWordAudio(word, btnElement) {
+  const isBeginner = STATE.currentLesson?.monthId === 'beginner' || STATE.courseLevel === 'beginner' || STATE.activeTutor === 'piseth';
+  const tutor = isBeginner ? 'piseth' : 'sorn';
+  speakEnglish(word, btnElement, tutor);
 }
 
 // ==========================================
