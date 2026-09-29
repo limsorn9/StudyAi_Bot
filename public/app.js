@@ -669,6 +669,305 @@ function fillPracticeChat(text) {
   }
 }
 
+// ==========================================
+// VISUAL WORD LOGO MAPPING SYSTEM
+// Maps vocabulary words to representative logos/emblems
+// ==========================================
+const WORD_LOGO_MAP = {
+  // Animals
+  'cat': '🐱', 'cats': '🐱', 'kitten': '🐱',
+  'dog': '🐶', 'dogs': '🐶', 'puppy': '🐶',
+  'bird': '🐦', 'birds': '🐦',
+  'fish': '🐟', 'fishes': '🐟',
+  'duck': '🦆', 'ducks': '🦆',
+  'elephant': '🐘', 'elephants': '🐘',
+  'lion': '🦁', 'lions': '🦁',
+  'tiger': '🐯', 'tigers': '🐯',
+  'monkey': '🐵', 'monkeys': '🐵',
+  'bear': '🐻', 'bears': '🐻',
+  'rabbit': '🐰', 'rabbits': '🐰', 'bunny': '🐰',
+  'cow': '🐮', 'cows': '🐮',
+  'pig': '🐷', 'pigs': '🐷',
+  'horse': '🐴', 'horses': '🐴',
+  'sheep': '🐑', 'goat': '🐐',
+  'chicken': '🐔', 'rooster': '🐓',
+  'frog': '🐸', 'frogs': '🐸',
+  'snake': '🐍', 'snakes': '🐍',
+  'bee': '🐝', 'bees': '🐝',
+  'ant': '🐜', 'ants': '🐜',
+  'butterfly': '🦋', 'butterflies': '🦋',
+  'turtle': '🐢', 'turtles': '🐢',
+  'zebra': '🦓', 'zebras': '🦓',
+  'zoo': '🦁',
+  'mouse': '🐭', 'rat': '🐀',
+  'spider': '🕷️', 'whale': '🐋', 'shark': '🦈',
+
+  // Foods, Fruits & Drinks
+  'apple': '🍎', 'apples': '🍎',
+  'banana': '🍌', 'bananas': '🍌',
+  'orange': '🍊', 'oranges': '🍊',
+  'grape': '🍇', 'grapes': '🍇',
+  'strawberry': '🍓', 'strawberries': '🍓',
+  'watermelon': '🍉',
+  'lemon': '🍋', 'lemons': '🍋', 'lime': '🍋',
+  'mango': '🥭', 'pineapple': '🍍',
+  'cherry': '🍒', 'peach': '🍑', 'pear': '🍐',
+  'coconut': '🥥', 'avocado': '🥑',
+  'tomato': '🍅', 'potato': '🥔', 'carrot': '🥕', 'carrots': '🥕',
+  'corn': '🌽', 'mushroom': '🍄',
+  'egg': '🥚', 'eggs': '🥚',
+  'bread': '🍞', 'toast': '🍞',
+  'rice': '🍚', 'noodle': '🍜', 'noodles': '🍜',
+  'pizza': '🍕', 'burger': '🍔', 'hamburger': '🍔',
+  'sandwich': '🥪', 'cheese': '🧀',
+  'meat': '🥩', 'beef': '🥩', 'pork': '🥩',
+  'soup': '🍲', 'salad': '🥗',
+  'cake': '🎂', 'cookie': '🍪', 'cookies': '🍪',
+  'ice cream': '🍦', 'chocolate': '🍫', 'candy': '🍬',
+  'coffee': '☕', 'tea': '🍵',
+  'milk': '🥛', 'water': '💧',
+  'juice': '🧃', 'wine': '🍷', 'beer': '🍺',
+  'breakfast': '🍳', 'lunch': '🍱', 'dinner': '🍽️',
+  'food': '🍲', 'drink': '🥤',
+
+  // Objects, School & Home
+  'book': '📖', 'books': '📖', 'notebook': '📓',
+  'pen': '🖊️', 'pens': '🖊️',
+  'pencil': '✏️', 'pencils': '✏️',
+  'bag': '🎒', 'backpack': '🎒',
+  'eraser': '🧼', 'ruler': '📏', 'scissors': '✂️',
+  'paper': '📄', 'letter': '✉️',
+  'desk': '🪑', 'table': '🪵', 'chair': '🪑',
+  'door': '🚪', 'window': '🪟',
+  'bed': '🛏️', 'box': '📦',
+  'cup': '☕', 'glass': '🥛', 'bottle': '🍾',
+  'plate': '🍽️', 'bowl': '🥣', 'fork': '🍴', 'spoon': '🥄', 'knife': '🔪',
+  'umbrella': '☂️', 'clock': '⏰', 'watch': '⌚',
+  'key': '🔑', 'keys': '🔑', 'lock': '🔒',
+  'light': '💡', 'lamp': '🛋️',
+  'phone': '📱', 'telephone': '☎️',
+  'computer': '💻', 'laptop': '💻',
+  'camera': '📷', 'radio': '📻', 'tv': '📺', 'television': '📺',
+  'mirror': '🪞', 'soap': '🧼', 'towel': '🧺',
+
+  // Clothes & Accessories
+  'hat': '👒', 'hats': '👒', 'cap': '🧢',
+  'shirt': '👕', 'shirts': '👕', 't-shirt': '👕',
+  'pants': '👖', 'trousers': '👖', 'jeans': '👖',
+  'dress': '👗', 'skirt': '👗',
+  'coat': '🧥', 'jacket': '🧥', 'sweater': '🧥',
+  'suit': '👔', 'tie': '👔',
+  'shoes': '👟', 'shoe': '👟', 'sneakers': '👟', 'boots': '👢',
+  'socks': '🧦', 'gloves': '🧤', 'scarf': '🧣',
+  'glasses': '👓', 'sunglasses': '🕶️',
+  'ring': '💍', 'necklace': '📿',
+
+  // Nature, Weather & Places
+  'sun': '☀️', 'moon': '🌙', 'star': '⭐', 'stars': '⭐',
+  'sky': '🌤️', 'cloud': '☁️', 'clouds': '☁️',
+  'rain': '🌧️', 'snow': '❄️', 'wind': '💨',
+  'storm': '⛈️', 'rainbow': '🌈',
+  'tree': '🌳', 'trees': '🌳', 'plant': '🌱',
+  'flower': '🌸', 'flowers': '🌸', 'rose': '🌹',
+  'grass': '🌿', 'leaf': '🍃', 'leaves': '🍃',
+  'forest': '🌲', 'mountain': '⛰️', 'hill': '🏔️',
+  'river': '🌊', 'lake': '🏞️', 'sea': '🌊', 'ocean': '🌊', 'beach': '🏖️',
+  'fire': '🔥', 'earth': '🌍', 'world': '🌐',
+  'house': '🏠', 'home': '🏡',
+  'school': '🏫', 'classroom': '🏫', 'university': '🏛️',
+  'hospital': '🏥', 'airport': '✈️', 'station': '🚉',
+  'hotel': '🏨', 'restaurant': '🍽️', 'cafe': '☕',
+  'bank': '🏦', 'park': '🏞️', 'shop': '🏪', 'market': '🛒',
+  'city': '🏙️', 'town': '🏘️', 'village': '🏡',
+  'road': '🛣️', 'street': '🚦', 'bridge': '🌉',
+
+  // People & Family
+  'teacher': '👩‍🏫', 'teachers': '👩‍🏫',
+  'student': '🧑‍🎓', 'students': '🧑‍🎓',
+  'doctor': '👨‍⚕️', 'nurse': '👩‍⚕️',
+  'police': '👮', 'chef': '👨‍🍳', 'cook': '👨‍🍳',
+  'driver': '🚗', 'pilot': '👨‍✈️', 'farmer': '👨‍🌾',
+  'singer': '🎤', 'dancer': '💃',
+  'king': '👑', 'queen': '👸', 'prince': '🤴', 'princess': '👸',
+  'baby': '👶', 'child': '🧒', 'children': '🧒', 'kid': '🧒',
+  'boy': '👦', 'boys': '👦',
+  'girl': '👧', 'girls': '👧',
+  'man': '👨', 'men': '👨',
+  'woman': '👩', 'women': '👩',
+  'father': '👨', 'dad': '👨',
+  'mother': '👩', 'mom': '👩',
+  'parent': '👨‍👩‍👧', 'parents': '👨‍👩‍👧',
+  'brother': '👦', 'sister': '👧',
+  'son': '👦', 'daughter': '👧',
+  'grandfather': '👴', 'grandpa': '👴',
+  'grandmother': '👵', 'grandma': '👵',
+  'family': '👨‍👩‍👧‍👦', 'friend': '🤝', 'friends': '🧑‍🤝‍🧑',
+
+  // Colors
+  'red': '🔴', 'blue': '🔵', 'yellow': '🟡', 'green': '🟢',
+  'orange color': '🟠', 'pink': '🌸', 'purple': '🟣',
+  'black': '⚫', 'white': '⚪', 'brown': '🟤', 'gray': '🔘', 'grey': '🔘',
+  'gold': '🪙', 'silver': '🥈', 'color': '🎨', 'colors': '🎨',
+
+  // Shapes & Geometry
+  'circle': '⭕', 'square': '⬛', 'triangle': '🔺',
+  'rectangle': '▭', 'heart': '❤️', 'diamond': '💎',
+
+  // Numbers
+  'one': '1️⃣', 'two': '2️⃣', 'three': '3️⃣', 'four': '4️⃣', 'five': '5️⃣',
+  'six': '6️⃣', 'seven': '7️⃣', 'eight': '8️⃣', 'nine': '9️⃣', 'ten': '🔟',
+  'eleven': '1️⃣1️⃣', 'twelve': '1️⃣2️⃣', 'twenty': '2️⃣0️⃣',
+  'thirty': '3️⃣0️⃣', 'forty': '4️⃣0️⃣', 'fifty': '5️⃣0️⃣',
+  'hundred': '💯', 'one hundred': '💯', 'number': '🔢', 'numbers': '🔢',
+
+  // Verbs & Actions
+  'eat': '🍴', 'drink': '🥤',
+  'run': '🏃', 'walk': '🚶',
+  'sleep': '😴', 'wake': '⏰',
+  'read': '📖', 'write': '✍️',
+  'speak': '🗣️', 'talk': '🗣️', 'say': '💬',
+  'listen': '🎧', 'hear': '👂',
+  'see': '👁️', 'look': '👀', 'watch': '📺',
+  'sing': '🎤', 'dance': '💃',
+  'jump': '🦘', 'fly': '✈️', 'swim': '🏊',
+  'drive': '🚗', 'ride': '🚲',
+  'play': '🎮', 'study': '📚', 'learn': '🧠', 'teach': '👩‍🏫',
+  'work': '💼', 'buy': '🛍️', 'sell': '🏷️',
+  'help': '🤝', 'smile': '😊', 'laugh': '😄', 'cry': '😢',
+  'clean': '✨', 'wash': '🧼', 'open': '🔓', 'close': '🔒',
+  'love': '❤️', 'like': '👍', 'go': '🚶', 'come': '🏃',
+
+  // Feelings & States
+  'happy': '😊', 'glad': '😊',
+  'sad': '😢', 'angry': '😠', 'mad': '😠',
+  'tired': '🥱', 'sleepy': '😴',
+  'hungry': '😋', 'thirsty': '🥤',
+  'hot': '♨️', 'cold': '❄️', 'warm': '☀️', 'cool': '🍃',
+  'big': '🐘', 'large': '🐘', 'small': '🐜', 'little': '🐜',
+  'tall': '🦒', 'short': '🌱',
+  'fast': '⚡', 'quick': '⚡', 'slow': '🐢',
+  'good': '👍', 'great': '🌟', 'nice': '✨', 'bad': '👎',
+  'beautiful': '🌸', 'pretty': '🌸',
+
+  // Greetings & Courtesies
+  'hello': '👋', 'hi': '👋',
+  'good morning': '🌅', 'good afternoon': '☀️', 'good evening': '🌇', 'good night': '🌙',
+  'goodbye': '👋', 'bye': '👋',
+  'thank you': '🙏', 'thanks': '🙏',
+  'please': '🙏', 'welcome': '😊', 'sorry': '🙇',
+  'yes': '✅', 'no': '❌', 'question': '❓', 'answer': '💡'
+};
+
+function getWordVisualLogo(enText, khText) {
+  if (!enText && !khText) return '🔤';
+
+  // 1. Direct match on clean English word
+  const cleanEn = (enText || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .trim();
+  
+  if (WORD_LOGO_MAP[cleanEn]) {
+    return WORD_LOGO_MAP[cleanEn];
+  }
+
+  // 2. Check individual words in English string
+  const words = cleanEn.split(/\s+/).filter(Boolean);
+  for (const w of words) {
+    if (WORD_LOGO_MAP[w]) {
+      return WORD_LOGO_MAP[w];
+    }
+  }
+
+  // 3. Substring check on English
+  for (const [key, logo] of Object.entries(WORD_LOGO_MAP)) {
+    if (key.length >= 3 && cleanEn.includes(key)) {
+      return logo;
+    }
+  }
+
+  // 4. Khmer keyword matching fallback
+  const kh = khText || '';
+  if (kh.includes('ប៉ោម')) return '🍎';
+  if (kh.includes('សៀវភៅ')) return '📖';
+  if (kh.includes('ឆ្មា')) return '🐱';
+  if (kh.includes('ឆ្កែ')) return '🐶';
+  if (kh.includes('ពងមាន់') || kh.includes('ស៊ុត')) return '🥚';
+  if (kh.includes('ត្រី')) return '🐟';
+  if (kh.includes('ក្មេងស្រី')) return '👧';
+  if (kh.includes('ក្មេងប្រុស')) return '👦';
+  if (kh.includes('មួក')) return '👒';
+  if (kh.includes('ផ្ទះ')) return '🏠';
+  if (kh.includes('ទឹកដោះគោ')) return '🥛';
+  if (kh.includes('ទឹកផ្លែឈើ')) return '🧃';
+  if (kh.includes('ទឹក')) return '💧';
+  if (kh.includes('ស្តេច')) return '👑';
+  if (kh.includes('តោ')) return '🦁';
+  if (kh.includes('ច្រមុះ')) return '👃';
+  if (kh.includes('ក្រូច')) return '🍊';
+  if (kh.includes('ប៊ិច')) return '🖊️';
+  if (kh.includes('ខ្មៅដៃ')) return '✏️';
+  if (kh.includes('ក្សត្រិយានី')) return '👸';
+  if (kh.includes('ទន្សាយ')) return '🐰';
+  if (kh.includes('ព្រះអាទិត្យ')) return '☀️';
+  if (kh.includes('ខ្លា')) return '🐯';
+  if (kh.includes('ដើមឈើ')) return '🌳';
+  if (kh.includes('ឆ័ត្រ')) return '☂️';
+  if (kh.includes('ប្រអប់')) return '📦';
+  if (kh.includes('សេះបង្កង់')) return '🦓';
+  if (kh.includes('សួនសត្វ')) return '🦁';
+  if (kh.includes('គ្រែ')) return '🛏️';
+  if (kh.includes('ជ្រូក')) return '🐷';
+  if (kh.includes('ក្តៅ')) return '♨️';
+  if (kh.includes('ពែង')) return '☕';
+  if (kh.includes('ធំ')) return '🐘';
+  if (kh.includes('តូច')) return '🐜';
+  if (kh.includes('សួស្តី') || kh.includes('ជម្រាបសួរ')) return '👋';
+  if (kh.includes('អរគុណ')) return '🙏';
+  if (kh.includes('លាហើយ')) return '👋';
+  if (kh.includes('ក្រហម')) return '🔴';
+  if (kh.includes('ខៀវ')) return '🔵';
+  if (kh.includes('លឿង')) return '🟡';
+  if (kh.includes('បៃតង')) return '🟢';
+  if (kh.includes('ស')) return '⚪';
+  if (kh.includes('ខ្មៅ')) return '⚫';
+  if (kh.includes('ផ្កាឈូក')) return '🌸';
+  if (kh.includes('ស្វាយ')) return '🟣';
+  if (kh.includes('រង្វង់')) return '⭕';
+  if (kh.includes('ការ៉េ')) return '⬛';
+  if (kh.includes('ត្រីកោណ')) return '🔺';
+  if (kh.includes('ផ្កាយ')) return '⭐';
+  if (kh.includes('មេឃ')) return '🌤️';
+  if (kh.includes('ស្មៅ')) return '🌿';
+  if (kh.includes('ផ្កា')) return '🌸';
+  if (kh.includes('ស្លឹក')) return '🍃';
+  if (kh.includes('សាលា') || kh.includes('ថ្នាក់')) return '🏫';
+  if (kh.includes('គ្រូ') || kh.includes('អ្នកគ្រូ')) return '👩‍🏫';
+  if (kh.includes('សិស្ស')) return '🧑‍🎓';
+  if (kh.includes('ឡាន')) return '🚗';
+  if (kh.includes('កង់')) return '🚲';
+  if (kh.includes('យន្តហោះ')) return '✈️';
+  if (kh.includes('រត់')) return '🏃';
+  if (kh.includes('ដើរ')) return '🚶';
+  if (kh.includes('ញ៉ាំ') || kh.includes('ហូប')) return '🍴';
+  if (kh.includes('ផឹក')) return '🥤';
+  if (kh.includes('ដេក')) return '😴';
+  if (kh.includes('អាន')) return '📖';
+  if (kh.includes('សរសេរ')) return '✍️';
+  if (kh.includes('និយាយ')) return '🗣️';
+  if (kh.includes('ស្តាប់')) return '🎧';
+  if (kh.includes('មើល')) return '👁️';
+  if (kh.includes('លេង')) return '🎮';
+
+  // 5. Fallback letter emblem if word starts with alphabet
+  const firstLetter = cleanEn.charAt(0).toUpperCase();
+  if (firstLetter && /[A-Z]/.test(firstLetter)) {
+    return `<span class="letter-monogram">${firstLetter}</span>`;
+  }
+
+  return '🔤';
+}
+
 function renderProfessionalLessonHTML(rawText) {
   if (!rawText) return '';
 
@@ -732,11 +1031,12 @@ function renderProfessionalLessonHTML(rawText) {
               const parts = cleaned.split(' = ');
               const en = (parts[0] || '').replace(/^[🇬🇧\s]+/, '').trim();
               const kh = (parts[1] || '').replace(/^[🇰🇭\s]+/, '').trim();
+              const logo = getWordVisualLogo(en, kh);
               return `
                 <div class="pro-bilingual-card">
                   <div class="pro-en-row">
                     <div class="pro-en-left">
-                      <span class="pro-flag">🇬🇧</span>
+                      <span class="pro-word-logo-badge" title="${escapeAttr(en)}">${logo}</span>
                       <span class="pro-en-text">${en}</span>
                     </div>
                     <button class="pro-speak-btn" onclick="speakEnglish('${escapeAttr(en)}', this)" title="ស្តាប់ការបញ្ចេញសំឡេង">🔊</button>
@@ -781,12 +1081,13 @@ function renderProfessionalLessonHTML(rawText) {
           currentKh = line.replace(/^[•\d.\s]*🇰🇭\s*/, '').replace(/^[↳\s]*បកប្រែ៖\s*/, '').replace(/^\(|\)$/g, '').trim();
 
           if (currentEn && currentKh) {
+            const logo = getWordVisualLogo(currentItemTitle || currentEn, currentKh);
             html += `
               <div class="pro-bilingual-card">
                 ${currentItemTitle ? `<div style="font-size: 13px; font-weight: 700; color: #a78bfa; margin-bottom: 4px;">${currentItemTitle}</div>` : ''}
                 <div class="pro-en-row">
                   <div class="pro-en-left">
-                    <span class="pro-flag">🇬🇧</span>
+                    <span class="pro-word-logo-badge" title="${escapeAttr(currentEn)}">${logo}</span>
                     <span class="pro-en-text">${currentEn}</span>
                   </div>
                   <button class="pro-speak-btn" onclick="speakEnglish('${escapeAttr(currentEn)}', this)" title="ស្តាប់ការបញ្ចេញសំឡេង">🔊</button>
@@ -2772,17 +3073,25 @@ function renderVerbsTable(filterKey = 'all', query = '') {
     return;
   }
 
-  tbody.innerHTML = flatList.map(v => `
+  tbody.innerHTML = flatList.map(v => {
+    const logo = getWordVisualLogo(v.v1, v.kh);
+    return `
     <tr>
-      <td><strong style="color: #38bdf8;">${v.v1}</strong></td>
+      <td>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="pro-word-logo-badge" style="width:28px;height:28px;min-width:28px;font-size:16px;">${logo}</span>
+          <strong style="color: #38bdf8;">${v.v1}</strong>
+        </div>
+      </td>
       <td>${v.v2}</td>
       <td>${v.v3}</td>
       <td><span style="color: #cbd5e1;">${v.kh}</span></td>
       <td>
-        <button class="btn btn-xs btn-outline" onclick="playSingleWordAudio('${v.v1}')">🔊</button>
+        <button class="btn btn-xs btn-outline" onclick="playSingleWordAudio('${v.v1}', this)">🔊</button>
       </td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
 }
 
 function filterVerbGroup(groupKey) {
