@@ -215,11 +215,12 @@ Student Question: ${userText}`;
           verified: false
         });
       }
+      const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'StudyAiEngKH_bot';
       return res.json({
         success: true,
         token,
-        botUsername: 'TeacherSornAiBot',
-        botUrl: `https://t.me/TeacherSornAiBot?start=auth_${token}`
+        botUsername,
+        botUrl: `https://t.me/${botUsername}?start=auth_${token}`
       });
     } catch (err) {
       console.error('Create telegram token error:', err);

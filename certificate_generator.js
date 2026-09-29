@@ -33,8 +33,9 @@ function generateCertificateCard(data) {
   const certType = isAnnualExam ? 'វិញ្ញាបនបត្របញ្ចប់មុខវិជ្ជាប្រចាំឆ្នាំ' : 'វិញ្ញាបនបត្របញ្ចប់មេរៀនជោគជ័យ';
 
   const baseUrl = process.env.RENDER_EXTERNAL_URL || process.env.BASE_URL || '';
+  const botUser = process.env.TELEGRAM_BOT_USERNAME || 'StudyAiEngKH_bot';
   const verifyWebUrl = baseUrl ? `${baseUrl}/cert/${certId}` : null;
-  const verifyTgUrl = `https://t.me/TeacherSornAiBot?start=verify_${certId}`;
+  const verifyTgUrl = `https://t.me/${botUser}?start=verify_${certId}`;
 
   return (
     `╔════════════════════════════════════════════╗\n` +
@@ -54,7 +55,7 @@ function generateCertificateCard(data) {
     `📅 កាលបរិច្ឆេទចេញ៖ *${dateStr}*\n` +
     `📜 លេខកូដសម្គាល់៖ \`CERT-${certId}\`\n` +
     `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
-    `👨‍🏫 *គ្រូបន្ទុកថ្នាក់ (Instructor):* TeacherSornAiBot\n` +
+    `👨‍🏫 *គ្រូបន្ទុកថ្នាក់ (Instructor):* @${botUser}\n` +
     `👨‍💼 *នាយកសាលារៀន (School Director):* លីម សន (Lim Sorn)\n` +
     (verifyWebUrl ? `🌐 *មើលតាម Web:* ${verifyWebUrl}\n` : '') +
     `📱 *ផ្ទៀងផ្ទាត់ QR Code:* \`${verifyTgUrl}\``
@@ -73,8 +74,9 @@ async function generateCertificateHTML(data) {
     : 'CERTIFICATE OF ACHIEVEMENT & COMPLETION';
 
   const baseUrl = process.env.RENDER_EXTERNAL_URL || process.env.BASE_URL || '';
+  const botUser = process.env.TELEGRAM_BOT_USERNAME || 'StudyAiEngKH_bot';
   const verifyWebUrl = baseUrl ? `${baseUrl}/cert/${certId}` : null;
-  const verifyTgUrl = `https://t.me/TeacherSornAiBot?start=verify_${certId}`;
+  const verifyTgUrl = `https://t.me/${botUser}?start=verify_${certId}`;
   const verifyUrl = data.verifyUrl || verifyWebUrl || verifyTgUrl;
 
   // QR Code

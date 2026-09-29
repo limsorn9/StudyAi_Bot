@@ -133,11 +133,27 @@ try {
     // Set Telegram Menu Commands
     bot.telegram.setMyCommands([
       { command: 'start', description: '📚 ចាប់ផ្តើមរៀន (Start Learning)' },
+      { command: 'app', description: '🌐 បើក Mini Web App' },
+      { command: 'link', description: '🔗 យកលេខកូដភ្ជាប់ Web App (Sync)' },
       { command: 'verbs', description: '📝 កិរិយាសព្ទប្រែប្រួល (Irregular Verbs)' },
       { command: 'scores', description: '📊 ពិន្ទុប្រឡងរបស់ខ្ញុំ (My Quiz Scores)' },
       { command: 'history', description: '🕰️ ប្រវត្តិមេរៀន (Learning History)' },
       { command: 'help', description: '❓ ជំនួយ (Help)' }
     ]);
+
+    // Set Menu Button at bottom-left of Telegram chat to open Mini Web App!
+    const defaultWebUrl = process.env.WEBAPP_URL || process.env.RENDER_EXTERNAL_URL || 'https://studyai-bot.onrender.com';
+    bot.telegram.setChatMenuButton({
+      menu_button: {
+        type: 'web_app',
+        text: '🌐 រៀន Online',
+        web_app: { url: defaultWebUrl }
+      }
+    }).then(() => {
+      console.log('✅ Telegram Chat Menu Button (Mini Web App) set successfully:', defaultWebUrl);
+    }).catch(e => {
+      console.warn('⚠️ setChatMenuButton note:', e.message);
+    });
   }
 } catch (e) {
   console.error("❌ ERROR setting up webhook or commands:", e.message);
@@ -455,7 +471,7 @@ bot.start(async (ctx) => {
       });
     }
 
-    const webUrl = process.env.WebHook_URL || 'https://studyai-bot.onrender.com';
+    const webUrl = process.env.WEBAPP_URL || process.env.RENDER_EXTERNAL_URL || process.env.WebHook_URL || 'https://studyai-bot.onrender.com';
     return ctx.reply(
       `🎉 *ចូលរៀនលើវេបសាយជោគជ័យ!*\n\n` +
       `សួស្តី *${username}*! គណនីរបស់អ្នកត្រូវបានផ្ទៀងផ្ទាត់ និងអនុញ្ញាតឱ្យចូលប្រើលើ Browser រួចរាល់ហើយ។\n\n` +
@@ -489,7 +505,7 @@ bot.start(async (ctx) => {
       });
     }
 
-    const webUrl = process.env.WebHook_URL || 'https://studyai-bot.onrender.com';
+    const webUrl = process.env.WEBAPP_URL || process.env.RENDER_EXTERNAL_URL || process.env.WebHook_URL || 'https://studyai-bot.onrender.com';
     return ctx.reply(
       `🎉 *ចុះឈ្មោះចូលរៀនជោគជ័យ!*\n\n` +
       `សួស្តី *${username}*! គណនី Telegram របស់អ្នកត្រូវបានចុះឈ្មោះចូលរៀនជាមួយ *Teacher SSOnline English Academy* រួចរាល់ដោយស្វ័យប្រវត្ត!\n\n` +
@@ -3482,7 +3498,7 @@ app.get(['/cert/:certId', '/verify/:certId'], async (req, res) => {
             <div class="code">CERT-${certId}</div>
             <p>លេខកូដវិញ្ញាបនបត្រនេះមិនមាននៅក្នុងប្រព័ន្ធទិន្នន័យរបស់ <strong>វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline</strong> ឡើយ។</p>
             <p style="font-size: 13px; color: #94a3b8; margin-top: 10px;">សូមពិនិត្យមើលលេខកូដសម្គាល់ ឬស្កេន QR Code ឡើងវិញ។</p>
-            <a href="https://t.me/TeacherSornAiBot" class="btn">🤖 ចូលទៅកាន់ Telegram Bot</a>
+            <a href="https://t.me/${process.env.TELEGRAM_BOT_USERNAME || 'StudyAiEngKH_bot'}" class="btn">🤖 ចូលទៅកាន់ Telegram Bot</a>
           </div>
         </body>
         </html>
