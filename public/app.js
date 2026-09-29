@@ -856,20 +856,145 @@ function copyBubbleText(btn) {
   });
 }
 
+// ====================================================
+// INTERACTIVE AUDIO PLAYER (TTS WITH SEEK & CONTROLS)
+// ====================================================
+
+let CURRENT_AUDIO_PLAYER = {
+  audio: null,
+  blobUrl: null,
+  btnElement: null,
+  widgetElement: null,
+  originalBtnHtml: '🔊 ស្តាប់',
+  isSeeking: false,
+  text: ''
+};
+
+function formatAudioSeconds(sec) {
+  if (!sec || isNaN(sec) || sec < 0) return '00:00';
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+}
+
+function stopCurrentAudio() {
+  if (CURRENT_AUDIO_PLAYER.audio) {
+    try {
+      CURRENT_AUDIO_PLAYER.audio.pause();
+      CURRENT_AUDIO_PLAYER.audio.currentTime = 0;
+    } catch (e) {}
+    CURRENT_AUDIO_PLAYER.audio = null;
+  }
+  if (CURRENT_AUDIO_PLAYER.blobUrl) {
+    try { URL.revokeObjectURL(CURRENT_AUDIO_PLAYER.blobUrl); } catch (e) {}
+    CURRENT_AUDIO_PLAYER.blobUrl = null;
+  }
+  if (CURRENT_AUDIO_PLAYER.btnElement) {
+    CURRENT_AUDIO_PLAYER.btnElement.innerHTML = CURRENT_AUDIO_PLAYER.originalBtnHtml || '🔊 ស្តាប់';
+    CURRENT_AUDIO_PLAYER.btnElement.classList.remove('playing');
+    CURRENT_AUDIO_PLAYER.btnElement.disabled = false;
+  }
+  if (CURRENT_AUDIO_PLAYER.widgetElement && CURRENT_AUDIO_PLAYER.widgetElement.parentElement) {
+    CURRENT_AUDIO_PLAYER.widgetElement.remove();
+  }
+  CURRENT_AUDIO_PLAYER.widgetElement = null;
+  CURRENT_AUDIO_PLAYER.btnElement = null;
+  CURRENT_AUDIO_PLAYER.isSeeking = false;
+  CURRENT_AUDIO_PLAYER.text = '';
+}
+
+function toggleAudioPlayback() {
+  if (!CURRENT_AUDIO_PLAYER.audio) return;
+  const playPauseBtn = document.getElementById('audioPlayPauseBtn');
+  if (CURRENT_AUDIO_PLAYER.audio.paused) {
+    CURRENT_AUDIO_PLAYER.audio.play();
+    if (playPauseBtn) playPauseBtn.innerHTML = '⏸️';
+    if (CURRENT_AUDIO_PLAYER.btnElement) {
+      CURRENT_AUDIO_PLAYER.btnElement.innerHTML = '🔊 កំពុងនិយាយ...';
+      CURRENT_AUDIO_PLAYER.btnElement.classList.add('playing');
+    }
+  } else {
+    CURRENT_AUDIO_PLAYER.audio.pause();
+    if (playPauseBtn) playPauseBtn.innerHTML = '▶️';
+    if (CURRENT_AUDIO_PLAYER.btnElement) {
+      CURRENT_AUDIO_PLAYER.btnElement.innerHTML = '▶️ បន្តស្តាប់';
+      CURRENT_AUDIO_PLAYER.btnElement.classList.remove('playing');
+    }
+  }
+}
+
+function seekAudioRelative(seconds) {
+  if (!CURRENT_AUDIO_PLAYER.audio) return;
+  const audio = CURRENT_AUDIO_PLAYER.audio;
+  const duration = audio.duration || 0;
+  let target = (audio.currentTime || 0) + seconds;
+  if (target < 0) target = 0;
+  if (duration > 0 && target > duration) target = duration;
+  audio.currentTime = target;
+  
+  const slider = document.getElementById('playerSeekSlider');
+  const timeDisplay = document.getElementById('playerTimeDisplay');
+  if (slider) slider.value = target;
+  if (timeDisplay) {
+    timeDisplay.innerText = `${formatAudioSeconds(target)} / ${formatAudioSeconds(duration)}`;
+  }
+}
+
+function onSeekSliderInput(val) {
+  if (!CURRENT_AUDIO_PLAYER.audio) return;
+  CURRENT_AUDIO_PLAYER.isSeeking = true;
+  const duration = CURRENT_AUDIO_PLAYER.audio.duration || 0;
+  const timeDisplay = document.getElementById('playerTimeDisplay');
+  if (timeDisplay) {
+    timeDisplay.innerText = `${formatAudioSeconds(parseFloat(val))} / ${formatAudioSeconds(duration)}`;
+  }
+}
+
+function onSeekSliderChange(val) {
+  if (!CURRENT_AUDIO_PLAYER.audio) return;
+  CURRENT_AUDIO_PLAYER.audio.currentTime = parseFloat(val);
+  CURRENT_AUDIO_PLAYER.isSeeking = false;
+}
+
 async function playTTS(text, btnElement) {
-  if (!text) return;
-  const originalHtml = btnElement.innerHTML;
-  btnElement.innerHTML = '⏳ កំពុងដំណើរការ...';
+  if (!text || !text.trim()) return;
+  
+  // If clicking on the currently active button and audio exists, toggle pause/play
+  if (CURRENT_AUDIO_PLAYER.btnElement === btnElement && CURRENT_AUDIO_PLAYER.audio) {
+    toggleAudioPlayback();
+    return;
+  }
+
+  // Otherwise, stop any previous audio
+  stopCurrentAudio();
+
+  const originalHtml = btnElement.innerHTML || '🔊 ស្តាប់';
+  CURRENT_AUDIO_PLAYER.btnElement = btnElement;
+  CURRENT_AUDIO_PLAYER.originalBtnHtml = originalHtml;
+  CURRENT_AUDIO_PLAYER.text = text;
+
+  btnElement.innerHTML = '⏳ កំពុងទាញសំឡេង...';
   btnElement.disabled = true;
 
   try {
-    const isEnglish = /[a-zA-Z]{4,}/.test(text);
+    // Strip markdown formatting & emojis before passing to speech
+    const cleanSpeechText = text
+      .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')
+      .replace(/[*_#`~>\[\]\(\)]/g, ' ')
+      .trim();
+
+    // Check for Khmer unicode characters (\u1780-\u17FF)
+    // If ANY Khmer characters exist, lang must be 'km' so the server uses km-KH-PisethNeural!
+    // km-KH-PisethNeural reads both Khmer and English seamlessly.
+    const hasKhmer = /[\u1780-\u17FF]/.test(cleanSpeechText);
+    const lang = hasKhmer ? 'km' : 'en';
+
     const res = await fetch('/api/tts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        text,
-        lang: isEnglish ? 'en' : 'km'
+        text: cleanSpeechText,
+        lang: lang
       })
     });
 
@@ -879,24 +1004,96 @@ async function playTTS(text, btnElement) {
     const url = URL.createObjectURL(blob);
     const audio = new Audio(url);
 
+    CURRENT_AUDIO_PLAYER.audio = audio;
+    CURRENT_AUDIO_PLAYER.blobUrl = url;
+
+    // Create interactive player widget and insert it below the action buttons
+    const playerWidget = document.createElement('div');
+    playerWidget.className = 'bubble-audio-player';
+    playerWidget.id = 'activeBubbleAudioPlayer';
+    playerWidget.innerHTML = `
+      <div class="player-top-row">
+        <button type="button" class="player-ctrl-btn play-pause-btn" id="audioPlayPauseBtn" onclick="toggleAudioPlayback()" title="ផ្អាក / ចាក់បន្ត">
+          ⏸️
+        </button>
+        <button type="button" class="player-ctrl-btn skip-btn" onclick="seekAudioRelative(-5)" title="ថយក្រោយ 5 វិនាទី">
+          ⏪ 5s
+        </button>
+        <button type="button" class="player-ctrl-btn skip-btn" onclick="seekAudioRelative(5)" title="ទៅមុខ 5 វិនាទី">
+          5s ⏩
+        </button>
+        <div class="player-slider-wrap">
+          <input type="range" class="player-seek-slider" id="playerSeekSlider" min="0" max="100" value="0" step="0.1"
+                 oninput="onSeekSliderInput(this.value)"
+                 onchange="onSeekSliderChange(this.value)"
+                 title="ទាញទៅមុខ / ថយក្រោយ (Seek)">
+        </div>
+        <span class="player-time" id="playerTimeDisplay">00:00 / --:--</span>
+        <button type="button" class="player-ctrl-btn stop-btn" onclick="stopCurrentAudio()" title="បញ្ឈប់ទាំងស្រុង (Stop)">
+          ⏹️ បញ្ឈប់
+        </button>
+      </div>
+    `;
+
+    // Insert widget after actions container or parent bubble
+    const actionsParent = btnElement.parentElement;
+    if (actionsParent) {
+      actionsParent.insertAdjacentElement('afterend', playerWidget);
+    } else {
+      btnElement.insertAdjacentElement('afterend', playerWidget);
+    }
+    CURRENT_AUDIO_PLAYER.widgetElement = playerWidget;
+
     btnElement.innerHTML = '🔊 កំពុងនិយាយ...';
     btnElement.classList.add('playing');
     btnElement.disabled = false;
 
-    audio.play();
+    audio.onloadedmetadata = () => {
+      const slider = document.getElementById('playerSeekSlider');
+      const timeDisplay = document.getElementById('playerTimeDisplay');
+      if (slider && !isNaN(audio.duration)) {
+        slider.max = audio.duration;
+        slider.value = 0;
+      }
+      if (timeDisplay && !isNaN(audio.duration)) {
+        timeDisplay.innerText = `00:00 / ${formatAudioSeconds(audio.duration)}`;
+      }
+    };
+
+    audio.ontimeupdate = () => {
+      if (CURRENT_AUDIO_PLAYER.isSeeking) return;
+      const slider = document.getElementById('playerSeekSlider');
+      const timeDisplay = document.getElementById('playerTimeDisplay');
+      if (slider) {
+        slider.value = audio.currentTime;
+      }
+      if (timeDisplay) {
+        const cur = formatAudioSeconds(audio.currentTime);
+        const dur = formatAudioSeconds(audio.duration || 0);
+        timeDisplay.innerText = `${cur} / ${dur}`;
+      }
+    };
+
     audio.onended = () => {
-      btnElement.innerHTML = originalHtml;
-      btnElement.classList.remove('playing');
-      URL.revokeObjectURL(url);
+      stopCurrentAudio();
     };
+
     audio.onerror = () => {
-      btnElement.innerHTML = originalHtml;
-      btnElement.classList.remove('playing');
+      stopCurrentAudio();
+      showToast('បរាជ័យក្នុងការចាក់សំឡេង', 'error');
     };
+
+    await audio.play();
+
   } catch (err) {
-    btnElement.innerHTML = '❌ មិនអាចចាក់បាន';
+    console.error('Play TTS Error:', err);
+    btnElement.innerHTML = '❌ បរាជ័យ';
     btnElement.disabled = false;
-    setTimeout(() => { btnElement.innerHTML = originalHtml; }, 2000);
+    setTimeout(() => {
+      if (CURRENT_AUDIO_PLAYER.btnElement === btnElement) {
+        btnElement.innerHTML = originalHtml;
+      }
+    }, 2500);
   }
 }
 

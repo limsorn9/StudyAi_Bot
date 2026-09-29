@@ -2533,8 +2533,12 @@ Provide practical English pronunciation coaching:
       let cleanText = text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '');
       cleanText = cleanText.replace(/[*_#`]/g, '').trim();
 
-      const isEnglish = (lang === 'en') || /[a-zA-Z]{4,}/.test(cleanText);
-      const voice = isEnglish ? 'en-US-AriaNeural' : 'km-KH-PisethNeural';
+      // Check for Khmer unicode characters (\u1780-\u17FF)
+      const hasKhmer = /[\u1780-\u17FF]/.test(cleanText);
+      // If there are Khmer characters, ALWAYS use km-KH-PisethNeural so both Khmer and English words are read properly!
+      // An English voice (en-US-AriaNeural) skips/mutes all Khmer words!
+      const isPureEnglish = (lang === 'en' && !hasKhmer) || (!hasKhmer && /[a-zA-Z]{3,}/.test(cleanText));
+      const voice = isPureEnglish ? 'en-US-GuyNeural' : 'km-KH-PisethNeural';
 
       const edgeTts = new MsEdgeTTS();
       await edgeTts.setMetadata(voice, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);

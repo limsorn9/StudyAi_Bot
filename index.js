@@ -3298,7 +3298,9 @@ bot.action(/tts_(.+)/, async (ctx) => {
 
     const { MsEdgeTTS, OUTPUT_FORMAT } = require("msedge-tts");
     const edgeTts = new MsEdgeTTS();
-    await edgeTts.setMetadata("km-KH-SreymomNeural", OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
+    const hasKhmer = /[\u1780-\u17FF]/.test(text);
+    const selectedVoice = hasKhmer ? "km-KH-PisethNeural" : "en-US-GuyNeural";
+    await edgeTts.setMetadata(selectedVoice, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
     
     // Generate Audio Stream
     const { audioStream } = edgeTts.toStream(text.substring(0, 4000));
