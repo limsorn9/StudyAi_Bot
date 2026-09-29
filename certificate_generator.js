@@ -172,6 +172,9 @@ async function generateCertificateHTML(data) {
       padding: 6px;
       min-height: calc(1123px - 36px);
       box-sizing: border-box;
+      background: transparent;
+      position: relative;
+      z-index: 1;
     }
     .cert-frame-inner {
       border: 1px solid #8b1c1c;
@@ -181,12 +184,14 @@ async function generateCertificateHTML(data) {
       position: relative;
       display: flex;
       flex-direction: column;
+      background: transparent;
     }
     .wm-logo {
       position: absolute; top: 50%; left: 50%;
       transform: translate(-50%, -50%);
-      width: 330px; height: 330px; object-fit: contain;
-      opacity: 0.05; pointer-events: none; z-index: 0;
+      width: 530px; height: 530px; object-fit: contain;
+      opacity: 0.085; mix-blend-mode: multiply;
+      pointer-events: none; z-index: 0;
     }
 
     /* -------- HEADER -------- */
@@ -195,14 +200,14 @@ async function generateCertificateHTML(data) {
       margin-bottom: 2px; position: relative; z-index: 1;
     }
     .hdr-logo-box {
-      width: 90px; display: flex; align-items: center; justify-content: flex-start;
+      width: 105px; display: flex; align-items: center; justify-content: flex-start;
     }
     .hdr-logo {
-      width: 82px; height: 82px;
+      width: 100px; height: 100px;
       object-fit: contain; border-radius: 50%;
-      filter: drop-shadow(0 2px 6px rgba(0,0,0,0.15));
+      filter: drop-shadow(0 2px 8px rgba(0,0,0,0.18));
     }
-    .hdr-spacer { width: 90px; } /* Empty balancer - ONLY 1 stamp on whole certificate */
+    .hdr-spacer { width: 105px; } /* Empty balancer - ONLY 1 stamp on whole certificate */
     .hdr-center { flex: 1; text-align: center; padding: 0 10px; }
     .kingdom-box { margin-bottom: 3px; }
     .kingdom-title {
@@ -393,9 +398,9 @@ async function generateCertificateHTML(data) {
   </div>
 
   <div class="cert-wrapper">
+    ${wmTag}
     <div class="cert-frame-outer">
       <div class="cert-frame-inner">
-        ${wmTag}
 
         <!-- HEADER (Only Logo on Left, Center Kingdom & Institute, Right Balanced Spacer - NO STAMP) -->
         <div class="hdr">
