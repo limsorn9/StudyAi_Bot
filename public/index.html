@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Teacher SSOnline - ប្រព័ន្ធសិក្សាភាសាអង់គ្លេសស្វ័យប្រវត្ត & វិញ្ញាបនបត្រ</title>
+  
+  <!-- Telegram WebApp SDK -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Battambang:wght@400;700;900&family=Inter:wght@400;500;600;700;800&family=Moul&family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body class="dark-theme">
+  <!-- Top Ambient Glow -->
+  <div class="ambient-glow top-glow"></div>
+  <div class="ambient-glow bottom-glow"></div>
+
+  <!-- Main App Wrapper -->
+  <div id="app" class="app-container">
+
+    <!-- Top Navigation Header -->
+    <header class="navbar">
+      <div class="nav-brand" onclick="navigateTo('dashboard')">
+        <div class="logo-badge">
+          <span>SS</span>
+        </div>
+        <div class="brand-text">
+          <div class="brand-title">Teacher SSOnline</div>
+          <div class="brand-sub">English Automated Academy</div>
+        </div>
+      </div>
+
+      <div class="nav-links">
+        <button class="nav-item active" data-tab="dashboard" onclick="navigateTo('dashboard')">
+          <span class="icon">🏠</span> <span class="label">ទំព័រដើម</span>
+        </button>
+        <button class="nav-item" data-tab="curriculum" onclick="navigateTo('curriculum')">
+          <span class="icon">📚</span> <span class="label">មេរៀន (12 ខែ)</span>
+        </button>
+        <button class="nav-item" data-tab="annual-exams" onclick="navigateTo('annual-exams')">
+          <span class="icon">🎓</span> <span class="label">ប្រឡងប្រចាំឆ្នាំ</span>
+        </button>
+        <button class="nav-item" data-tab="certificates" onclick="navigateTo('certificates')">
+          <span class="icon">📜</span> <span class="label">វិញ្ញាបនបត្រ</span>
+        </button>
+        <button class="nav-item" data-tab="verbs" onclick="navigateTo('verbs')">
+          <span class="icon">⚡</span> <span class="label">កិរិយាសព្ទ</span>
+        </button>
+        <button class="nav-item" data-tab="vip" onclick="navigateTo('vip')">
+          <span class="icon">💎</span> <span class="label">VIP</span>
+        </button>
+      </div>
+
+      <div class="nav-actions">
+        <!-- User State / Login Buttons -->
+        <div id="authActions">
+          <button class="btn btn-outline btn-sm" onclick="openLoginModal()">
+            <span>🔑 ចូលគណនី</span>
+          </button>
+          <button class="btn btn-primary btn-sm" onclick="openRegisterModal()">
+            <span>📝 ចុះឈ្មោះ</span>
+          </button>
+        </div>
+
+        <div id="userProfileBadge" class="user-badge hidden" onclick="openProfileModal()">
+          <div class="avatar-ring">
+            <span id="userAvatarChar">S</span>
+          </div>
+          <div class="user-info-text">
+            <div id="userNameDisplay" class="user-name">សិស្ស</div>
+            <div id="userVipStatusBadge" class="user-tier-badge free">Free Account</div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+
+      <!-- ==============================================
+           1. DASHBOARD TAB
+      ============================================== -->
+      <section id="tab-dashboard" class="tab-pane active">
+        <!-- Hero Banner -->
+        <div class="hero-card">
+          <div class="hero-content">
+            <div class="hero-badge">
+              <span class="pulse-dot"></span> ប្រព័ន្ធសិក្សាភាសាអង់គ្លេស ១២ ខែ និងប្រឡងទទួលវិញ្ញាបនបត្រ A4 ផ្តេក
+            </div>
+            <h1 class="hero-title">
+              រៀនភាសាអង់គ្លេសស្វ័យប្រវត្ត <br>
+              <span class="gradient-text">ជាមួយ AI Teacher Sorn & SSOnline</span>
+            </h1>
+            <p class="hero-desc">
+              កម្មវិធីសិក្សាខ្នាតស្តង់ដារ ១២ ខែ (២៨៨ មេរៀន), មានប្រឡង Quiz បញ្ជាក់សមត្ថភាព, ស្តាប់ការបញ្ចេញសំឡេងច្បាស់ល្អ, និងទទួលបានវិញ្ញាបនបត្រផ្លូវការទម្រង់ A4 ផ្តេក មាន QR Code Verified!
+            </p>
+            <div class="hero-actions">
+              <button class="btn btn-primary btn-lg" onclick="navigateTo('curriculum')">
+                <span>📚 ចាប់ផ្តើមរៀនឥឡូវនេះ</span>
+              </button>
+              <button class="btn btn-glass btn-lg" onclick="navigateTo('annual-exams')">
+                <span>🎓 ការប្រឡងបញ្ចប់មុខវិជ្ជា</span>
+              </button>
+              <button id="heroLinkTelegramBtn" class="btn btn-cyan btn-lg" onclick="openSyncModal()">
+                <span>🔗 ភ្ជាប់គណនី Telegram</span>
+              </button>
+            </div>
+          </div>
+          <div class="hero-art">
+            <div class="art-card glass-panel">
+              <div class="art-icon">🏛️</div>
+              <div class="art-title">វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស</div>
+              <div class="art-sub">Teacher SSOnline</div>
+              <div class="art-director">👨‍💼 នាយកសាលា៖ លីម សន (Lim Sorn)</div>
+              <div class="art-seal">
+                <span>★ VERIFIED ★</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sync Notice Banner -->
+        <div id="syncNoticeBanner" class="sync-banner glass-panel">
+          <div class="sync-icon">📱</div>
+          <div class="sync-text">
+            <div class="sync-title">💡 ភ្ជាប់ទិន្នន័យជាមួយ Telegram Bot</div>
+            <div class="sync-sub">តើអ្នកមានគណនី Telegram Bot រួចហើយមែនទេ? ចុចទីនេះដើម្បីបញ្ចូលកូដ ៦ ខ្ទង់ ហើយ Sync ទិន្នន័យមេរៀន ពិន្ទុ និងវិញ្ញាបនបត្រមកកាន់ Chrome!</div>
+          </div>
+          <button class="btn btn-sm btn-cyan" onclick="openSyncModal()">
+            <span>🔗 ភ្ជាប់ Telegram (Sync)</span>
+          </button>
+        </div>
+
+        <!-- Progress Overview Stats -->
+        <div class="stats-grid">
+          <div class="stat-card glass-panel">
+            <div class="stat-header">
+              <span class="stat-label">មេរៀនបានបញ្ចប់</span>
+              <span class="stat-icon">📚</span>
+            </div>
+            <div class="stat-val" id="statCompletedLessons">0</div>
+            <div class="stat-sub">ពីសរុប ២៨៨ មេរៀន (12 ខែ)</div>
+            <div class="progress-bar">
+              <div class="progress-fill" id="statCompletedProgress" style="width: 0%;"></div>
+            </div>
+          </div>
+
+          <div class="stat-card glass-panel">
+            <div class="stat-header">
+              <span class="stat-label">ពិន្ទុ Quiz សរុប</span>
+              <span class="stat-icon">🎯</span>
+            </div>
+            <div class="stat-val" id="statTotalScore">0</div>
+            <div class="stat-sub" id="statScoreSub">ការប្រឡងសរុប 0 ដង</div>
+            <div class="progress-bar">
+              <div class="progress-fill" id="statScoreProgress" style="width: 0%;"></div>
+            </div>
+          </div>
+
+          <div class="stat-card glass-panel">
+            <div class="stat-header">
+              <span class="stat-label">វិញ្ញាបនបត្រសម្រេចបាន</span>
+              <span class="stat-icon">📜</span>
+            </div>
+            <div class="stat-val" id="statCertificatesCount">0</div>
+            <div class="stat-sub">ទម្រង់ A4 ផ្តេក + QR Code</div>
+            <div class="progress-bar">
+              <div class="progress-fill fill-gold" id="statCertProgress" style="width: 0%;"></div>
+            </div>
+          </div>
+
+          <div class="stat-card glass-panel">
+            <div class="stat-header">
+              <span class="stat-label">ស្ថានភាពគណនី</span>
+              <span class="stat-icon">💎</span>
+            </div>
+            <div class="stat-val" id="statVipPlan">Free</div>
+            <div class="stat-sub" id="statVipDays">មិនទាន់ជា VIP</div>
+            <button class="btn btn-xs btn-outline-gold mt-2" onclick="navigateTo('vip')">
+              <span>💎 Upgrade VIP</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Quick Categories Grid -->
+        <div class="section-title">
+          <h2>🚀 មុខងារចម្បងៗ</h2>
+          <p>ជ្រើសរើសផ្នែកដែលអ្នកចង់សិក្សា ឬប្រឡង</p>
+        </div>
+
+        <div class="features-grid">
+          <div class="feature-card glass-panel" onclick="navigateTo('curriculum')">
+            <div class="f-icon">📚</div>
+            <div class="f-title">កម្មវិធីសិក្សា ១២ ខែ</div>
+            <div class="f-desc">រៀនវេយ្យាករណ៍, សន្ទនា, វាក្យសព្ទ, កិរិយាសព្ទ, គុណនាម និងការបង្កើតល្បះ។</div>
+            <div class="f-action">ចូលរៀន ➡️</div>
+          </div>
+
+          <div class="feature-card glass-panel" onclick="navigateTo('annual-exams')">
+            <div class="f-icon">🎓</div>
+            <div class="f-title">ការប្រឡងប្រចាំឆ្នាំ (៧ មុខវិជ្ជា)</div>
+            <div class="f-desc">វិញ្ញាសា ២០ សំណួរ, ប្រឡងជាប់ទទួលបានវិញ្ញាបនបត្រ A4 ផ្តេក នាយកសាលា លីម សន ចុះហត្ថលេខា។</div>
+            <div class="f-action">ចូលប្រឡង ➡️</div>
+          </div>
+
+          <div class="feature-card glass-panel" onclick="navigateTo('certificates')">
+            <div class="f-icon">📜</div>
+            <div class="f-title">វិញ្ញាបនបត្ររបស់ខ្ញុំ & Refresh</div>
+            <div class="f-desc">មើលវិញ្ញាបនបត្រទាំងអស់, បោះពុម្ព A4 ផ្តេក, និង Refresh អាប់ដេតឈ្មោះថ្មីគ្រប់ពេល។</div>
+            <div class="f-action">ពិនិត្យមើល ➡️</div>
+          </div>
+
+          <div class="feature-card glass-panel" onclick="navigateTo('verbs')">
+            <div class="f-icon">⚡</div>
+            <div class="f-title">តារាងកិរិយាសព្ទប្រែប្រួល</div>
+            <div class="f-desc">ស្វែងរក Irregular Verbs (V1, V2, V3) ជាមួយអត្ថន័យជាភាសាខ្មែរយ៉ាងរហ័ស។</div>
+            <div class="f-action">មើលតារាង ➡️</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==============================================
+           2. CURRICULUM TAB (12 MONTHS)
+      ============================================== -->
+      <section id="tab-curriculum" class="tab-pane">
+        <div class="section-title">
+          <h2>📚 កម្មវិធីសិក្សាភាសាអង់គ្លេស ១២ ខែ</h2>
+          <p>កម្មវិធីសិក្សាស្តង់ដារ ២៨៨ មេរៀន ចែកជា ១២ ខែ និង ៤៨ សប្តាហ៍</p>
+        </div>
+
+        <!-- Month Navigation Pills -->
+        <div class="months-bar" id="monthsTabsBar">
+          <!-- Populated by JS -->
+        </div>
+
+        <!-- Weeks & Lessons Container -->
+        <div id="curriculumWeeksContainer" class="weeks-container">
+          <!-- Populated by JS -->
+        </div>
+      </section>
+
+      <!-- ==============================================
+           3. LESSON DETAIL & STUDY TAB
+      ============================================== -->
+      <section id="tab-lesson" class="tab-pane">
+        <div class="lesson-header-bar">
+          <button class="btn btn-glass btn-sm" onclick="navigateTo('curriculum')">
+            <span>🔙 ត្រឡប់ទៅបញ្ជីមេរៀន</span>
+          </button>
+          <div class="lesson-breadcrumbs" id="lessonBreadcrumbs">
+            Month 1 > Week 1 > Lesson 1
+          </div>
+        </div>
+
+        <div class="lesson-layout">
+          <!-- Left: Lesson Content & Audio -->
+          <div class="lesson-card glass-panel">
+            <div class="lesson-meta-header">
+              <h1 id="lessonTitleDisplay" class="lesson-title">មេរៀន</h1>
+              <div class="lesson-badges">
+                <span id="lessonStatusBadge" class="badge badge-cyan">មេរៀនធម្មតា</span>
+              </div>
+            </div>
+
+            <!-- Audio TTS Player -->
+            <div class="audio-player-box glass-panel">
+              <div class="audio-info">
+                <div class="audio-icon-pulse" id="audioPulseIcon">🔊</div>
+                <div class="audio-text">
+                  <div class="audio-title">ស្តាប់ការបញ្ចេញសំឡេង (Pronunciation)</div>
+                  <div class="audio-sub" id="audioStatusText">ចុចប៊ូតុងខាងក្រោមដើម្បីចាក់សំឡេងមេរៀន</div>
+                </div>
+              </div>
+              <div class="audio-controls">
+                <button id="playAudioBtn" class="btn btn-primary" onclick="toggleLessonAudio()">
+                  <span id="playAudioIcon">▶️</span> <span id="playAudioText">ចាក់សំឡេង (Play Audio)</span>
+                </button>
+                <audio id="globalAudioPlayer" class="hidden"></audio>
+              </div>
+            </div>
+
+            <!-- Lesson Content Text -->
+            <div class="lesson-content-text" id="lessonContentText">
+              <!-- Content rendered here -->
+            </div>
+
+            <!-- Lesson Footer Action Buttons -->
+            <div class="lesson-actions-bar">
+              <button class="btn btn-gold btn-lg" onclick="startCurrentLessonQuiz()">
+                <span>📝 ប្រឡង Quiz មេរៀននេះ</span>
+              </button>
+              <button id="lessonCertBtn" class="btn btn-cyan btn-lg hidden" onclick="refreshCurrentLessonCert()">
+                <span>📜 ទទួល/Refresh វិញ្ញាបនបត្រ</span>
+              </button>
+              <button id="nextLessonBtn" class="btn btn-outline btn-lg" onclick="goToNextLesson()">
+                <span>➡️ មេរៀនបន្ទាប់</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Right: AI Tutor Chat Drawer -->
+          <div class="ai-tutor-card glass-panel">
+            <div class="ai-header">
+              <div class="ai-avatar">🤖</div>
+              <div class="ai-header-text">
+                <div class="ai-name">គ្រូសន (Teacher Sorn AI)</div>
+                <div class="ai-status">🟢 កំពុងអនឡាញ • ជួយឆ្លើយសំណួរមេរៀន</div>
+              </div>
+            </div>
+
+            <div class="chat-messages" id="chatMessagesBox">
+              <div class="chat-bubble ai">
+                សួស្តីប្អូន! ខ្ញុំគឺគ្រូសន (Teacher Sorn)។ តើប្អូនមានចម្ងល់ ឬចង់ឱ្យគ្រូជួយពន្យល់អ្វីបន្ថែមទាក់ទងនឹងមេរៀននេះទេ?
+              </div>
+            </div>
+
+            <!-- Quick Prompt Suggestions -->
+            <div class="quick-prompts">
+              <button class="pill-btn" onclick="sendQuickPrompt('សូមជួយពន្យល់មេរៀននេះបន្ថែមជាភាសាខ្មែរ')">💡 ពន្យល់បន្ថែម</button>
+              <button class="pill-btn" onclick="sendQuickPrompt('សូមឱ្យឧទាហរណ៍ ៣ ប្រយោគទៀត')">📝 សុំឧទាហរណ៍ ៣</button>
+              <button class="pill-btn" onclick="sendQuickPrompt('តើចំណុចនេះខុសគ្នាយ៉ាងណា?')">🔍 ប្រៀបធៀប</button>
+            </div>
+
+            <div class="chat-input-bar">
+              <input type="text" id="chatInput" placeholder="សួរសំណួរទៅកាន់គ្រូសន..." onkeypress="handleChatKeyPress(event)">
+              <button class="btn btn-primary" onclick="sendChatMessage()">
+                <span>ផ្ញើ 🚀</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==============================================
+           4. QUIZ ENGINE TAB
+      ============================================== -->
+      <section id="tab-quiz" class="tab-pane">
+        <div class="quiz-container glass-panel">
+          <div class="quiz-header">
+            <div class="quiz-title-box">
+              <span class="quiz-badge" id="quizTypeBadge">LESSON QUIZ</span>
+              <h2 id="quizTitleDisplay" class="quiz-main-title">សំណួរប្រឡង</h2>
+            </div>
+            <div class="quiz-progress-text" id="quizCounterText">សំណួរ 1 / 10</div>
+          </div>
+
+          <!-- Question Pills Navigator -->
+          <div class="quiz-pills-bar" id="quizPillsBar">
+            <!-- Pills 1 to 10/20 -->
+          </div>
+
+          <!-- Current Question Box -->
+          <div class="quiz-question-box">
+            <div class="question-number" id="questionNumLabel">សំណួរទី 1</div>
+            <div class="question-text" id="questionTextDisplay">តើសំណួរអ្វី?</div>
+
+            <!-- Options A, B, C, D -->
+            <div class="quiz-options-list" id="quizOptionsList">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+
+          <!-- Navigation Footer -->
+          <div class="quiz-nav-footer">
+            <button class="btn btn-outline" id="prevQuizBtn" onclick="prevQuestion()">
+              <span>⬅️ សំណួរមុន</span>
+            </button>
+            <div class="center-actions">
+              <button class="btn btn-primary" id="nextQuizBtn" onclick="nextQuestion()">
+                <span>សំណួរបន្ទាប់ ➡️</span>
+              </button>
+              <button class="btn btn-gold hidden" id="submitQuizBtn" onclick="submitQuiz()">
+                <span>✅ បញ្ជូនចម្លើយ (Submit)</span>
+              </button>
+            </div>
+            <button class="btn btn-danger btn-sm" onclick="cancelQuiz()">
+              <span>បោះបង់</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==============================================
+           5. ANNUAL EXAMS TAB
+      ============================================== -->
+      <section id="tab-annual-exams" class="tab-pane">
+        <div class="section-title">
+          <h2>🏛️ មណ្ឌលប្រឡងបញ្ចប់មុខវិជ្ជាប្រចាំឆ្នាំ</h2>
+          <p>ប្រឡងបញ្ចប់មុខវិជ្ជាប្រចាំឆ្នាំទាំង ៧ ប្រភេទ និងទទួលបានវិញ្ញាបនបត្រផ្លូវការទម្រង់ A4 ផ្តេក</p>
+        </div>
+
+        <div class="annual-notice glass-panel">
+          <div class="notice-icon">🛡️</div>
+          <div class="notice-body">
+            <h3>លក្ខខណ្ឌនៃការប្រឡង និងការចេញវិញ្ញាបនបត្រ A4 ផ្តេក</h3>
+            <p>
+              • វិញ្ញាសានីមួយៗមាន <strong>២០ សំណួរ</strong> (MCQ)<br>
+              • ប្រឡងជាប់និទ្ទេស <strong>A, B, ឬ C</strong> (ចាប់ពី 70% ឡើងទៅ) នឹងទទួលបាន <strong>វិញ្ញាបនបត្រ A4 ផ្តេក</strong> មាន QR Code Verified<br>
+              • ចេញដោយនាយកសាលារៀន <strong>លីម សន (Lim Sorn)</strong> និងគ្រូបន្ទុកថ្នាក់ <strong>TeacherSornAiBot</strong><br>
+              • ផ្ដល់ជូនសម្រាប់តែសិស្សដែលបង់ប្រាក់ <strong>VIP ប្រចាំឆ្នាំ (30$/ឆ្នាំ)</strong> ឬបានបង់សន្សំគ្រប់ ១ ឆ្នាំ (៣៦០ ថ្ងៃ) ប៉ុណ្ណោះ!
+            </p>
+          </div>
+        </div>
+
+        <div class="annual-grid" id="annualExamsGrid">
+          <!-- Populated by JS -->
+        </div>
+      </section>
+
+      <!-- ==============================================
+           6. CERTIFICATES TAB (MY CERTS & REFRESH)
+      ============================================== -->
+      <section id="tab-certificates" class="tab-pane">
+        <div class="section-title">
+          <h2>📜 វិញ្ញាបនបត្ររបស់ខ្ញុំ (My Certificates)</h2>
+          <p>ពិនិត្យមើលវិញ្ញាបនបត្រដែលអ្នកបានទទួល, ទាញយកទម្រង់ A4 ផ្តេក និងស្នើសុំ Refresh ថ្មី</p>
+        </div>
+
+        <div class="certs-toolbar">
+          <button class="btn btn-gold" onclick="refreshAllCertificates()">
+            <span>🔄 Refresh វិញ្ញាបនបត្រទាំងអស់ (Refresh All)</span>
+          </button>
+          <button class="btn btn-outline" onclick="loadUserCertificates()">
+            <span>🔄 ផ្ទុកបញ្ជីឡើងវិញ</span>
+          </button>
+        </div>
+
+        <div id="certificatesListContainer" class="certs-list-grid">
+          <!-- Populated by JS -->
+        </div>
+      </section>
+
+      <!-- ==============================================
+           7. IRREGULAR VERBS TAB
+      ============================================== -->
+      <section id="tab-verbs" class="tab-pane">
+        <div class="section-title">
+          <h2>⚡ តារាងកិរិយាសព្ទប្រែប្រួល (Irregular Verbs)</h2>
+          <p>តារាងកិរិយាសព្ទប្រែប្រួលពេញលេញ V1, V2, V3 និងអត្ថន័យជាភាសាខ្មែរ</p>
+        </div>
+
+        <div class="verbs-search-box glass-panel">
+          <input type="text" id="verbsSearchInput" placeholder="🔍 ស្វែងរកពាក្យកិរិយាសព្ទ (ឧ. Go, Went, Do, See...)" oninput="filterVerbs()">
+          <div class="verbs-group-buttons">
+            <button class="verb-filter-btn active" data-group="all" onclick="filterVerbGroup('all')">ទាំងអស់</button>
+            <button class="verb-filter-btn" data-group="verbs_A_C" onclick="filterVerbGroup('verbs_A_C')">A - C</button>
+            <button class="verb-filter-btn" data-group="verbs_D_F" onclick="filterVerbGroup('verbs_D_F')">D - F</button>
+            <button class="verb-filter-btn" data-group="verbs_G_L" onclick="filterVerbGroup('verbs_G_L')">G - L</button>
+            <button class="verb-filter-btn" data-group="verbs_M_R" onclick="filterVerbGroup('verbs_M_R')">M - R</button>
+            <button class="verb-filter-btn" data-group="verbs_S_W" onclick="filterVerbGroup('verbs_S_W')">S - W</button>
+          </div>
+        </div>
+
+        <div class="verbs-table-card glass-panel">
+          <table class="modern-table">
+            <thead>
+              <tr>
+                <th>V1 (Infinitive)</th>
+                <th>V2 (Past Simple)</th>
+                <th>V3 (Past Participle)</th>
+                <th>ប្រែជាភាសាខ្មែរ</th>
+                <th>សំឡេង</th>
+              </tr>
+            </thead>
+            <tbody id="verbsTableBody">
+              <!-- Populated by JS -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ==============================================
+           8. VIP & LICENSE TAB
+      ============================================== -->
+      <section id="tab-vip" class="tab-pane">
+        <div class="section-title">
+          <h2>💎 ដំឡើងគណនី VIP (Upgrade VIP)</h2>
+          <p>ដោះសោការសន្ទនាជាមួយគ្រូ AI, ស្តាប់សំឡេងមេរៀន, និងប្រឡងទទួលវិញ្ញាបនបត្រ A4 ផ្តេក</p>
+        </div>
+
+        <div class="vip-plans-grid">
+          <!-- Free Plan Card -->
+          <div class="plan-card glass-panel">
+            <div class="plan-badge">គណនីឥតគិតថ្លៃ</div>
+            <h3 class="plan-title">Free Plan</h3>
+            <div class="plan-price">0$ <span>/ រហូត</span></div>
+            <ul class="plan-features">
+              <li>✅ មើលមេរៀនទាំង ២៨៨ (12 ខែ)</li>
+              <li>✅ មើលតារាងកិរិយាសព្ទប្រែប្រួល</li>
+              <li>❌ ស្តាប់សំឡេងអានមេរៀន</li>
+              <li>❌ ឆាតសួរគ្រូ AI (Teacher Sorn)</li>
+              <li>❌ ប្រឡង Quiz & Annual Exams</li>
+              <li>❌ ទទួលវិញ្ញាបនបត្រ A4 ផ្តេក</li>
+            </ul>
+          </div>
+
+          <!-- Monthly VIP Card -->
+          <div class="plan-card glass-panel featured">
+            <div class="plan-badge hot">ពេញនិយម</div>
+            <h3 class="plan-title">VIP ប្រចាំខែ</h3>
+            <div class="plan-price">3$ <span>/ ខែ</span></div>
+            <ul class="plan-features">
+              <li>✅ រៀនគ្រប់មេរៀនទាំងអស់</li>
+              <li>✅ ស្តាប់សំឡេងអានមេរៀនគ្មានដែនកំណត់</li>
+              <li>✅ ឆាតសួរគ្រូ AI ជំនាញគ្រប់ពេលវេលា</li>
+              <li>✅ ធ្វើតេស្ត Quiz បញ្ចប់មេរៀន</li>
+              <li>✅ ទទួលបានវិញ្ញាបនបត្របញ្ចប់មេរៀន</li>
+            </ul>
+          </div>
+
+          <!-- Yearly VIP Card -->
+          <div class="plan-card glass-panel luxury">
+            <div class="plan-badge gold">តម្លៃពិសេស & កិត្តិយស</div>
+            <h3 class="plan-title">VIP ប្រចាំឆ្នាំ</h3>
+            <div class="plan-price">30$ <span>/ ឆ្នាំ</span></div>
+            <ul class="plan-features">
+              <li>✅ គ្រប់មុខងារទាំងអស់របស់ VIP</li>
+              <li>✅ សិទ្ធិប្រឡងបញ្ចប់មុខវិជ្ជាប្រចាំឆ្នាំ ៧ មុខ</li>
+              <li>✅ វិញ្ញាបនបត្រផ្លូវការ A4 ផ្តេក មាន QR Code Verified</li>
+              <li>✅ ហត្ថលេខានាយកសាលា លីម សន (Lim Sorn)</li>
+              <li>✅ សន្សំបាន ៦ ដុល្លារក្នុងមួយឆ្នាំ</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- License Key Activation Box -->
+        <div class="license-box glass-panel">
+          <div class="license-header">
+            <div class="lic-icon">🔑</div>
+            <div class="lic-text">
+              <h3>បញ្ចូល License Key (Activate VIP)</h3>
+              <p>ប្រសិនបើអ្នកបានទទួល License Key ពី Admin ឬទិញតាមឆានែល សូមបញ្ចូលនៅទីនេះ៖</p>
+            </div>
+          </div>
+          <div class="license-input-row">
+            <input type="text" id="licenseKeyInput" placeholder="ឧ. STUDY-ABCD-1234-EFGH" maxlength="24">
+            <button class="btn btn-gold btn-lg" onclick="submitLicenseKey()">
+              <span>🚀 ដំណើរការ License</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Payment Info Card -->
+        <div class="payment-card glass-panel">
+          <h3>💳 ព័ត៌មានបង់ប្រាក់តាម KHQR</h3>
+          <p>ស្កេនទូទាត់ប្រាក់តាម Bakong KHQR រួចផ្ញើវិក្កយបត្រមកកាន់ Telegram Admin <strong>@TeacherSornAiBot</strong> ដើម្បីទទួល License Key ភ្លាមៗ!</p>
+          <div class="qr-preview-box">
+            <img src="/khqr.png" alt="Bakong KHQR" class="khqr-img" onerror="this.style.display='none'">
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Bottom Mobile Nav Bar -->
+    <nav class="mobile-nav">
+      <button class="m-nav-item active" data-tab="dashboard" onclick="navigateTo('dashboard')">
+        <span class="m-icon">🏠</span>
+        <span class="m-label">ទំព័រដើម</span>
+      </button>
+      <button class="m-nav-item" data-tab="curriculum" onclick="navigateTo('curriculum')">
+        <span class="m-icon">📚</span>
+        <span class="m-label">មេរៀន</span>
+      </button>
+      <button class="m-nav-item" data-tab="annual-exams" onclick="navigateTo('annual-exams')">
+        <span class="m-icon">🎓</span>
+        <span class="m-label">ប្រឡង</span>
+      </button>
+      <button class="m-nav-item" data-tab="certificates" onclick="navigateTo('certificates')">
+        <span class="m-icon">📜</span>
+        <span class="m-label">វិញ្ញាបនបត្រ</span>
+      </button>
+      <button class="m-nav-item" data-tab="vip" onclick="navigateTo('vip')">
+        <span class="m-icon">💎</span>
+        <span class="m-label">VIP</span>
+      </button>
+    </nav>
+
+  </div>
+
+  <!-- ==============================================
+       MODALS
+  ============================================== -->
+
+  <!-- 1. LOGIN MODAL -->
+  <div id="loginModal" class="modal-overlay hidden">
+    <div class="modal-card glass-panel">
+      <div class="modal-header">
+        <div class="modal-title">🔐 ចូលប្រើប្រព័ន្ធ (Login)</div>
+        <button class="modal-close" onclick="closeModal('loginModal')">✕</button>
+      </div>
+
+      <div class="modal-tabs">
+        <button class="tab-btn active" id="loginTabStandard" onclick="switchLoginTab('standard')">Username & Password</button>
+        <button class="tab-btn" id="loginTabSync" onclick="switchLoginTab('sync')">📱 កូដ Telegram (Sync)</button>
+      </div>
+
+      <!-- Standard Login Form -->
+      <form id="standardLoginForm" onsubmit="handleStandardLogin(event)">
+        <div class="form-group">
+          <label>ឈ្មោះអ្នកប្រើ (Username)</label>
+          <input type="text" id="loginUsername" required placeholder="បញ្ចូល username របស់អ្នក">
+        </div>
+        <div class="form-group">
+          <label>ពាក្យសម្ងាត់ (Password)</label>
+          <input type="password" id="loginPassword" required placeholder="បញ្ចូលពាក្យសម្ងាត់">
+        </div>
+        <button type="submit" class="btn btn-primary btn-block btn-lg">
+          <span>ចូលគណនី (Login) 🚀</span>
+        </button>
+      </form>
+
+      <!-- Telegram Sync Code Login -->
+      <form id="syncCodeLoginForm" class="hidden" onsubmit="handleSyncCodeLogin(event)">
+        <div class="sync-info-box">
+          💡 បើក <strong>Telegram Bot @TeacherSornAiBot</strong> រួចវាយពាក្យ <code>/link</code> ដើម្បីទទួលលេខកូដ ៦ ខ្ទង់។
+        </div>
+        <div class="form-group">
+          <label>លេខកូដសម្គាល់ ៦ ខ្ទង់ (Sync Code)</label>
+          <input type="text" id="loginSyncCode" maxlength="6" required placeholder="ឧ. 123456" class="text-center font-mono">
+        </div>
+        <button type="submit" class="btn btn-cyan btn-block btn-lg">
+          <span>ចូលតាម Telegram (Instant Login) 📱</span>
+        </button>
+      </form>
+
+      <div class="modal-footer-note">
+        មិនទាន់មានគណនីមែនទេ? <a href="#" onclick="openRegisterModal(); closeModal('loginModal');">ចុះឈ្មោះទីនេះ (ភ្ជាប់ Gmail)</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. REGISTER MODAL (Strict Gmail requirement) -->
+  <div id="registerModal" class="modal-overlay hidden">
+    <div class="modal-card glass-panel">
+      <div class="modal-header">
+        <div class="modal-title">📝 ចុះឈ្មោះគណនីថ្មី (Register)</div>
+        <button class="modal-close" onclick="closeModal('registerModal')">✕</button>
+      </div>
+
+      <div class="gmail-notice-box">
+        <span class="g-icon">📧</span>
+        <span>តម្រូវឱ្យភ្ជាប់ជាមួយគណនី <strong>Gmail (@gmail.com)</strong> ត្រឹមត្រូវដើម្បីធានាសុវត្ថិភាព និងទទួលវិញ្ញាបនបត្រ!</span>
+      </div>
+
+      <form onsubmit="handleRegister(event)">
+        <div class="form-group">
+          <label>ឈ្មោះពេញ (Full Name សម្រាប់ដាក់លើវិញ្ញាបនបត្រ)</label>
+          <input type="text" id="regFullName" required placeholder="ឧ. លីម សន ឬ Lim Sorn">
+        </div>
+        <div class="form-group">
+          <label>ឈ្មោះអ្នកប្រើ (Username)</label>
+          <input type="text" id="regUsername" required placeholder="អក្សរតូច និងលេខ ឧ. sorn123">
+        </div>
+        <div class="form-group">
+          <label>គណនី Gmail (@gmail.com)</label>
+          <input type="email" id="regGmail" required placeholder="ឧ. yourname@gmail.com">
+          <small class="form-hint">ត្រូវតែបញ្ចប់ដោយ @gmail.com</small>
+        </div>
+        <div class="form-group">
+          <label>ពាក្យសម្ងាត់ (Password)</label>
+          <input type="password" id="regPassword" required placeholder="យ៉ាងតិច ៤ តួអក្សរ">
+        </div>
+        <div class="form-group">
+          <label>កូដ Telegram Sync (មិនបង្ខំ - បើមាន)</label>
+          <input type="text" id="regSyncCode" maxlength="6" placeholder="បញ្ចូលកូដ ៦ ខ្ទង់ពី Bot បើចង់ Link ភ្លាមៗ">
+        </div>
+        <button type="submit" class="btn btn-gold btn-block btn-lg">
+          <span>ចុះឈ្មោះ និងបង្កើតគណនី 🎉</span>
+        </button>
+      </form>
+
+      <div class="modal-footer-note">
+        មានគណនីរួចហើយ? <a href="#" onclick="openLoginModal(); closeModal('registerModal');">ចូលគណនីទីនេះ</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. TELEGRAM SYNC MODAL -->
+  <div id="syncModal" class="modal-overlay hidden">
+    <div class="modal-card glass-panel">
+      <div class="modal-header">
+        <div class="modal-title">📱 ភ្ជាប់គណនី Telegram</div>
+        <button class="modal-close" onclick="closeModal('syncModal')">✕</button>
+      </div>
+
+      <div class="sync-instructions">
+        <div class="step-item">
+          <span class="step-num">1</span>
+          <span>បើកកម្មវិធី Telegram ហើយចូលទៅកាន់ Bot <strong>@TeacherSornAiBot</strong></span>
+        </div>
+        <div class="step-item">
+          <span class="step-num">2</span>
+          <span>វាយពាក្យបញ្ជា <code>/link</code> ឬ <code>/sync</code></span>
+        </div>
+        <div class="step-item">
+          <span class="step-num">3</span>
+          <span>Bot នឹងផ្ញើលេខកូដ <strong>៦ ខ្ទង់</strong> មកកាន់អ្នក</span>
+        </div>
+        <div class="step-item">
+          <span class="step-num">4</span>
+          <span>បញ្ចូលលេខកូដនោះក្នុងប្រអប់ខាងក្រោម៖</span>
+        </div>
+      </div>
+
+      <form onsubmit="handleDirectSyncCode(event)">
+        <div class="form-group">
+          <input type="text" id="directSyncCodeInput" maxlength="6" required placeholder="1 2 3 4 5 6" class="text-center font-mono text-2xl">
+        </div>
+        <button type="submit" class="btn btn-cyan btn-block btn-lg">
+          <span>🔗 ភ្ជាប់គណនីឥឡូវនេះ (Sync Now)</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- 4. QUIZ RESULT MODAL -->
+  <div id="quizResultModal" class="modal-overlay hidden">
+    <div class="modal-card glass-panel max-w-lg">
+      <div class="modal-header">
+        <div class="modal-title" id="resModalTitle">🎉 លទ្ធផលការប្រឡង</div>
+        <button class="modal-close" onclick="closeModal('quizResultModal')">✕</button>
+      </div>
+
+      <div class="result-summary-box text-center">
+        <div class="grade-circle" id="resGradeCircle">A</div>
+        <div class="grade-title-text" id="resGradeTitle">ល្អប្រសើរណាស់ (Outstanding)</div>
+        <div class="score-display-text" id="resScoreText">10 / 10 (100%)</div>
+        <p id="resFeedbackMsg" class="mt-2 text-slate-300">អបអរសាទរ! អ្នកបានប្រឡងជាប់ដោយជោគជ័យ!</p>
+      </div>
+
+      <div class="result-actions" id="resActionsContainer">
+        <!-- Buttons injected by JS (View Cert, Refresh, Review) -->
+      </div>
+
+      <div class="review-answers-box mt-4">
+        <h4>📋 ពិនិត្យមើលចម្លើយឡើងវិញ</h4>
+        <div class="review-list" id="resReviewList">
+          <!-- Questions review -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. CERTIFICATE PREVIEW MODAL (A4 Landscape) -->
+  <div id="certPreviewModal" class="modal-overlay hidden">
+    <div class="modal-card glass-panel cert-modal-card">
+      <div class="modal-header">
+        <div class="modal-title">🎓 វិញ្ញាបនបត្រផ្លូវការទម្រង់ A4 ផ្តេក (A4 Landscape)</div>
+        <button class="modal-close" onclick="closeModal('certPreviewModal')">✕</button>
+      </div>
+
+      <div class="cert-modal-toolbar">
+        <button class="btn btn-gold" onclick="printCertificateIframe()">
+          <span>🖨️ បោះពុម្ព / Save as PDF</span>
+        </button>
+        <button class="btn btn-cyan" onclick="downloadCertificateHtml()">
+          <span>📥 ទាញយកឯកសារ HTML</span>
+        </button>
+        <button class="btn btn-primary" onclick="triggerCertRefresh()">
+          <span>🔄 Refresh វិញ្ញាបនបត្រ</span>
+        </button>
+      </div>
+
+      <div class="cert-iframe-wrapper">
+        <iframe id="certPreviewIframe" src="about:blank"></iframe>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

@@ -7,6 +7,8 @@ const Groq = require('groq-sdk');
 const OpenAI = require('openai');
 const express = require('express');
 const fs = require('fs');
+const path = require('path');
+const { createWebAPIRouter } = require('./web_api.js');
 const irregularVerbs = require('./irregular_verbs.js');
 const { generateQuiz, generateAnnualSubjectQuiz, SUBJECT_EXAMS } = require('./quiz_generator.js');
 const { checkTTSLimit, recordTTSStart, recordTTSDone, checkAILimit, recordAIUsage, getTTSStats } = require('./rate_limiter.js');
@@ -377,8 +379,9 @@ const generateAndSendTTS = async (ctx, text) => {
 // Persistent Reply Keyboard Menu
 const mainMenuKeyboard = Markup.keyboard([
   ['📚 បញ្ជីមេរៀន (Lessons)', '🎓 ប្រឡងបញ្ចប់មុខវិជ្ជា'],
-  ['📜 វិញ្ញាបនបត្ររបស់ខ្ញុំ', '🕰️ ប្រវត្តិសិក្សា'],
-  ['💎 គណនី VIP (Upgrade)', '❓ ជំនួយ (Help)']
+  ['🌐 បើក Web App (Study Online)', '📜 វិញ្ញាបនបត្ររបស់ខ្ញុំ'],
+  ['🕰️ ប្រវត្តិសិក្សា', '💎 គណនី VIP (Upgrade)'],
+  ['🔗 យកកូដភ្ជាប់ Web (Link)', '❓ ជំនួយ (Help)']
 ]).resize();
 
 // Check Membership Button
@@ -2842,9 +2845,11 @@ bot.on('text', async (ctx) => {
   const menuOptions = [
     '📚 បញ្ជីមេរៀន (Lessons)',
     '🎓 ប្រឡងបញ្ចប់មុខវិជ្ជា',
+    '🌐 បើក Web App (Study Online)',
     '📜 វិញ្ញាបនបត្ររបស់ខ្ញុំ',
     '🔄 ប្តូរគ្រូ AI',
     '🕰️ ប្រវត្តិសិក្សា',
+    '🔗 យកកូដភ្ជាប់ Web (Link)',
     '❓ ជំនួយ (Help)',
     '💎 គណនី VIP (Upgrade)'
   ];
@@ -3328,7 +3333,29 @@ bot.action(/reject_(\d+)/, async (ctx) => {
   }
 });
 
-app.get('/', (req, res) => res.send('StudyAi Curriculum Bot is running!'));
+// Express Middleware for Web App and Web API
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Mount Web API Router
+const webApiRouter = createWebAPIRouter({
+  db,
+  curriculum,
+  bot,
+  SUPER_ADMIN_IDS,
+  checkVIP,
+  checkYearlyVIP,
+  getNextGroqKey,
+  getNextGeminiKey
+});
+app.use('/api', webApiRouter);
+
+// Serve static frontend files (Single Page Application for Chrome & Telegram WebApp)
+app.use(express.static(path.join(__dirname, 'public')));
+
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 
 // Public Web Certificate Viewer Endpoint (for anyone scanning QR code with phone camera)
 app.get(['/cert/:certId', '/verify/:certId'], async (req, res) => {
@@ -3435,3 +3462,92 @@ bot.action(/verbs_(.+)/, (ctx) => {
     ]).reply_markup
   });
 });
+
+// ==========================================
+// TELEGRAM BOT WEB APP & SYNC CODE COMMANDS
+// ==========================================
+
+const WEBAPP_DEFAULT_URL = process.env.WEBAPP_URL || process.env.RENDER_EXTERNAL_URL || 'https://studyai-bot.onrender.com';
+
+// Open Web App Command
+bot.command(['app', 'webapp', 'web', 'online'], async (ctx) => {
+  const webUrl = WEBAPP_DEFAULT_URL;
+  return ctx.reply(
+    `🌐 *វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline (Web App)* 🌐\n\n` +
+    `លោកអ្នកអាចបើកប្រព័ន្ធសិក្សាពេញលេញលើ Telegram Web App ឬលើ Google Chrome បានភ្លាមៗ!\n\n` +
+    `✨ *មុខងារពិសេសៗលើ Web App៖*\n` +
+    `• មើលមេរៀន និងស្តាប់សំឡេងអានមេរៀនច្បាស់ល្អ 🔊\n` +
+    `• ឆាតសួរគ្រូ AI (Teacher Sorn) ផ្ទាល់ 🤖\n` +
+    `• ធ្វើតេស្ត Quiz ប្រឡងយកវិញ្ញាបនបត្រ A4 ផ្តេក 📜\n` +
+    `• ស្វែងរកកិរិយាសព្ទប្រែប្រួល និងដំឡើង VIP 💎`,
+    {
+      parse_mode: 'Markdown',
+      reply_markup: Markup.inlineKeyboard([
+        [Markup.button.webApp('🌐 បើក Web App (Study Online)', webUrl)],
+        [Markup.button.callback('🔗 យកកូដភ្ជាប់ Web App (Sync Code)', 'get_sync_code')]
+      ]).reply_markup
+    }
+  );
+});
+
+// Sync Code Generation Handler (/link, /sync)
+const generateAndSendSyncCode = async (ctx) => {
+  const userId = ctx.from.id.toString();
+  const userName = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ') || `User ${userId}`;
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+
+  if (db) {
+    try {
+      await db.ref(`sync_codes/${code}`).set({
+        telegramId: userId,
+        name: userName,
+        username: ctx.from.username || '',
+        createdAt: Date.now(),
+        expiresAt: Date.now() + 15 * 60 * 1000 // 15 mins validity
+      });
+    } catch (err) {
+      console.error('Error creating sync code:', err);
+    }
+  }
+
+  const webUrl = WEBAPP_DEFAULT_URL;
+
+  return ctx.reply(
+    `╔════════════════════════════════════════════╗\n` +
+    `   🔗 *លេខកូដភ្ជាប់គណនី WEB APP (SYNC CODE)* 🔗\n` +
+    `╚════════════════════════════════════════════╝\n\n` +
+    `🔑 លេខកូដសម្គាល់របស់អ្នក៖\n` +
+    `👉 \`${code}\` 👈\n\n` +
+    `⏱️ សុពលភាព៖ *១៥ នាទី*\n\n` +
+    `🌐 *របៀបប្រើប្រាស់លើ Google Chrome / Safari៖*\n` +
+    `១. បើកវេបសាយ៖ [ចុចទីនេះដើម្បីបើក](${webUrl})\n` +
+    `២. ចុចប៊ូតុង *«🔑 ចូលគណនី»* រួចរើសយក *«📱 កូដ Telegram (Sync)»* (ឬពេលចុះឈ្មោះ)\n` +
+    `៣. បញ្ចូលលេខកូដសម្គាល់៖ \`${code}\`\n\n` +
+    `✨ _នោះប្រព័ន្ធនឹង Sync រាល់មេរៀនដែលបានរៀន, ពិន្ទុ, វិញ្ញាបនបត្រ និងគណនី VIP របស់អ្នករវាង Telegram និង Chrome ជាមួយគ្នាដោយស្វ័យប្រវត្តិ!_`,
+    {
+      parse_mode: 'Markdown',
+      reply_markup: Markup.inlineKeyboard([
+        [Markup.button.webApp('🌐 បើក Web App ឥឡូវនេះ', webUrl)],
+        [Markup.button.url('🌐 បើកលើ Browser', webUrl)]
+      ]).reply_markup
+    }
+  );
+};
+
+bot.command(['link', 'sync', 'syncweb', 'webcode'], generateAndSendSyncCode);
+bot.hears('🔗 យកកូដភ្ជាប់ Web (Link)', generateAndSendSyncCode);
+bot.action('get_sync_code', async (ctx) => {
+  await ctx.answerCbQuery();
+  await generateAndSendSyncCode(ctx);
+});
+
+bot.hears('🌐 បើក Web App (Study Online)', async (ctx) => {
+  const webUrl = WEBAPP_DEFAULT_URL;
+  return ctx.reply('👇 សូមចុចប៊ូតុងខាងក្រោមដើម្បីបើក Web App សិក្សា៖', {
+    reply_markup: Markup.inlineKeyboard([
+      [Markup.button.webApp('🌐 បើក Web App (Study Online)', webUrl)],
+      [Markup.button.callback('🔗 យកកូដភ្ជាប់ Web App (Sync Code)', 'get_sync_code')]
+    ]).reply_markup
+  });
+});
+
