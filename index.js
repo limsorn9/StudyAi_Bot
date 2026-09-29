@@ -8,6 +8,10 @@ const OpenAI = require('openai');
 const express = require('express');
 const fs = require('fs');
 const irregularVerbs = require('./irregular_verbs.js');
+const { generateQuiz } = require('./quiz_generator.js');
+
+// In-memory quiz state: { userId: { questions, currentQ, score, lessonId, answers } }
+const quizState = {};
 
 // Load Curriculum Data
 const curriculum = JSON.parse(fs.readFileSync('./curriculum.json', 'utf8'));
@@ -88,6 +92,7 @@ try {
     bot.telegram.setMyCommands([
       { command: 'start', description: '📚 ចាប់ផ្តើមរៀន (Start Learning)' },
       { command: 'verbs', description: '📝 កិរិយាសព្ទប្រែប្រួល (Irregular Verbs)' },
+      { command: 'scores', description: '📊 ពិន្ទុប្រឡងរបស់ខ្ញុំ (My Quiz Scores)' },
       { command: 'history', description: '🕰️ ប្រវត្តិមេរៀន (Learning History)' },
       { command: 'help', description: '❓ ជំនួយ (Help)' }
     ]);
@@ -381,6 +386,7 @@ bot.action(/lesson_([^-]+)-([^-]+)-(.+)/, async (ctx) => {
   await ctx.reply(lessonData.content, 
     Markup.inlineKeyboard([
       [Markup.button.callback('🔊 អានជាសំឡេង (Listen)', `tts_${userId}`)],
+      [Markup.button.callback('📝 ប្រឡងបញ្ចប់មេរៀន (Quiz)', `quiz_start_${monthId}-${weekId}-${lessonId}`)],
       [Markup.button.callback('🔙 ត្រឡប់ទៅបញ្ជីមេរៀន', `week_${monthId}-${weekId}`)]
     ])
   );
@@ -389,7 +395,174 @@ bot.action(/lesson_([^-]+)-([^-]+)-(.+)/, async (ctx) => {
 });
 
 
-// Check History
+// ========================
+// QUIZ SYSTEM
+// ========================
+
+function sendQuestion(ctx, userId, state) {
+  const q = state.questions[state.currentQ];
+  const qNum = state.currentQ + 1;
+  const total = state.questions.length;
+  const text = `📝 *សំណួរទី ${qNum}/${total}*\n\n${q.q}`;
+  return ctx.reply(text, {
+    parse_mode: 'Markdown',
+    reply_markup: Markup.inlineKeyboard([
+      [Markup.button.callback(q.c[0], `quiz_ans_A`), Markup.button.callback(q.c[1], `quiz_ans_B`)],
+      [Markup.button.callback(q.c[2], `quiz_ans_C`), Markup.button.callback(q.c[3], `quiz_ans_D`)]
+    ]).reply_markup
+  });
+}
+
+// Start Quiz
+bot.action(/quiz_start_([^-]+)-([^-]+)-(.+)/, async (ctx) => {
+  await ctx.answerCbQuery();
+  const monthId = ctx.match[1];
+  const weekId = ctx.match[2];
+  const lessonId = ctx.match[3];
+  const userId = ctx.from.id;
+
+  const monthData = curriculum.months.find(m => m.id === monthId);
+  if (!monthData) return;
+  const weekData = monthData.weeks.find(w => w.id === weekId);
+  if (!weekData) return;
+  const lessonData = weekData.lessons.find(l => l.id === lessonId);
+  if (!lessonData) return;
+
+  const questions = generateQuiz(lessonData);
+  if (!questions || questions.length === 0) {
+    return ctx.reply('⚠️ មិនអាចបង្កើតសំណួរតេស្តបានទេ។ សូមសាកល្បងម្តងទៀត!');
+  }
+
+  quizState[userId] = {
+    questions,
+    currentQ: 0,
+    score: 0,
+    lessonTitle: lessonData.title,
+    lessonId: `${monthId}-${weekId}-${lessonId}`,
+    answers: []
+  };
+
+  await ctx.reply(`🎯 *ការប្រឡងបញ្ចប់មេរៀន*\n📚 ${lessonData.title}\n\nខ្ញុំបានរៀបចំ *${questions.length} សំណួរ* ជ្រើសរើសចម្លើយ (MCQ) !\nត្រូវចុចលើ A, B, C ឬ D ។ ចំណាំ: ចុចតែម្ដង!\n\n🏁 ចាប់ផ្ដើម!`, {
+    parse_mode: 'Markdown'
+  });
+
+  await sendQuestion(ctx, userId, quizState[userId]);
+});
+
+// Handle Quiz Answer
+bot.action(/quiz_ans_([ABCD])/, async (ctx) => {
+  await ctx.answerCbQuery();
+  const userId = ctx.from.id;
+  const chosen = ctx.match[1];
+
+  if (!quizState[userId]) {
+    return ctx.reply('⚠️ គ្មានការប្រឡងដែលកំពុងដំណើរការ! សូមចុច 📝 ប្រឡងបញ្ចប់មេរៀន ម្ដងទៀត។');
+  }
+
+  const state = quizState[userId];
+  const q = state.questions[state.currentQ];
+  const isCorrect = chosen === q.a;
+
+  if (isCorrect) state.score++;
+
+  // Record answer
+  state.answers.push({
+    q: q.q,
+    chosen: `${chosen}) ${q.c.find(c => c.startsWith(chosen))}`.replace(/^[A-D]\) /, ''),
+    correct: q.c.find(c => c.startsWith(q.a)).replace(/^[A-D]\) /, ''),
+    isCorrect
+  });
+
+  const feedback = isCorrect
+    ? `✅ *ត្រូវហើយ!* 🎉\n\nចម្លើយត្រឹមត្រូវ: *${q.c.find(c => c.startsWith(q.a))}*`
+    : `❌ *មិនត្រូវទេ!*\n\nអ្នកបានជ្រើស: ${q.c.find(c => c.startsWith(chosen))}\nចម្លើយត្រូវ: *${q.c.find(c => c.startsWith(q.a))}*`;
+
+  await ctx.reply(feedback, { parse_mode: 'Markdown' });
+
+  state.currentQ++;
+
+  if (state.currentQ < state.questions.length) {
+    await sendQuestion(ctx, userId, state);
+  } else {
+    // Quiz finished — show results
+    const score = state.score;
+    const total = state.questions.length;
+    const percent = Math.round((score / total) * 100);
+
+    let grade, emoji;
+    if (percent >= 90) { grade = 'A'; emoji = '🏆'; }
+    else if (percent >= 80) { grade = 'B'; emoji = '🥇'; }
+    else if (percent >= 70) { grade = 'C'; emoji = '🥈'; }
+    else if (percent >= 60) { grade = 'D'; emoji = '🥉'; }
+    else { grade = 'F'; emoji = '📖'; }
+
+    // Build result table
+    let resultText = `${emoji} *លទ្ធផលការប្រឡង*\n`;
+    resultText += `📚 ${state.lessonTitle}\n`;
+    resultText += `━━━━━━━━━━━━━━━━━\n`;
+    resultText += `🎯 ពិន្ទុ: *${score}/${total}* (${percent}%) - ថ្នាក់ *${grade}*\n`;
+    resultText += `━━━━━━━━━━━━━━━━━\n\n`;
+    resultText += `📋 *ចម្លើយលម្អិត:*\n`;
+
+    state.answers.forEach((ans, i) => {
+      const icon = ans.isCorrect ? '✅' : '❌';
+      resultText += `${icon} *ស${i + 1}.* ${ans.q}\n`;
+      if (!ans.isCorrect) {
+        resultText += `   👉 ចម្លើយត្រូវ: _${ans.correct}_\n`;
+      }
+      resultText += '\n';
+    });
+
+    if (percent >= 70) {
+      resultText += `🌟 *សូមអបអរ! អ្នកបានប្រឡងជាប់!*`;
+    } else {
+      resultText += `💪 *ព្យាយាមម្ដងទៀតបន្ទាប់ពីបានរៀនម្ដងទៀត!*`;
+    }
+
+    // Save result to Firebase
+    if (db) {
+      await db.ref(`users/${userId}/quiz_results/${state.lessonId}_${Date.now()}`).set({
+        lessonTitle: state.lessonTitle,
+        score,
+        total,
+        percent,
+        grade,
+        timestamp: Date.now()
+      });
+    }
+
+    // Split long message if needed
+    const maxLen = 3800;
+    if (resultText.length > maxLen) {
+      const summary = `${emoji} *លទ្ធផលការប្រឡង*\n📚 ${state.lessonTitle}\n━━━━━━━━━━━━━━━━━\n🎯 ពិន្ទុ: *${score}/${total}* (${percent}%) - ថ្នាក់ *${grade}*\n━━━━━━━━━━━━━━━━━\n${percent >= 70 ? '🌟 *សូមអបអរ! អ្នកបានប្រឡងជាប់!*' : '💪 *ព្យាយាមម្ដងទៀត!*'}`;
+      await ctx.reply(summary, { parse_mode: 'Markdown' });
+    } else {
+      await ctx.reply(resultText, { parse_mode: 'Markdown' });
+    }
+
+    delete quizState[userId];
+  }
+});
+
+// View Quiz History (scores)
+bot.command('scores', async (ctx) => {
+  const userId = ctx.from.id;
+  if (!db) return ctx.reply('⚠️ Database មិនទាន់ភ្ជាប់ទេ!');
+  const snapshot = await db.ref(`users/${userId}/quiz_results`).limitToLast(10).once('value');
+  const data = snapshot.val();
+  if (!data) return ctx.reply('📊 អ្នកមិនទាន់បានប្រឡងមេរៀនណាមួយនៅឡើយទេ!');
+
+  let text = '📊 *ប្រវត្តិពិន្ទុប្រឡង (10 ចុងក្រោយ)*\n━━━━━━━━━━━━━━━\n';
+  const results = Object.values(data).sort((a, b) => b.timestamp - a.timestamp);
+  results.forEach((r, i) => {
+    const date = new Date(r.timestamp).toLocaleDateString('km-KH');
+    const emoji = r.percent >= 70 ? '✅' : '❌';
+    text += `${emoji} ${r.lessonTitle.split(':').pop().trim()}\n   ➡️ ${r.score}/${r.total} (${r.percent}%) - ${r.grade} | ${date}\n\n`;
+  });
+  ctx.reply(text, { parse_mode: 'Markdown' });
+});
+
+
 bot.command('history', async (ctx) => {
   const userId = ctx.from.id;
   const snapshot = await db.ref(`users/${userId}/history`).once('value');
