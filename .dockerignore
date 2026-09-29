@@ -1,0 +1,10 @@
+node_modules
+npm-debug.log
+.git
+.gitignore
+*.pdf
+photo_*.jpg
+d7704c18*.jpg
+public/cert_preview.html
+test_*.js
+append.js
