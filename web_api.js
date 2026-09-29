@@ -11,7 +11,7 @@ const { generateQuiz, generateAnnualSubjectQuiz, SUBJECT_EXAMS } = require('./qu
 const { generateCertificateCard, generateCertificateHTML, getGradeTitle } = require('./certificate_generator.js');
 const { redeemLicenseKey, getUserLicenseInfo } = require('./license_manager.js');
 const irregularVerbs = require('./irregular_verbs.js');
-const { sendOtpEmail } = require('./mailer.js');
+const { sendOtpEmail, sendConfirmEmail } = require('./mailer.js');
 
 function hashPassword(password) {
   return crypto.createHash('sha256').update(password + '_studyai_secret_salt_2026').digest('hex');
@@ -669,6 +669,291 @@ Student Question: ${userText}`;
     } catch (err) {
       console.error('Google auth error:', err);
       res.status(500).json({ error: 'មានបញ្ហាក្នុងការផ្ទៀងផ្ទាត់គណនី Google' });
+    }
+  });
+
+  /**
+   * Request Google Security Confirmation Email
+   * Dispatches 1-Click Confirmation Link to student's Gmail
+   */
+  router.post('/auth/google-start-confirmation', async (req, res) => {
+    try {
+      let { email, name, photoUrl, googleId, deviceId, userAgent, credential } = req.body;
+
+      if (credential && typeof credential === 'string') {
+        try {
+          const parts = credential.split('.');
+          if (parts.length === 3) {
+            const jwtPayload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8'));
+            if (jwtPayload && jwtPayload.email) {
+              email = jwtPayload.email;
+              name = jwtPayload.name || name;
+              photoUrl = jwtPayload.picture || photoUrl;
+              googleId = jwtPayload.sub || googleId;
+            }
+          }
+        } catch (jwtErr) {}
+      }
+
+      if (!email) {
+        return res.status(400).json({ error: 'សូមជ្រើសរើស ឬបញ្ចូលព័ត៌មាន Email ពីគណនី Google!' });
+      }
+
+      const cleanGmail = email.trim().toLowerCase();
+      const cleanName = (name || cleanGmail.split('@')[0] || 'Student').trim();
+
+      if (!cleanGmail.endsWith('@gmail.com')) {
+        return res.status(400).json({ error: 'តម្រូវឱ្យប្រើប្រាស់គណនី Gmail (@gmail.com) ប៉ុណ្ណោះ!' });
+      }
+
+      if (!db) return res.status(500).json({ error: 'ប្រព័ន្ធទិន្នន័យមិនទាន់ភ្ជាប់!' });
+
+      const token = 'gm_auth_' + crypto.randomBytes(16).toString('hex');
+      const baseUrl = process.env.RENDER_EXTERNAL_URL || process.env.WEBAPP_URL || process.env.WebHook_URL || 'https://studyai-bot.onrender.com';
+      const confirmUrl = `${baseUrl}/api/auth/confirm-email?token=${token}`;
+
+      await db.ref(`gmail_web_confirmations/${token}`).set({
+        token,
+        email: cleanGmail,
+        name: cleanName,
+        photoUrl: photoUrl || '',
+        googleId: googleId || '',
+        deviceId: deviceId || '',
+        userAgent: userAgent || '',
+        createdAt: Date.now(),
+        expiresAt: Date.now() + 15 * 60 * 1000,
+        verified: false
+      });
+
+      const mailResult = await sendConfirmEmail({
+        toEmail: cleanGmail,
+        fullName: cleanName,
+        confirmUrl,
+        purpose: 'register'
+      });
+
+      return res.json({
+        success: true,
+        token,
+        email: cleanGmail,
+        name: cleanName,
+        delivered: mailResult.delivered,
+        message: mailResult.delivered
+          ? `✉️ សំបុត្របញ្ជាក់សុវត្ថិភាពត្រូវបានផ្ញើទៅកាន់ ${cleanGmail} រួចរាល់ហើយ! សូមបើក Gmail របស់អ្នក រួចចុចលើ «✅ Confirm» ដើម្បីចូលរៀនភ្លាមៗ។`
+          : `⚠️ Server មិនទាន់កំណត់ GMAIL_APP_PASSWORD លើ Render នៅឡើយទេ។`
+      });
+    } catch (err) {
+      console.error('Google request confirm error:', err);
+      res.status(500).json({ error: 'មានបញ្ហាក្នុងការផ្ញើសារបញ្ជាក់សុវត្ថិភាព' });
+    }
+  });
+
+  /**
+   * 1-Click Confirm Endpoint from Student's Gmail
+   */
+  router.get('/auth/confirm-email', async (req, res) => {
+    try {
+      const { token } = req.query;
+      if (!token || !db) {
+        return res.status(400).send('Invalid or missing confirmation token');
+      }
+
+      const snap = await db.ref(`gmail_web_confirmations/${token}`).once('value');
+      const confirmData = snap.val();
+
+      if (!confirmData) {
+        return res.status(404).send('<h2 style="font-family:sans-serif; text-align:center; margin-top:50px;">❌ តំណភ្ជាប់បញ្ជាក់សុវត្ថិភាពមិនត្រឹមត្រូវ ឬត្រូវបានប្រើប្រាស់រួចហើយ!</h2>');
+      }
+
+      if (confirmData.expiresAt && confirmData.expiresAt < Date.now()) {
+        return res.status(400).send('<h2 style="font-family:sans-serif; text-align:center; margin-top:50px;">⏳ តំណភ្ជាប់នេះបានផុតកំណត់ហើយ! សូមស្នើសុំបញ្ជាក់ម្តងទៀត។</h2>');
+      }
+
+      const cleanGmail = confirmData.email;
+      const cleanName = confirmData.name || cleanGmail.split('@')[0];
+      const emailKey = cleanGmail.replace(/[\.\#\$\[\]]/g, '_');
+
+      // Find or create user in Firebase
+      let userId = null;
+      const emailMapSnap = await db.ref(`users_by_email/${emailKey}`).once('value');
+      if (emailMapSnap.exists()) {
+        userId = emailMapSnap.val();
+      } else {
+        const emailPrefix = cleanGmail.split('@')[0].replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || 'student';
+        userId = `web_${emailPrefix}_${Math.random().toString(36).substring(2, 6)}`;
+        await db.ref(`users_by_email/${emailKey}`).set(userId);
+      }
+
+      // Update user profile
+      await db.ref(`users/${userId}/profile`).update({
+        name: cleanName,
+        gmail: cleanGmail,
+        gmailVerified: true,
+        photoUrl: confirmData.photoUrl || '',
+        googleId: confirmData.googleId || '',
+        registeredAt: Date.now(),
+        lastWebLogin: Date.now(),
+        isWebUser: true,
+        authProvider: 'google_email_confirm'
+      });
+
+      // Mark token as verified
+      await db.ref(`gmail_web_confirmations/${token}`).update({
+        verified: true,
+        userId: userId,
+        verifiedAt: Date.now()
+      });
+
+      const webUrl = process.env.WEBAPP_URL || process.env.RENDER_EXTERNAL_URL || 'https://studyai-bot.onrender.com';
+
+      const successHtml = `
+<!DOCTYPE html>
+<html lang="km">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>✅ បញ្ជាក់សុវត្ថិភាព Google (Gmail) ជោគជ័យ - Teacher SSOnline</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;600;700;800&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: radial-gradient(circle at 50% 20%, #172554, #0b0f19);
+      color: #ffffff;
+      font-family: 'Kantumruy Pro', 'Outfit', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .card {
+      background: rgba(19, 27, 46, 0.95);
+      border: 1px solid rgba(2, 132, 199, 0.3);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+      border-radius: 24px;
+      max-width: 520px;
+      width: 100%;
+      padding: 40px 30px;
+      text-align: center;
+    }
+    .icon {
+      width: 80px;
+      height: 80px;
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(2, 132, 199, 0.2));
+      border: 2px solid #10b981;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 38px;
+      margin: 0 auto 24px;
+      box-shadow: 0 0 30px rgba(16, 185, 129, 0.3);
+    }
+    h1 { font-size: 24px; font-weight: 800; color: #f8fafc; margin-bottom: 12px; }
+    p { font-size: 15px; color: #94a3b8; line-height: 1.6; margin-bottom: 24px; }
+    .badge {
+      display: inline-block;
+      background: rgba(2, 132, 199, 0.15);
+      border: 1px solid rgba(2, 132, 199, 0.4);
+      color: #38bdf8;
+      padding: 6px 16px;
+      border-radius: 999px;
+      font-size: 14px;
+      margin-bottom: 20px;
+    }
+    .btn {
+      display: inline-block;
+      background: linear-gradient(135deg, #0284c7, #2563eb);
+      color: #ffffff;
+      padding: 16px 36px;
+      border-radius: 14px;
+      font-size: 16px;
+      font-weight: 700;
+      text-decoration: none;
+      box-shadow: 0 10px 25px rgba(2, 132, 199, 0.4);
+      transition: transform 0.2s;
+    }
+    .btn:hover { transform: translateY(-2px); }
+    .note { font-size: 13px; color: #64748b; margin-top: 24px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">✅</div>
+    <h1>ការផ្ទៀងផ្ទាត់ជោគជ័យ! 🎉</h1>
+    <div class="badge">✉️ ${cleanGmail}</div>
+    <p>សួស្តី <strong>${cleanName}</strong>! គណនីរបស់អ្នកត្រូវបានបញ្ជាក់ (Confirm) តាមរយៈប្រព័ន្ធសុវត្ថិភាព Google (Gmail) រួចរាល់ហើយ។ ផ្ទាំង Browser ដើមរបស់អ្នកកំពុងចូលរៀនដោយស្វ័យប្រវត្ត។</p>
+    <a href="${webUrl}" class="btn">🌐 ចូលរៀនលើវេបសាយភ្លាមៗ</a>
+    <div class="note">អ្នកអាចបិទផ្ទាំងនេះបាន ហើយត្រឡប់ទៅកាន់ Browser ដើមវិញ។</div>
+  </div>
+  <script>
+    setTimeout(() => { window.location.href = '${webUrl}'; }, 3000);
+  </script>
+</body>
+</html>
+      `;
+
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.send(successHtml);
+    } catch (err) {
+      console.error('Confirm email error:', err);
+      res.status(500).send('Error confirming email');
+    }
+  });
+
+  /**
+   * Check Status of Gmail Confirmation (for waiting modal polling)
+   */
+  router.get('/auth/confirm-email/status', async (req, res) => {
+    try {
+      const { token, deviceId } = req.query;
+      if (!token || !db) return res.status(400).json({ error: 'Missing token' });
+
+      const snap = await db.ref(`gmail_web_confirmations/${token}`).once('value');
+      const data = snap.val();
+
+      if (!data) return res.status(404).json({ error: 'Token not found' });
+      if (data.expiresAt && data.expiresAt < Date.now()) {
+        return res.status(400).json({ error: 'Token expired' });
+      }
+
+      if (data.verified && data.userId) {
+        const userId = data.userId.toString();
+        const userSnap = await db.ref(`users/${userId}`).once('value');
+        const userData = userSnap.val() || {};
+        const profile = userData.profile || {};
+
+        const isVIP = checkVIP ? await checkVIP(userId) : false;
+        const yearly = checkYearlyVIP ? await checkYearlyVIP(userId) : { eligible: false };
+
+        const session = await createDeviceSession(userId, deviceId, req.headers['user-agent'], req.ip);
+
+        // Remove token after consumption
+        await db.ref(`gmail_web_confirmations/${token}`).remove();
+
+        return res.json({
+          success: true,
+          verified: true,
+          user: {
+            id: userId,
+            name: profile.name || data.name,
+            gmail: profile.gmail || data.email,
+            isTelegram: !!userData.telegramId,
+            isVIP,
+            yearlyEligible: yearly.eligible,
+            vipDetails: yearly
+          },
+          deviceId: session.deviceId,
+          sessionToken: session.sessionToken
+        });
+      }
+
+      return res.json({ success: true, verified: false });
+    } catch (err) {
+      console.error('Confirm email status error:', err);
+      res.status(500).json({ error: 'Status check error' });
     }
   });
 

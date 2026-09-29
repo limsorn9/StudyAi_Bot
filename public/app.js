@@ -1324,51 +1324,155 @@ function switchRegTab(tab) {
 }
 
 // ------------------------------------------
-// GOOGLE 1-CLICK AUTHENTICATION
+// GOOGLE & TELEGRAM SECURITY 0-TYPING AUTH
 // ------------------------------------------
 
-async function handleGoogleSignIn() {
-  try {
-    showToast('⏳ កំពុងដំណើរការ Google Sign-In...', 'info');
+let googleConfirmPollInterval = null;
+let telegramConfirmPollInterval = null;
 
-    // 1. Check if Firebase Web SDK is available and configured
+function toggleSyncCodeLogin() {
+  const form = document.getElementById('syncCodeLoginForm');
+  if (form) form.classList.toggle('hidden');
+}
+
+function cancelAuthWaiting() {
+  if (googleConfirmPollInterval) {
+    clearInterval(googleConfirmPollInterval);
+    googleConfirmPollInterval = null;
+  }
+  if (telegramConfirmPollInterval) {
+    clearInterval(telegramConfirmPollInterval);
+    telegramConfirmPollInterval = null;
+  }
+  closeModal('authWaitingModal');
+}
+
+async function startGoogleSecurityAuth() {
+  try {
+    showToast('⏳ កំពុងហៅប្រព័ន្ធសុវត្ថិភាព Google...', 'info');
+
+    let gUser = null;
+
+    // 1. Try Firebase Google Sign-In Popup (Select account UI)
     if (window.firebase && window.firebase.auth) {
       try {
         const provider = new firebase.auth.GoogleAuthProvider();
         provider.setCustomParameters({ prompt: 'select_account' });
         const result = await firebase.auth().signInWithPopup(provider);
-        const gUser = result.user;
-        if (gUser && gUser.email) {
-          return await sendGoogleAuthToServer({
-            email: gUser.email,
-            name: gUser.displayName || gUser.email.split('@')[0],
-            photoUrl: gUser.photoURL || '',
-            googleId: gUser.uid
-          });
+        if (result && result.user && result.user.email) {
+          gUser = {
+            email: result.user.email,
+            name: result.user.displayName || result.user.email.split('@')[0],
+            photoUrl: result.user.photoURL || '',
+            googleId: result.user.uid
+          };
         }
       } catch (fbErr) {
-        console.warn('Firebase popup attempt note:', fbErr.message);
+        console.warn('Firebase popup note:', fbErr.message);
       }
     }
 
-    // 2. Direct seamless Gmail input prompt
-    const promptGmail = prompt('សូមបញ្ចូលអាសយដ្ឋាន Gmail (@gmail.com) របស់អ្នកដើម្បីចូល/ចុះឈ្មោះដោយស្វ័យប្រវត្ត៖');
-    if (!promptGmail) return;
+    // 2. Fallback to quick seamless prompt if popup is blocked
+    if (!gUser || !gUser.email) {
+      const promptGmail = prompt('សូមជ្រើសរើស ឬបញ្ចូលអាសយដ្ឋាន Gmail (@gmail.com) របស់អ្នកដើម្បីទទួលសំបុត្រ Confirm៖');
+      if (!promptGmail) return;
 
-    const cleanGmail = promptGmail.trim().toLowerCase();
-    if (!cleanGmail.endsWith('@gmail.com')) {
-      return showToast('❌ តម្រូវឱ្យប្រើប្រាស់គណនី Gmail (@gmail.com) ប៉ុណ្ណោះ!', 'error');
+      const cleanGmail = promptGmail.trim().toLowerCase();
+      if (!cleanGmail.endsWith('@gmail.com')) {
+        return showToast('❌ តម្រូវឱ្យប្រើប្រាស់គណនី Gmail (@gmail.com) ប៉ុណ្ណោះ!', 'error');
+      }
+
+      gUser = {
+        email: cleanGmail,
+        name: cleanGmail.split('@')[0],
+        googleId: 'g_' + Math.random().toString(36).substring(2, 10)
+      };
     }
 
-    await sendGoogleAuthToServer({
-      email: cleanGmail,
-      name: cleanGmail.split('@')[0],
-      googleId: 'g_' + Math.random().toString(36).substring(2, 10)
+    // Close select modals
+    closeModal('loginModal');
+    closeModal('registerModal');
+
+    // 3. Dispatch security confirmation email request to server
+    showToast('✉️ កំពុងផ្ញើសំបុត្របញ្ជាក់សុវត្ថិភាពទៅ Gmail...', 'info');
+    const deviceId = getOrCreateDeviceId();
+    const res = await fetch('/api/auth/google-start-confirmation', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...gUser,
+        deviceId,
+        userAgent: navigator.userAgent
+      })
     });
+
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'ផ្ញើសំបុត្របញ្ជាក់មិនជោគជ័យ');
+
+    // If server does not have SMTP credentials configured yet, complete direct login safely
+    if (!data.delivered) {
+      console.warn('SMTP not configured on server, establishing direct Google Auth session...');
+      return await sendGoogleAuthToServer({
+        ...gUser,
+        deviceId
+      });
+    }
+
+    // 4. Open Auth Waiting Modal
+    const icon = document.getElementById('authWaitingIcon');
+    const title = document.getElementById('authWaitingTitle');
+    const desc = document.getElementById('authWaitingDesc');
+    const status = document.getElementById('authWaitingStatus');
+
+    if (icon) {
+      icon.textContent = '✉️';
+      icon.className = 'w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl animate-pulse bg-sky-500/20 border border-sky-500/40 text-sky-400';
+    }
+    if (title) title.textContent = `✉️ សូមពិនិត្យ Gmail (${data.email})`;
+    if (desc) {
+      desc.innerHTML = `ប្រព័ន្ធបានបញ្ជូនសំបុត្របញ្ជាក់សុវត្ថិភាពទៅកាន់ <strong>${data.email}</strong> រួចរាល់ហើយ។<br>សូមបើក Gmail (Inbox ឬ Spam) របស់អ្នក រួចចុចប៊ូតុង <strong>«✅ ចុចបញ្ជាក់ និងចូលរៀន (Confirm)»</strong> ដើម្បីចូលរៀនលើ Browser នេះស្វ័យប្រវត្ត។`;
+    }
+    if (status) status.textContent = '⏳ កំពុងរង់ចាំលោកអ្នកចុច Confirm លើ Gmail...';
+
+    openModal('authWaitingModal');
+
+    // 5. Poll for confirmation from student's Gmail
+    if (googleConfirmPollInterval) clearInterval(googleConfirmPollInterval);
+    const token = data.token;
+    let pollCount = 0;
+
+    googleConfirmPollInterval = setInterval(async () => {
+      pollCount++;
+      if (pollCount > 150) { // 5 minutes timeout
+        clearInterval(googleConfirmPollInterval);
+        googleConfirmPollInterval = null;
+        closeModal('authWaitingModal');
+        showToast('⏳ ការបញ្ជាក់ផុតកំណត់ពេល។ សូមសាកល្បងម្តងទៀត។', 'warning');
+        return;
+      }
+
+      try {
+        const pollRes = await fetch(`/api/auth/confirm-email/status?token=${encodeURIComponent(token)}&deviceId=${encodeURIComponent(deviceId)}`);
+        const pollData = await pollRes.json();
+
+        if (pollData.verified && pollData.user) {
+          clearInterval(googleConfirmPollInterval);
+          googleConfirmPollInterval = null;
+          closeModal('authWaitingModal');
+          setCurrentUser(pollData.user, pollData.sessionToken, pollData.deviceId);
+          showToast(`🎉 ស្វាគមន៍ ${pollData.user.name}! បញ្ជាក់សុវត្ថិភាព Gmail ជោគជ័យ`, 'success');
+          refreshUserProfile();
+        }
+      } catch (e) {}
+    }, 2000);
+
   } catch (err) {
     showToast(err.message || 'មានបញ្ហាក្នុងការផ្ទៀងផ្ទាត់ Google', 'error');
   }
 }
+
+// Backward compatibility alias
+const handleGoogleSignIn = startGoogleSecurityAuth;
 
 async function sendGoogleAuthToServer(payload) {
   showToast('⏳ កំពុងផ្ទៀងផ្ទាត់គណនី Google...', 'info');
@@ -1388,6 +1492,7 @@ async function sendGoogleAuthToServer(payload) {
   setCurrentUser(data.user, data.sessionToken, data.deviceId);
   closeModal('loginModal');
   closeModal('registerModal');
+  closeModal('authWaitingModal');
   showToast(`🎉 ស្វាគមន៍ ${data.user.name}! ចូលគណនី Google (Gmail) ជោគជ័យ`, 'success');
   refreshUserProfile();
 }
@@ -1641,12 +1746,35 @@ async function startTelegramOneClickLogin() {
     window.open(data.botUrl, '_blank');
     showToast('🛡️ សូមបើក Telegram Bot ហើយចុច «✅ យល់ព្រម និងអនុញ្ញាត» ដើម្បីផ្ទៀងផ្ទាត់សុវត្ថិភាព!', 'info');
 
+    closeModal('loginModal');
+    closeModal('registerModal');
+
+    const icon = document.getElementById('authWaitingIcon');
+    const title = document.getElementById('authWaitingTitle');
+    const desc = document.getElementById('authWaitingDesc');
+    const status = document.getElementById('authWaitingStatus');
+
+    if (icon) {
+      icon.textContent = '🛡️';
+      icon.className = 'w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl animate-pulse bg-cyan-500/20 border border-cyan-500/40 text-cyan-400';
+    }
+    if (title) title.textContent = '🛡️ រង់ចាំការបញ្ជាក់លើ Telegram Bot';
+    if (desc) {
+      desc.innerHTML = `Telegram Bot <strong>@StudyAiEngKH_bot</strong> ត្រូវបានបើក។<br>សូមចុចប៊ូតុង <strong>«✅ យល់ព្រម និងអនុញ្ញាត»</strong> លើ Telegram ដើម្បីចូលរៀនលើ Browser នេះស្វ័យប្រវត្ត។`;
+    }
+    if (status) status.textContent = '⏳ កំពុងរង់ចាំលោកអ្នកចុច Confirm លើ Telegram...';
+    openModal('authWaitingModal');
+
     // Poll for login status
     const token = data.token;
     const startTime = Date.now();
-    const pollInterval = setInterval(async () => {
-      if (Date.now() - startTime > 120000 || STATE.currentUser) {
-        clearInterval(pollInterval);
+    if (telegramConfirmPollInterval) clearInterval(telegramConfirmPollInterval);
+
+    telegramConfirmPollInterval = setInterval(async () => {
+      if (Date.now() - startTime > 180000 || STATE.currentUser) {
+        clearInterval(telegramConfirmPollInterval);
+        telegramConfirmPollInterval = null;
+        closeModal('authWaitingModal');
         return;
       }
       try {
@@ -1654,22 +1782,25 @@ async function startTelegramOneClickLogin() {
         const pollData = await pollRes.json();
 
         if (pollData.denied) {
-          clearInterval(pollInterval);
+          clearInterval(telegramConfirmPollInterval);
+          telegramConfirmPollInterval = null;
+          closeModal('authWaitingModal');
           showToast(pollData.error || '❌ ការស្នើសុំត្រូវបានបដិសេធលើ Telegram', 'error');
           return;
         }
 
         if (pollData.verified && pollData.user) {
-          clearInterval(pollInterval);
+          clearInterval(telegramConfirmPollInterval);
+          telegramConfirmPollInterval = null;
+          closeModal('authWaitingModal');
           setCurrentUser(pollData.user, pollData.sessionToken, pollData.deviceId);
-          closeModal('loginModal');
-          closeModal('registerModal');
           showToast(`🎉 ស្វាគមន៍ ${pollData.user.name}! ផ្ទៀងផ្ទាត់សុវត្ថិភាព Telegram ជោគជ័យ`, 'success');
           refreshUserProfile();
         }
       } catch (e) {}
     }, 2000);
   } catch (err) {
+    closeModal('authWaitingModal');
     showToast(err.message, 'error');
   }
 }

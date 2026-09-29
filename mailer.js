@@ -121,7 +121,96 @@ async function sendOtpEmail({ toEmail, fullName, otpCode, purpose = 'register' }
   }
 }
 
+/**
+ * Send 1-Click Confirmation Link directly to student's Gmail
+ */
+async function sendConfirmEmail({ toEmail, fullName, confirmUrl, purpose = 'register' }) {
+  const transporter = getTransporter();
+  const cleanEmail = toEmail.trim().toLowerCase();
+  const cleanName = fullName ? fullName.trim() : 'សិស្ស (Student)';
+
+  const purposeTitle = purpose === 'login' 
+    ? 'ចូលរៀនលើវេបសាយ (Course Login)' 
+    : 'ចុះឈ្មោះចូលរៀន (Course Registration)';
+
+  const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #0b0f19; color: #ffffff; margin: 0; padding: 20px; }
+    .email-container { max-width: 560px; margin: 0 auto; background: #131b2e; border: 1px solid #1e293b; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+    .header { background: linear-gradient(135deg, #1e3a8a, #0284c7); padding: 30px 20px; text-align: center; }
+    .header h1 { margin: 0; font-size: 22px; color: #ffffff; letter-spacing: 0.5px; }
+    .header p { margin: 6px 0 0; font-size: 13px; color: #93c5fd; }
+    .content { padding: 30px 25px; text-align: center; }
+    .greeting { font-size: 18px; color: #e2e8f0; margin-bottom: 12px; font-weight: 700; }
+    .desc { font-size: 15px; color: #94a3b8; line-height: 1.6; margin-bottom: 28px; }
+    .btn-confirm { display: inline-block; background: linear-gradient(135deg, #0284c7, #2563eb); color: #ffffff !important; padding: 16px 36px; border-radius: 12px; font-size: 16px; font-weight: 700; text-decoration: none; box-shadow: 0 4px 15px rgba(2, 132, 199, 0.4); margin: 10px 0; }
+    .security-note { font-size: 12px; color: #eab308; background: rgba(234, 179, 8, 0.1); border-left: 3px solid #eab308; padding: 12px 14px; text-align: left; border-radius: 6px; margin: 24px 0 10px; }
+    .footer { background: #0b101d; border-top: 1px solid #1e293b; padding: 20px; text-align: center; font-size: 12px; color: #64748b; }
+    .footer strong { color: #94a3b8; }
+  </style>
+</head>
+<body>
+  <div class="email-container">
+    <div class="header">
+      <h1>វិទ្យាស្ថានភាសាអង់គ្លេស Teacher SSOnline</h1>
+      <p>English Automated Academy • នាយកសាលា៖ លីម សន (Lim Sorn)</p>
+    </div>
+    <div class="content">
+      <div class="greeting">សួស្តី ${cleanName}! 👋</div>
+      <div class="desc">
+        អ្នកទើបតែបានស្នើសុំ <strong>${purposeTitle}</strong> ដោយជ្រើសរើសគណនី Google (Gmail) របស់អ្នក។
+        ដើម្បីផ្ទៀងផ្ទាត់សុវត្ថិភាព និងអនុញ្ញាតឱ្យឧបករណ៍របស់អ្នកចូលរៀន សូមចុចប៊ូតុងបញ្ជាក់ខាងក្រោម៖
+      </div>
+      <div>
+        <a href="${confirmUrl}" target="_blank" class="btn-confirm">
+          ✅ ចុចបញ្ជាក់ និងចូលរៀន (Confirm & Enter)
+        </a>
+      </div>
+      <div class="security-note">
+        🛡️ <strong>ប្រព័ន្ធសុវត្ថិភាព Google Security Confirmation៖</strong><br>
+        តំណភ្ជាប់នេះមានសុពលភាពរយៈពេល ១៥ នាទី។ ប្រសិនបើលោកអ្នកមិនបានស្នើសុំចូលរៀនទេ សូមកុំចុចលើតំណភ្ជាប់នេះ។
+      </div>
+    </div>
+    <div class="footer">
+      <div><strong>Teacher SSOnline English Academy</strong></div>
+      <div>គេហទំព័រសិក្សាស្វ័យប្រវត្ត & វិញ្ញាបនបត្រ A4 ផ្លូវការ</div>
+      <div style="margin-top: 8px;">📩 បញ្ជូនទៅកាន់៖ ${cleanEmail}</div>
+    </div>
+  </div>
+</body>
+</html>
+  `;
+
+  if (transporter) {
+    try {
+      const senderUser = (process.env.GMAIL_USER || process.env.SMTP_USER || '').trim();
+      const fromSender = senderUser ? `"Teacher SSOnline English Academy" <${senderUser}>` : 'Teacher SSOnline <noreply@ssonline.edu.kh>';
+      const info = await transporter.sendMail({
+        from: fromSender,
+        to: cleanEmail,
+        subject: `🛡️ [CONFIRM] បញ្ជាក់សុវត្ថិភាព ${purposeTitle} - Teacher SSOnline`,
+        text: `សួស្តី ${cleanName}! សូមចុចលើ Link ខាងក្រោមដើម្បីបញ្ជាក់សុវត្ថិភាព ${purposeTitle} ចូលរៀន៖\n${confirmUrl}`,
+        html: htmlContent
+      });
+
+      console.log(`✅ [GMAIL CONFIRM SENT] Sent confirmation to ${cleanEmail} (MsgID: ${info.messageId})`);
+      return { success: true, delivered: true };
+    } catch (err) {
+      console.error(`❌ [GMAIL CONFIRM ERROR] To ${cleanEmail}:`, err.message);
+      return { success: false, delivered: false, error: err.message };
+    }
+  } else {
+    console.warn(`⚠️ [GMAIL NOT CONFIGURED] Cannot send confirm email to ${cleanEmail}. GMAIL_USER and GMAIL_APP_PASSWORD are required.`);
+    return { success: false, delivered: false, note: 'SMTP not configured', error: 'Server មិនទាន់កំណត់ GMAIL_USER និង GMAIL_APP_PASSWORD ក្នុង Environment Variables' };
+  }
+}
+
 module.exports = {
   sendOtpEmail,
+  sendConfirmEmail,
   getTransporter
 };

@@ -597,6 +597,7 @@
   ============================================== -->
 
   <!-- 1. LOGIN MODAL -->
+  <!-- 1. LOGIN MODAL -->
   <div id="loginModal" class="modal-overlay hidden">
     <div class="modal-card glass-panel max-w-md">
       <div class="modal-header">
@@ -604,179 +605,123 @@
         <button class="modal-close" onclick="closeModal('loginModal')">✕</button>
       </div>
 
-      <div class="modal-tabs">
-        <button class="tab-btn active" id="loginTabTg" onclick="switchLoginTab('telegram')">📱 ចូលតាម Telegram</button>
-        <button class="tab-btn" id="loginTabEmail" onclick="switchLoginTab('email')">📧 ចូលតាម Gmail</button>
+      <div class="text-center my-3">
+        <p class="text-sm text-slate-300">ចូលរៀនរហ័ស & សុវត្ថិភាពខ្ពស់ (មិនបាច់វាយអក្សរ ០-Typing)៖</p>
       </div>
 
-      <!-- Option 1: Login via Telegram -->
-      <div id="loginSectionTg">
-        <div class="sync-info-box">
-          🛡️ <strong>ជម្រើសទី ១៖ ចូលតាមប្រព័ន្ធសុវត្ថិភាព Telegram (Security 2FA)</strong><br>
-          <span class="text-xs text-slate-300">
-            ចុចប៊ូតុងខាងក្រោមដើម្បីបើក Telegram Bot <strong>@StudyAiEngKH_bot</strong>។ Telegram នឹងបង្ហាញសារ <strong>Security Confirmation</strong> ឱ្យអ្នកចុច <strong>«✅ យល់ព្រម និងអនុញ្ញាត»</strong> ដើម្បីការពារសុវត្ថិភាពគណនីរបស់អ្នក!
-          </span>
-        </div>
-        <button type="button" class="btn btn-cyan btn-block btn-lg mb-3" onclick="startTelegramOneClickLogin()">
-          <span>🛡️ ចូលតាមប្រព័ន្ធសុវត្ថិភាព Telegram (Confirm via Bot)</span>
+      <!-- Option 1: Google Security (Gmail) -->
+      <div class="google-auth-btn-wrap mb-3">
+        <button type="button" class="btn btn-google btn-block btn-lg" onclick="startGoogleSecurityAuth()">
+          <svg class="google-icon-svg" viewBox="0 0 24 24">
+            <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.15z"/>
+            <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
+            <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
+            <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+          </svg>
+          <span>🌐 ចូលរៀនតាមប្រព័ន្ធសុវត្ថិភាព Google (Gmail)</span>
         </button>
-
-        <div class="divider-text"><span>ឬបញ្ចូលលេខកូដ ៦ ខ្ទង់</span></div>
-
-        <form id="syncCodeLoginForm" onsubmit="handleSyncCodeLogin(event)">
-          <div class="form-group">
-            <label>លេខកូដសម្គាល់ Telegram ៦ ខ្ទង់ (/link)</label>
-            <input type="text" id="loginSyncCode" maxlength="6" placeholder="ឧ. 123456" class="text-center font-mono tracking-widest text-xl">
-          </div>
-          <button type="submit" class="btn btn-outline btn-block">
-            <span>🔗 ចូលដោយប្រើកូដ Sync</span>
-          </button>
-        </form>
+        <div class="text-xs text-slate-400 mt-1 text-center">
+          រើស Gmail របស់អ្នក ➜ ផ្ញើសំបុត្របញ្ជាក់ ➜ ចុច Confirm ក្នុង Gmail ចូលរៀនភ្លាមៗ
+        </div>
       </div>
 
-      <!-- Option 2: Login via Gmail (Google 1-Click / OTP / Password) -->
-      <div id="loginSectionEmail" class="hidden">
-        <!-- 1-Click Google Sign-in Button -->
-        <div class="google-auth-btn-wrap">
-          <button type="button" class="btn btn-google btn-block btn-lg" onclick="handleGoogleSignIn()">
-            <svg class="google-icon-svg" viewBox="0 0 24 24">
-              <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.15z"/>
-              <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
-              <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
-              <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
-            </svg>
-            <span>ចូលដោយប្រព័ន្ធសុវត្ថិភាព Google (Gmail)</span>
-          </button>
+      <div class="divider-text"><span>ឬ</span></div>
+
+      <!-- Option 2: Telegram Security -->
+      <div class="mt-3 mb-3">
+        <button type="button" class="btn btn-cyan btn-block btn-lg" onclick="startTelegramOneClickLogin()">
+          <span>🛡️ ចូលរៀនតាមប្រព័ន្ធសុវត្ថិភាព Telegram Bot</span>
+        </button>
+        <div class="text-xs text-slate-400 mt-1 text-center">
+          Telegram Bot នឹងផ្ញើសារសុវត្ថិភាពឱ្យអ្នកចុច Confirm ភ្លាមៗ
         </div>
-
-        <div class="divider-text"><span>ឬផ្ញើកូដ OTP ទៅកាន់ Gmail</span></div>
-
-        <form id="emailOtpLoginForm" onsubmit="handleSendLoginOtp(event)">
-          <div class="form-group">
-            <label>អាសយដ្ឋាន Gmail (@gmail.com)</label>
-            <input type="email" id="loginGmailInput" required placeholder="ឧ. yourname@gmail.com">
-          </div>
-          <button type="submit" id="btnSendLoginOtp" class="btn btn-gold btn-block btn-lg">
-            <span>📩 ផ្ញើលេខកូដ OTP ទៅ Gmail</span>
-          </button>
-        </form>
-
-        <form id="verifyLoginOtpForm" class="hidden mt-3" onsubmit="handleVerifyLoginOtp(event)">
-          <div class="form-group text-center">
-            <label>បញ្ចូលលេខកូដ OTP ៦ ខ្ទង់ដែលបានផ្ញើទៅ Gmail</label>
-            <input type="text" id="loginOtpCodeInput" maxlength="6" required placeholder="0 0 0 0 0 0" class="text-center font-mono text-2xl tracking-widest form-input">
-          </div>
-          <div class="text-xs text-slate-400 text-center my-2">
-            📩 សូមបើកប្រអប់សំបុត្រ Gmail (Inbox / Spam) របស់អ្នកដើម្បីយកលេខកូដសម្ងាត់ OTP ៦ ខ្ទង់
-          </div>
-          <button type="submit" class="btn btn-primary btn-block btn-lg mt-2">
-            <span>🚀 ផ្ទៀងផ្ទាត់ និងចូលរៀន (Login)</span>
-          </button>
-          <div class="text-center mt-2">
-            <button type="button" class="btn-link-action text-xs" onclick="resetEmailLoginForm()">← ប្រើ Gmail ផ្សេង</button>
-          </div>
-        </form>
-
-        <!-- Toggle for traditional password login -->
-        <div class="mt-3 text-center">
-          <button type="button" class="btn-link-action text-xs text-slate-400" onclick="togglePasswordLogin()">
-            🔐 ឬចូលដោយប្រើ Password
-          </button>
-        </div>
-
-        <form id="standardLoginForm" class="hidden mt-3" onsubmit="handleStandardLogin(event)">
-          <div class="form-group">
-            <label>Username ឬ Gmail</label>
-            <input type="text" id="loginUsername" placeholder="បញ្ចូល username">
-          </div>
-          <div class="form-group">
-            <label>ពាក្យសម្ងាត់ (Password)</label>
-            <input type="password" id="loginPassword" placeholder="បញ្ចូលពាក្យសម្ងាត់">
-          </div>
-          <button type="submit" class="btn btn-primary btn-block">
-            <span>ចូលដោយ Password</span>
-          </button>
-        </form>
       </div>
 
-      <div class="modal-footer-note mt-3">
-        មិនទាន់មានគណនីមែនទេ? <a href="#" onclick="openRegisterModal(); closeModal('loginModal');">ចុះឈ្មោះចូលរៀនទីនេះ</a>
+      <!-- Option 3: Optional Telegram Sync Code -->
+      <div class="text-center mt-3">
+        <button type="button" class="btn-link-action text-xs text-slate-400" onclick="toggleSyncCodeLogin()">
+          🔗 ឬចូលដោយប្រើលេខកូដ Telegram ៦ ខ្ទង់ (/link)
+        </button>
+      </div>
+
+      <form id="syncCodeLoginForm" class="hidden mt-3" onsubmit="handleSyncCodeLogin(event)">
+        <div class="form-group text-center">
+          <label>លេខកូដ Telegram ៦ ខ្ទង់</label>
+          <input type="text" id="loginSyncCode" maxlength="6" placeholder="0 0 0 0 0 0" class="text-center font-mono tracking-widest text-xl form-input">
+        </div>
+        <button type="submit" class="btn btn-outline btn-block">
+          <span>🔗 ចូលដោយកូដ Telegram</span>
+        </button>
+      </form>
+
+      <div class="modal-footer-note mt-4 text-center">
+        មិនទាន់មានគណនី? <a href="#" onclick="closeModal('loginModal'); openRegisterModal();">ចុះឈ្មោះទីនេះ</a>
       </div>
     </div>
   </div>
 
-  <!-- 2. REGISTER MODAL (Telegram Auto-Enroll OR Gmail + OTP) -->
+  <!-- 2. REGISTER MODAL -->
   <div id="registerModal" class="modal-overlay hidden">
     <div class="modal-card glass-panel max-w-md">
       <div class="modal-header">
-        <div class="modal-title">📝 ចុះឈ្មោះចូលរៀន (Course Registration)</div>
+        <div class="modal-title">📝 ចុះឈ្មោះចូលរៀន (Register)</div>
         <button class="modal-close" onclick="closeModal('registerModal')">✕</button>
       </div>
 
-      <div class="modal-tabs">
-        <button class="tab-btn active" id="regTabGmail" onclick="switchRegTab('gmail')">📧 ចុះឈ្មោះតាម Gmail</button>
-        <button class="tab-btn" id="regTabTg" onclick="switchRegTab('telegram')">📱 ចុះឈ្មោះតាម Telegram</button>
+      <div class="text-center my-3">
+        <p class="text-sm text-slate-300">ចុះឈ្មោះរហ័ស មិនបាច់វាយអក្សរ (0-Typing System)៖</p>
       </div>
 
-      <!-- Option A: Register via Gmail (Google 1-Click OR Name + Gmail -> OTP to Gmail) -->
-      <div id="regSectionGmail">
-        <!-- 1-Click Google Registration Button -->
-        <div class="google-auth-btn-wrap">
-          <button type="button" class="btn btn-google btn-block btn-lg" onclick="handleGoogleSignIn()">
-            <svg class="google-icon-svg" viewBox="0 0 24 24">
-              <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.15z"/>
-              <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
-              <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
-              <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
-            </svg>
-            <span>ចុះឈ្មោះដោយប្រព័ន្ធសុវត្ថិភាព Google (Gmail)</span>
-          </button>
-        </div>
-
-        <div class="divider-text"><span>ឬបំពេញឈ្មោះ & Gmail ខាងក្រោម</span></div>
-
-        <form id="gmailRegisterForm" onsubmit="handleSendRegisterOtp(event)">
-          <div class="form-group">
-            <label>ឈ្មោះពេញ (Full Name សម្រាប់វិញ្ញាបនបត្រ)</label>
-            <input type="text" id="regFullName" required placeholder="ឧ. លីម សន ឬ Lim Sorn">
-          </div>
-          <div class="form-group">
-            <label>អាសយដ្ឋាន Gmail (@gmail.com)</label>
-            <input type="email" id="regGmail" required placeholder="ឧ. yourname@gmail.com">
-            <small class="form-hint">ត្រូវតែបញ្ចប់ដោយ @gmail.com</small>
-          </div>
-          <button type="submit" id="btnSubmitRegGmail" class="btn btn-gold btn-block btn-lg">
-            <span>📩 ផ្ញើលេខកូដ OTP ទៅ Gmail & ចុះឈ្មោះ</span>
-          </button>
-        </form>
-      </div>
-
-      <!-- Option B: Register via Telegram (Auto-enrolls into Telegram bot) -->
-      <div id="regSectionTg" class="hidden">
-        <div class="sync-info-box">
-          🛡️ <strong>ចុះឈ្មោះដោយប្រព័ន្ធសុវត្ថិភាព Telegram (Security Confirmation)</strong><br>
-          <span class="text-xs text-slate-300">
-            ចុចប៊ូតុងខាងក្រោមដើម្បីបើក Telegram Bot <strong>@StudyAiEngKH_bot</strong>។ Telegram នឹងផ្ញើសារ <strong>Security Confirmation</strong> ឱ្យអ្នកចុច <strong>«✅ យល់ព្រម និងអនុញ្ញាត»</strong> ដើម្បីការពារគណនី និងចុះឈ្មោះចូលរៀនភ្លាមៗដោយស្វ័យប្រវត្ត!
-          </span>
-        </div>
-
-        <div class="text-center my-4">
-          <button type="button" class="btn btn-cyan btn-block btn-lg" onclick="startTelegramOneClickLogin()">
-            <span>🛡️ ចុះឈ្មោះតាមប្រព័ន្ធសុវត្ថិភាព Telegram 🚀</span>
-          </button>
-        </div>
-
-        <div class="divider-text"><span>ឬបើក BOT ដោយផ្ទាល់</span></div>
-
-        <div class="text-center my-2">
-          <a href="https://t.me/StudyAiEngKH_bot?start=web_enroll" target="_blank" class="btn btn-outline btn-block" onclick="handleTelegramEnrollClick()">
-            <span>🤖 បើក Telegram Bot @StudyAiEngKH_bot</span>
-          </a>
+      <!-- Option 1: Google Security (Gmail) -->
+      <div class="google-auth-btn-wrap mb-3">
+        <button type="button" class="btn btn-google btn-block btn-lg" onclick="startGoogleSecurityAuth()">
+          <svg class="google-icon-svg" viewBox="0 0 24 24">
+            <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.15z"/>
+            <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
+            <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
+            <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+          </svg>
+          <span>🌐 ចុះឈ្មោះតាមប្រព័ន្ធសុវត្ថិភាព Google (Gmail)</span>
+        </button>
+        <div class="text-xs text-slate-400 mt-1 text-center">
+          រើស Gmail របស់អ្នក ➜ ផ្ញើសំបុត្របញ្ជាក់ ➜ ចុច Confirm ក្នុង Gmail ចូលរៀនភ្លាមៗ
         </div>
       </div>
 
-      <div class="modal-footer-note mt-3">
-        មានគណនីរួចហើយ? <a href="#" onclick="openLoginModal(); closeModal('registerModal');">ចូលគណនីទីនេះ</a>
+      <div class="divider-text"><span>ឬ</span></div>
+
+      <!-- Option 2: Telegram Security -->
+      <div class="mt-3 mb-3">
+        <button type="button" class="btn btn-cyan btn-block btn-lg" onclick="startTelegramOneClickLogin()">
+          <span>🛡️ ចុះឈ្មោះតាមប្រព័ន្ធសុវត្ថិភាព Telegram Bot 🚀</span>
+        </button>
+        <div class="text-xs text-slate-400 mt-1 text-center">
+          Telegram Bot នឹងផ្ញើសារសុវត្ថិភាពឱ្យអ្នកចុច Confirm ចូលរៀនភ្លាមៗ
+        </div>
+      </div>
+
+      <div class="modal-footer-note mt-4 text-center">
+        មានគណនីរួចហើយ? <a href="#" onclick="closeModal('registerModal'); openLoginModal();">ចូលគណនីទីនេះ</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- AUTH WAITING / CONFIRMATION MODAL -->
+  <div id="authWaitingModal" class="modal-overlay hidden">
+    <div class="modal-card glass-panel max-w-md text-center p-6">
+      <div id="authWaitingIcon" class="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl animate-pulse bg-sky-500/20 border border-sky-500/40 text-sky-400">
+        ✉️
+      </div>
+      <h3 id="authWaitingTitle" class="text-lg font-bold text-white mb-2">កំពុងរង់ចាំការបញ្ជាក់សុវត្ថិភាព...</h3>
+      <p id="authWaitingDesc" class="text-sm text-slate-300 leading-relaxed mb-4">
+        ប្រព័ន្ធបានបញ្ជូនសំបុត្រសុវត្ថិភាពទៅកាន់ Gmail របស់អ្នករួចរាល់ហើយ។ សូមបើក Gmail រួចចុចលើ <strong>«✅ Confirm»</strong> ដើម្បីចូលរៀន។
+      </p>
+      <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-800/80 border border-slate-700/80 text-xs text-amber-400 mb-4">
+        <span class="inline-block w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+        <span id="authWaitingStatus">⏳ កំពុងរង់ចាំលោកអ្នកចុច Confirm...</span>
+      </div>
+      <div>
+        <button type="button" class="btn btn-outline btn-sm" onclick="cancelAuthWaiting()">✕ បោះបង់</button>
       </div>
     </div>
   </div>
