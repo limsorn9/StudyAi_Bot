@@ -438,6 +438,73 @@ bot.start(async (ctx) => {
     return handleCertificateVerification(ctx, certId);
   }
 
+  // Handle 1-Click Telegram Web Login Token: e.g. /start auth_tg_12345
+  if (payload && payload.startsWith('auth_')) {
+    const token = payload.replace('auth_', '');
+    if (db) {
+      await db.ref(`telegram_web_auth/${token}`).update({
+        verified: true,
+        userId: userId,
+        name: username,
+        verifiedAt: Date.now()
+      });
+      await db.ref(`users/${userId}/profile`).update({
+        name: username,
+        registeredAt: Date.now(),
+        isTelegram: true
+      });
+    }
+
+    const webUrl = process.env.WebHook_URL || 'https://studyai-bot.onrender.com';
+    return ctx.reply(
+      `🎉 *ចូលរៀនលើវេបសាយជោគជ័យ!*\n\n` +
+      `សួស្តី *${username}*! គណនីរបស់អ្នកត្រូវបានផ្ទៀងផ្ទាត់ និងអនុញ្ញាតឱ្យចូលប្រើលើ Browser រួចរាល់ហើយ។\n\n` +
+      `សូមត្រឡប់ទៅកាន់ Browser របស់អ្នកដើម្បីបន្តការសិក្សា! 🚀`,
+      {
+        parse_mode: 'Markdown',
+        reply_markup: Markup.inlineKeyboard([
+          [Markup.button.webApp('🌐 ចូលរៀនលើ WebApp', webUrl)]
+        ]).reply_markup
+      }
+    );
+  }
+
+  // Handle 1-Click Telegram Auto-Enroll: e.g. /start web_enroll
+  if (payload && (payload === 'web_enroll' || payload === 'enroll' || payload.startsWith('web_enroll'))) {
+    if (db) {
+      await db.ref(`users/${userId}/profile`).update({
+        name: username,
+        registeredAt: Date.now(),
+        isTelegram: true
+      });
+    }
+
+    const syncCode = Math.floor(100000 + Math.random() * 900000).toString();
+    if (db) {
+      await db.ref(`sync_codes/${syncCode}`).set({
+        telegramId: userId,
+        name: username,
+        createdAt: Date.now(),
+        expiresAt: Date.now() + 60 * 60 * 1000
+      });
+    }
+
+    const webUrl = process.env.WebHook_URL || 'https://studyai-bot.onrender.com';
+    return ctx.reply(
+      `🎉 *ចុះឈ្មោះចូលរៀនជោគជ័យ!*\n\n` +
+      `សួស្តី *${username}*! គណនី Telegram របស់អ្នកត្រូវបានចុះឈ្មោះចូលរៀនជាមួយ *Teacher SSOnline English Academy* រួចរាល់ដោយស្វ័យប្រវត្ត!\n\n` +
+      `🔑 លេខកូដសម្គាល់ភ្ជាប់ Web របស់អ្នកគឺ៖ \`${syncCode}\`\n\n` +
+      `អ្នកអាចរៀនតាម Bot នេះ ឬចុចប៊ូតុងខាងក្រោមដើម្បីចូលរៀនលើវេបសាយភ្លាមៗ៖`,
+      {
+        parse_mode: 'Markdown',
+        reply_markup: Markup.inlineKeyboard([
+          [Markup.button.webApp('🌐 ចូលរៀនលើ WebApp', webUrl)],
+          [Markup.button.url('💻 បើកលើ Browser', `${webUrl}?sync_code=${syncCode}`)]
+        ]).reply_markup
+      }
+    );
+  }
+
   // Check channel membership first
   const ok = await isMember(userId);
   if (!ok) {

@@ -11,9 +11,32 @@ const { generateQuiz, generateAnnualSubjectQuiz, SUBJECT_EXAMS } = require('./qu
 const { generateCertificateCard, generateCertificateHTML, getGradeTitle } = require('./certificate_generator.js');
 const { redeemLicenseKey, getUserLicenseInfo } = require('./license_manager.js');
 const irregularVerbs = require('./irregular_verbs.js');
+const { sendOtpEmail } = require('./mailer.js');
 
 function hashPassword(password) {
   return crypto.createHash('sha256').update(password + '_studyai_secret_salt_2026').digest('hex');
+}
+
+function parseDeviceName(userAgent) {
+  if (!userAgent) return 'Web Browser';
+  let browser = 'Web Browser';
+  let os = 'Device';
+
+  if (userAgent.includes('Edg/')) browser = 'Edge';
+  else if (userAgent.includes('Chrome/')) browser = 'Chrome';
+  else if (userAgent.includes('Safari/') && !userAgent.includes('Chrome')) browser = 'Safari';
+  else if (userAgent.includes('Firefox/')) browser = 'Firefox';
+  else if (userAgent.includes('MSIE') || userAgent.includes('Trident/')) browser = 'Internet Explorer';
+
+  if (userAgent.includes('Windows NT 10.0')) os = 'Windows 10/11';
+  else if (userAgent.includes('Windows')) os = 'Windows';
+  else if (userAgent.includes('iPhone')) os = 'iPhone';
+  else if (userAgent.includes('iPad')) os = 'iPad';
+  else if (userAgent.includes('Android')) os = 'Android';
+  else if (userAgent.includes('Macintosh') || userAgent.includes('Mac OS')) os = 'macOS';
+  else if (userAgent.includes('Linux')) os = 'Linux';
+
+  return `${browser} on ${os}`;
 }
 
 /**
@@ -88,6 +111,35 @@ Student Question: ${userText}`;
   }
 
   // ==========================================
+  // DEVICE & SESSION MANAGEMENT HELPERS
+  // ==========================================
+
+  async function createDeviceSession(userId, deviceId, userAgent, ip) {
+    const cleanDeviceId = deviceId && typeof deviceId === 'string' && deviceId.length > 5 
+      ? deviceId 
+      : `dev_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+    const sessionToken = `sess_${crypto.randomBytes(24).toString('hex')}`;
+    const deviceName = parseDeviceName(userAgent);
+
+    const sessionData = {
+      deviceId: cleanDeviceId,
+      sessionToken,
+      deviceName,
+      userAgent: (userAgent || '').substring(0, 200),
+      ip: ip || 'unknown',
+      createdAt: Date.now(),
+      lastActive: Date.now(),
+      revoked: false
+    };
+
+    if (db) {
+      await db.ref(`users/${userId}/sessions/${cleanDeviceId}`).set(sessionData);
+    }
+
+    return sessionData;
+  }
+
+  // ==========================================
   // 1. AUTHENTICATION & SYNC ENDPOINTS
   // ==========================================
 
@@ -97,7 +149,7 @@ Student Question: ${userText}`;
    */
   router.post('/auth/telegram', async (req, res) => {
     try {
-      const { id, first_name, last_name, username } = req.body;
+      const { id, first_name, last_name, username, deviceId, userAgent } = req.body;
       if (!id) {
         return res.status(400).json({ error: 'Missing Telegram User ID' });
       }
@@ -106,7 +158,6 @@ Student Question: ${userText}`;
       const displayName = [first_name, last_name].filter(Boolean).join(' ') || username || `User ${userId}`;
 
       if (db) {
-        // Ensure profile is updated
         await db.ref(`users/${userId}/profile`).update({
           name: displayName,
           username: username || '',
@@ -118,7 +169,6 @@ Student Question: ${userText}`;
       const isVIP = checkVIP ? await checkVIP(userId) : false;
       const yearly = checkYearlyVIP ? await checkYearlyVIP(userId) : { eligible: false };
 
-      // Fetch user progress and stats
       let completedLessons = {};
       let subjectCerts = {};
       if (db) {
@@ -127,6 +177,8 @@ Student Question: ${userText}`;
         completedLessons = data.completed_lessons || {};
         subjectCerts = data.subject_certifications || {};
       }
+
+      const session = await createDeviceSession(userId, deviceId, userAgent || req.headers['user-agent'], req.ip);
 
       return res.json({
         success: true,
@@ -140,7 +192,9 @@ Student Question: ${userText}`;
           vipDetails: yearly,
           completedLessonsCount: Object.keys(completedLessons).length,
           certificatesCount: Object.keys(subjectCerts).length
-        }
+        },
+        deviceId: session.deviceId,
+        sessionToken: session.sessionToken
       });
     } catch (err) {
       console.error('Telegram auth error:', err);
@@ -149,12 +203,494 @@ Student Question: ${userText}`;
   });
 
   /**
-   * Register with Username, Password & Gmail
-   * STRICT REQUIREMENT: Gmail (@gmail.com) connection is required!
+   * 1-Click Telegram Web Login / Auto-Enroll Token Generation
+   */
+  router.post('/auth/telegram-web-token', async (req, res) => {
+    try {
+      const token = 'tg_' + crypto.randomBytes(8).toString('hex');
+      if (db) {
+        await db.ref(`telegram_web_auth/${token}`).set({
+          createdAt: Date.now(),
+          expiresAt: Date.now() + 5 * 60 * 1000, // 5 minutes
+          verified: false
+        });
+      }
+      return res.json({
+        success: true,
+        token,
+        botUsername: 'TeacherSornAiBot',
+        botUrl: `https://t.me/TeacherSornAiBot?start=auth_${token}`
+      });
+    } catch (err) {
+      console.error('Create telegram token error:', err);
+      res.status(500).json({ error: 'Failed to create Telegram login token' });
+    }
+  });
+
+  /**
+   * Poll Status of Telegram Web Login Token
+   */
+  router.get('/auth/telegram-web-token/status', async (req, res) => {
+    try {
+      const { token, deviceId, userAgent } = req.query;
+      if (!token) return res.status(400).json({ error: 'Missing token' });
+
+      if (!db) return res.status(500).json({ error: 'Database disconnected' });
+
+      const snap = await db.ref(`telegram_web_auth/${token}`).once('value');
+      const data = snap.val();
+
+      if (!data) return res.status(404).json({ error: 'Token not found or expired' });
+      if (data.expiresAt < Date.now()) {
+        return res.status(400).json({ error: 'Token expired' });
+      }
+
+      if (data.verified && data.userId) {
+        const userId = data.userId.toString();
+        const userSnap = await db.ref(`users/${userId}`).once('value');
+        const userData = userSnap.val() || {};
+        const profile = userData.profile || {};
+
+        const isVIP = checkVIP ? await checkVIP(userId) : false;
+        const yearly = checkYearlyVIP ? await checkYearlyVIP(userId) : { eligible: false };
+
+        const session = await createDeviceSession(userId, deviceId, userAgent || req.headers['user-agent'], req.ip);
+
+        // Cleanup token
+        await db.ref(`telegram_web_auth/${token}`).remove();
+
+        return res.json({
+          success: true,
+          verified: true,
+          user: {
+            id: userId,
+            name: profile.name || data.name || `User ${userId}`,
+            username: profile.username || '',
+            isTelegram: true,
+            isVIP,
+            yearlyEligible: yearly.eligible,
+            vipDetails: yearly
+          },
+          deviceId: session.deviceId,
+          sessionToken: session.sessionToken
+        });
+      }
+
+      return res.json({ success: true, verified: false });
+    } catch (err) {
+      console.error('Check telegram token error:', err);
+      res.status(500).json({ error: 'Error checking token' });
+    }
+  });
+
+  /**
+   * Send 6-Digit OTP to Gmail for Course Registration
+   * Simplified requirement: Name + Gmail only!
+   */
+  router.post('/auth/send-register-otp', async (req, res) => {
+    try {
+      const { fullName, gmail } = req.body;
+
+      if (!fullName || !gmail) {
+        return res.status(400).json({ error: 'សូមបំពេញឈ្មោះពេញ និងអាសយដ្ឋាន Gmail!' });
+      }
+
+      const cleanName = fullName.trim();
+      const cleanGmail = gmail.trim().toLowerCase();
+
+      // Strict validation for @gmail.com
+      if (!/^[a-zA-Z0-9._%+-]+@gmail\.com$/i.test(cleanGmail)) {
+        return res.status(400).json({ error: 'តម្រូវឱ្យប្រើប្រាស់គណនី Gmail (@gmail.com) ប៉ុណ្ណោះ!' });
+      }
+
+      if (!db) {
+        return res.status(500).json({ error: 'ប្រព័ន្ធទិន្នន័យមិនទាន់ភ្ជាប់!' });
+      }
+
+      const emailKey = cleanGmail.replace(/[\.\#\$\[\]]/g, '_');
+
+      // Generate 6-digit OTP code
+      const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+      await db.ref(`email_verifications/${emailKey}`).set({
+        code: otpCode,
+        fullName: cleanName,
+        gmail: cleanGmail,
+        purpose: 'register',
+        createdAt: Date.now(),
+        expiresAt: Date.now() + 15 * 60 * 1000, // 15 mins
+        verified: false
+      });
+
+      // Send OTP directly to student's Gmail via nodemailer
+      const mailResult = await sendOtpEmail({
+        toEmail: cleanGmail,
+        fullName: cleanName,
+        otpCode,
+        purpose: 'register'
+      });
+
+      return res.json({
+        success: true,
+        message: 'លេខកូដ OTP ៦ ខ្ទង់ត្រូវបានផ្ញើចូលទៅកាន់ Gmail របស់អ្នក!',
+        email: cleanGmail,
+        previewCode: mailResult.delivered ? null : otpCode // Non-blocking preview for testing if SMTP not configured
+      });
+    } catch (err) {
+      console.error('Send register OTP error:', err);
+      res.status(500).json({ error: 'មានបញ្ហាក្នុងការផ្ញើលេខកូដ OTP សូមព្យាយាមម្តងទៀត' });
+    }
+  });
+
+  /**
+   * Verify Register OTP and Create Account
+   */
+  router.post('/auth/verify-register-otp', async (req, res) => {
+    try {
+      const { fullName, gmail, code, deviceId, userAgent } = req.body;
+
+      if (!gmail || !code) {
+        return res.status(400).json({ error: 'សូមបញ្ចូល Gmail និងលេខកូដ OTP ៦ ខ្ទង់!' });
+      }
+
+      const cleanGmail = gmail.trim().toLowerCase();
+      const cleanCode = code.toString().trim();
+      const emailKey = cleanGmail.replace(/[\.\#\$\[\]]/g, '_');
+
+      if (!db) return res.status(500).json({ error: 'ប្រព័ន្ធទិន្នន័យមិនទាន់ភ្ជាប់!' });
+
+      const snap = await db.ref(`email_verifications/${emailKey}`).once('value');
+      const vData = snap.val();
+
+      if (!vData) {
+        return res.status(404).json({ error: 'មិនមានសំណើផ្ទៀងផ្ទាត់សម្រាប់ Gmail នេះទេ! សូមចុះឈ្មោះម្តងទៀត។' });
+      }
+
+      if (vData.expiresAt && vData.expiresAt < Date.now()) {
+        return res.status(400).json({ error: 'លេខកូដ OTP បានផុតកំណត់ហើយ! សូមស្នើសុំលេខកូដថ្មី។' });
+      }
+
+      if (vData.code !== cleanCode) {
+        return res.status(400).json({ error: 'លេខកូដ OTP ៦ ខ្ទង់មិនត្រឹមត្រូវទេ! សូមពិនិត្យមើល Gmail របស់អ្នក។' });
+      }
+
+      const cleanName = (fullName || vData.fullName || 'Student').trim();
+
+      // Check if user already exists with this email
+      let userId = null;
+      const emailMapSnap = await db.ref(`users_by_email/${emailKey}`).once('value');
+      if (emailMapSnap.exists()) {
+        userId = emailMapSnap.val();
+      } else {
+        const emailPrefix = cleanGmail.split('@')[0].replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || 'student';
+        userId = `web_${emailPrefix}_${Math.random().toString(36).substring(2, 6)}`;
+        await db.ref(`users_by_email/${emailKey}`).set(userId);
+      }
+
+      // Mark email verified
+      await db.ref(`email_verifications/${emailKey}`).update({
+        verified: true,
+        verifiedAt: Date.now()
+      });
+
+      // Create or update user profile in Firebase
+      await db.ref(`users/${userId}/profile`).update({
+        name: cleanName,
+        gmail: cleanGmail,
+        gmailVerified: true,
+        registeredAt: Date.now(),
+        isWebUser: true
+      });
+
+      const isVIP = checkVIP ? await checkVIP(userId) : false;
+      const yearly = checkYearlyVIP ? await checkYearlyVIP(userId) : { eligible: false };
+
+      // Create persistent session for this device
+      const session = await createDeviceSession(userId, deviceId, userAgent || req.headers['user-agent'], req.ip);
+
+      return res.json({
+        success: true,
+        message: '🎉 ចុះឈ្មោះ និងផ្ទៀងផ្ទាត់គណនីជោគជ័យ!',
+        user: {
+          id: userId,
+          name: cleanName,
+          gmail: cleanGmail,
+          gmailVerified: true,
+          isVIP,
+          yearlyEligible: yearly.eligible,
+          vipDetails: yearly
+        },
+        deviceId: session.deviceId,
+        sessionToken: session.sessionToken
+      });
+    } catch (err) {
+      console.error('Verify register OTP error:', err);
+      res.status(500).json({ error: 'មានបញ្ហាក្នុងការផ្ទៀងផ្ទាត់ OTP' });
+    }
+  });
+
+  /**
+   * Send 6-Digit OTP to Gmail for Course Login
+   */
+  router.post('/auth/send-login-otp', async (req, res) => {
+    try {
+      const { gmail } = req.body;
+      if (!gmail) return res.status(400).json({ error: 'សូមបញ្ចូលអាសយដ្ឋាន Gmail!' });
+
+      const cleanGmail = gmail.trim().toLowerCase();
+      if (!/^[a-zA-Z0-9._%+-]+@gmail\.com$/i.test(cleanGmail)) {
+        return res.status(400).json({ error: 'តម្រូវឱ្យប្រើប្រាស់គណនី Gmail (@gmail.com) ប៉ុណ្ណោះ!' });
+      }
+
+      if (!db) return res.status(500).json({ error: 'ប្រព័ន្ធទិន្នន័យមិនទាន់ភ្ជាប់!' });
+
+      const emailKey = cleanGmail.replace(/[\.\#\$\[\]]/g, '_');
+
+      // Check if user exists
+      let studentName = 'សិស្ស (Student)';
+      const emailMapSnap = await db.ref(`users_by_email/${emailKey}`).once('value');
+      if (emailMapSnap.exists()) {
+        const uId = emailMapSnap.val();
+        const pSnap = await db.ref(`users/${uId}/profile/name`).once('value');
+        if (pSnap.exists()) studentName = pSnap.val();
+      }
+
+      const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+      await db.ref(`email_verifications/${emailKey}`).set({
+        code: otpCode,
+        fullName: studentName,
+        gmail: cleanGmail,
+        purpose: 'login',
+        createdAt: Date.now(),
+        expiresAt: Date.now() + 15 * 60 * 1000,
+        verified: false
+      });
+
+      const mailResult = await sendOtpEmail({
+        toEmail: cleanGmail,
+        fullName: studentName,
+        otpCode,
+        purpose: 'login'
+      });
+
+      return res.json({
+        success: true,
+        message: 'លេខកូដ OTP សម្រាប់ចូលគណនីត្រូវបានផ្ញើចូលទៅកាន់ Gmail របស់អ្នក!',
+        email: cleanGmail,
+        previewCode: mailResult.delivered ? null : otpCode
+      });
+    } catch (err) {
+      console.error('Send login OTP error:', err);
+      res.status(500).json({ error: 'មានបញ្ហាក្នុងការផ្ញើលេខកូដ OTP' });
+    }
+  });
+
+  /**
+   * Verify Login OTP and Establish Persistent Session
+   */
+  router.post('/auth/verify-login-otp', async (req, res) => {
+    try {
+      const { gmail, code, deviceId, userAgent } = req.body;
+      if (!gmail || !code) {
+        return res.status(400).json({ error: 'សូមបញ្ចូល Gmail និងលេខកូដ OTP!' });
+      }
+
+      const cleanGmail = gmail.trim().toLowerCase();
+      const cleanCode = code.toString().trim();
+      const emailKey = cleanGmail.replace(/[\.\#\$\[\]]/g, '_');
+
+      if (!db) return res.status(500).json({ error: 'ប្រព័ន្ធទិន្នន័យមិនទាន់ភ្ជាប់!' });
+
+      const snap = await db.ref(`email_verifications/${emailKey}`).once('value');
+      const vData = snap.val();
+
+      if (!vData) {
+        return res.status(404).json({ error: 'មិនមានសំណើផ្ទៀងផ្ទាត់សម្រាប់ Gmail នេះទេ! សូមចុចផ្ញើកូដជាមុនសិន។' });
+      }
+
+      if (vData.expiresAt && vData.expiresAt < Date.now()) {
+        return res.status(400).json({ error: 'លេខកូដ OTP បានផុតកំណត់ហើយ! សូមស្នើសុំលេខកូដថ្មី។' });
+      }
+
+      if (vData.code !== cleanCode) {
+        return res.status(400).json({ error: 'លេខកូដ OTP ៦ ខ្ទង់មិនត្រឹមត្រូវទេ!' });
+      }
+
+      // Find user by email or auto-create
+      let userId = null;
+      let userName = vData.fullName || 'Student';
+      const emailMapSnap = await db.ref(`users_by_email/${emailKey}`).once('value');
+      if (emailMapSnap.exists()) {
+        userId = emailMapSnap.val();
+        const pSnap = await db.ref(`users/${userId}/profile`).once('value');
+        const pData = pSnap.val() || {};
+        if (pData.name) userName = pData.name;
+      } else {
+        const emailPrefix = cleanGmail.split('@')[0].replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || 'student';
+        userId = `web_${emailPrefix}_${Math.random().toString(36).substring(2, 6)}`;
+        await db.ref(`users_by_email/${emailKey}`).set(userId);
+        await db.ref(`users/${userId}/profile`).set({
+          name: userName,
+          gmail: cleanGmail,
+          gmailVerified: true,
+          registeredAt: Date.now(),
+          isWebUser: true
+        });
+      }
+
+      await db.ref(`email_verifications/${emailKey}`).update({ verified: true });
+
+      const isVIP = checkVIP ? await checkVIP(userId) : false;
+      const yearly = checkYearlyVIP ? await checkYearlyVIP(userId) : { eligible: false };
+
+      const session = await createDeviceSession(userId, deviceId, userAgent || req.headers['user-agent'], req.ip);
+
+      return res.json({
+        success: true,
+        message: 'ចូលគណនីជោគជ័យ!',
+        user: {
+          id: userId,
+          name: userName,
+          gmail: cleanGmail,
+          gmailVerified: true,
+          isVIP,
+          yearlyEligible: yearly.eligible,
+          vipDetails: yearly
+        },
+        deviceId: session.deviceId,
+        sessionToken: session.sessionToken
+      });
+    } catch (err) {
+      console.error('Verify login OTP error:', err);
+      res.status(500).json({ error: 'មានបញ្ហាក្នុងការចូលគណនី' });
+    }
+  });
+
+  /**
+   * Validate Session & Device Status
+   * If device is revoked, browser will be instructed to forget account and logout!
+   */
+  router.get('/auth/check-session', async (req, res) => {
+    try {
+      const { userId, deviceId, sessionToken } = req.query;
+
+      if (!userId || !deviceId || !sessionToken) {
+        return res.json({ valid: false, reason: 'missing_params' });
+      }
+
+      if (!db) return res.status(500).json({ error: 'Database disconnected' });
+
+      const sessionSnap = await db.ref(`users/${userId}/sessions/${deviceId}`).once('value');
+      const session = sessionSnap.val();
+
+      if (!session) {
+        return res.json({
+          valid: false,
+          reason: 'revoked',
+          message: 'ឧបករណ៍ (Browser) នេះត្រូវបានផ្តាច់ចេញពីគណនីរួចហើយ!'
+        });
+      }
+
+      if (session.revoked) {
+        return res.json({
+          valid: false,
+          reason: 'revoked',
+          message: 'ឧបករណ៍ (Browser) នេះត្រូវបានផ្តាច់ចេញពីគណនីរួចហើយ!'
+        });
+      }
+
+      if (session.sessionToken !== sessionToken) {
+        return res.json({
+          valid: false,
+          reason: 'invalid_token',
+          message: 'Session Token មិនត្រឹមត្រូវទេ!'
+        });
+      }
+
+      // Update last active
+      await db.ref(`users/${userId}/sessions/${deviceId}`).update({
+        lastActive: Date.now()
+      });
+
+      return res.json({ valid: true });
+    } catch (err) {
+      console.error('Check session error:', err);
+      res.status(500).json({ error: 'Error checking session' });
+    }
+  });
+
+  /**
+   * List all Active Logged-in Devices for Current User
+   */
+  router.get('/auth/devices/:userId', async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const { currentDeviceId } = req.query;
+
+      if (!userId) return res.status(400).json({ error: 'Missing userId' });
+      if (!db) return res.status(500).json({ error: 'Database disconnected' });
+
+      const snap = await db.ref(`users/${userId}/sessions`).once('value');
+      const sessions = snap.val() || {};
+
+      const devices = Object.values(sessions)
+        .filter(s => !s.revoked)
+        .map(s => ({
+          deviceId: s.deviceId,
+          deviceName: s.deviceName || 'Web Browser',
+          ip: s.ip || 'Unknown IP',
+          createdAt: s.createdAt,
+          lastActive: s.lastActive,
+          isCurrent: s.deviceId === currentDeviceId
+        }))
+        .sort((a, b) => (b.lastActive || 0) - (a.lastActive || 0));
+
+      return res.json({
+        success: true,
+        devices
+      });
+    } catch (err) {
+      console.error('List devices error:', err);
+      res.status(500).json({ error: 'Error listing devices' });
+    }
+  });
+
+  /**
+   * Revoke (Disconnect) a specific Device
+   */
+  router.post('/auth/revoke-device', async (req, res) => {
+    try {
+      const { userId, targetDeviceId } = req.body;
+
+      if (!userId || !targetDeviceId) {
+        return res.status(400).json({ error: 'Missing userId or targetDeviceId' });
+      }
+
+      if (!db) return res.status(500).json({ error: 'Database disconnected' });
+
+      // Mark revoked in Firebase
+      await db.ref(`users/${userId}/sessions/${targetDeviceId}`).update({
+        revoked: true,
+        revokedAt: Date.now()
+      });
+
+      return res.json({
+        success: true,
+        message: 'ឧបករណ៍នេះត្រូវបានផ្តាច់ចេញពីគណនីជោគជ័យ!'
+      });
+    } catch (err) {
+      console.error('Revoke device error:', err);
+      res.status(500).json({ error: 'Error revoking device' });
+    }
+  });
+
+  /**
+   * Full Registration with Username, Password & Gmail (Legacy / Alternative)
    */
   router.post('/auth/register', async (req, res) => {
     try {
-      const { username, password, fullName, gmail, syncCode } = req.body;
+      const { username, password, fullName, gmail, syncCode, deviceId, userAgent } = req.body;
 
       if (!username || !password || !fullName || !gmail) {
         return res.status(400).json({ error: 'សូមបំពេញព័ត៌មានទាំងអស់ (ឈ្មោះពេញ, Username, Password, Gmail)!' });
@@ -164,17 +700,14 @@ Student Question: ${userText}`;
       const cleanGmail = gmail.trim().toLowerCase();
       const cleanName = fullName.trim();
 
-      // Validate Username
       if (!/^[a-zA-Z0-9_]{3,25}$/.test(cleanUser)) {
         return res.status(400).json({ error: 'Username ត្រូវតែមាន 3 ដល់ 25 តួអក្សរ (អក្សរអង់គ្លេស ឬលេខ)!' });
       }
 
-      // Validate Password
       if (password.length < 4) {
         return res.status(400).json({ error: 'Password ត្រូវមានយ៉ាងតិច 4 តួអក្សរឡើងទៅ!' });
       }
 
-      // Validate Gmail requirement (@gmail.com)
       if (!/^[a-zA-Z0-9._%+-]+@gmail\.com$/i.test(cleanGmail)) {
         return res.status(400).json({ error: 'តម្រូវឱ្យភ្ជាប់ជាមួយគណនី Gmail (@gmail.com) ត្រឹមត្រូវប៉ុណ្ណោះ!' });
       }
@@ -183,13 +716,11 @@ Student Question: ${userText}`;
         return res.status(500).json({ error: 'ប្រព័ន្ធទិន្នន័យមិនទាន់ភ្ជាប់!' });
       }
 
-      // Check if username already exists
       const userSnap = await db.ref(`web_users/${cleanUser}`).once('value');
       if (userSnap.exists()) {
         return res.status(400).json({ error: `Username "${cleanUser}" នេះមានអ្នកប្រើរួចហើយ! សូមជ្រើសរើស Username ផ្សេង។` });
       }
 
-      // Check if sync code is provided to link Telegram immediately
       let linkedTelegramId = null;
       if (syncCode) {
         const cleanCode = syncCode.toString().trim();
@@ -204,34 +735,6 @@ Student Question: ${userText}`;
       const passwordHashed = hashPassword(password);
       const effectiveUserId = linkedTelegramId || webUserId;
 
-      // 1. Firebase Authentication Account Sync
-      let firebaseUid = null;
-      let verificationLink = null;
-      if (auth) {
-        try {
-          let userRecord;
-          try {
-            userRecord = await auth.getUserByEmail(cleanGmail);
-          } catch (notFound) {
-            userRecord = await auth.createUser({
-              email: cleanGmail,
-              password: password,
-              displayName: cleanName,
-              emailVerified: false
-            });
-          }
-          firebaseUid = userRecord.uid;
-          try {
-            verificationLink = await auth.generateEmailVerificationLink(cleanGmail);
-          } catch (linkErr) {
-            console.warn('generateEmailVerificationLink note:', linkErr.message);
-          }
-        } catch (authErr) {
-          console.warn('Firebase Auth user creation note:', authErr.message);
-        }
-      }
-
-      // 2. Generate 6-Digit Email Verification Code stored in Firebase
       const verifyCode = Math.floor(100000 + Math.random() * 900000).toString();
       const emailKey = cleanGmail.replace(/[\.\#\$\[\]]/g, '_');
 
@@ -239,12 +742,19 @@ Student Question: ${userText}`;
         code: verifyCode,
         gmail: cleanGmail,
         username: cleanUser,
+        fullName: cleanName,
         userId: effectiveUserId,
-        firebaseUid: firebaseUid || null,
-        verificationLink: verificationLink || null,
         createdAt: Date.now(),
-        expiresAt: Date.now() + 30 * 60 * 1000, // 30 minutes
+        expiresAt: Date.now() + 15 * 60 * 1000,
         verified: false
+      });
+
+      // Send OTP to Gmail
+      const mailResult = await sendOtpEmail({
+        toEmail: cleanGmail,
+        fullName: cleanName,
+        otpCode: verifyCode,
+        purpose: 'register'
       });
 
       const record = {
@@ -253,15 +763,14 @@ Student Question: ${userText}`;
         gmail: cleanGmail,
         passwordHash: passwordHashed,
         userId: webUserId,
-        firebaseUid: firebaseUid || null,
         createdAt: Date.now(),
-        gmailVerified: false, // will be marked true upon 6-digit code or link verification
+        gmailVerified: false,
         linkedTelegramId
       };
 
       await db.ref(`web_users/${cleanUser}`).set(record);
+      await db.ref(`users_by_email/${emailKey}`).set(effectiveUserId);
 
-      // Initialize user profile in global users collection
       await db.ref(`users/${effectiveUserId}/profile`).update({
         name: cleanName,
         username: cleanUser,
@@ -273,13 +782,13 @@ Student Question: ${userText}`;
       });
 
       const isVIP = checkVIP ? await checkVIP(effectiveUserId) : false;
+      const session = await createDeviceSession(effectiveUserId, deviceId, userAgent || req.headers['user-agent'], req.ip);
 
       return res.json({
         success: true,
         requiresVerification: true,
-        message: 'គណនី Gmail ត្រូវបានចុះឈ្មោះជាមួយ Firebase! សូមផ្ទៀងផ្ទាត់លេខកូដ ៦ ខ្ទង់។',
-        verificationCode: verifyCode, // Provided for instant verification preview
-        verificationLink: verificationLink || null,
+        message: 'គណនី Gmail ត្រូវបានចុះឈ្មោះ! សូមផ្ទៀងផ្ទាត់លេខកូដ OTP ៦ ខ្ទង់ដែលបានផ្ញើទៅ Gmail។',
+        verificationCode: mailResult.delivered ? null : verifyCode,
         user: {
           id: effectiveUserId,
           name: cleanName,
@@ -289,7 +798,9 @@ Student Question: ${userText}`;
           isTelegram: !!linkedTelegramId,
           linkedTelegramId,
           isVIP
-        }
+        },
+        deviceId: session.deviceId,
+        sessionToken: session.sessionToken
       });
     } catch (err) {
       console.error('Registration error:', err);
@@ -298,7 +809,7 @@ Student Question: ${userText}`;
   });
 
   /**
-   * Verify Email with 6-digit Code (Firebase Email Verification)
+   * Verify Email with 6-digit Code
    */
   router.post('/auth/verify-email-code', async (req, res) => {
     try {
@@ -328,7 +839,6 @@ Student Question: ${userText}`;
         return res.status(400).json({ error: 'លេខកូដផ្ទៀងផ្ទាត់ ៦ ខ្ទង់មិនត្រឹមត្រូវទេ!' });
       }
 
-      // Mark verified in Firebase Database
       await db.ref(`email_verifications/${emailKey}`).update({
         verified: true,
         verifiedAt: Date.now()
@@ -348,18 +858,9 @@ Student Question: ${userText}`;
         });
       }
 
-      // Mark verified in Firebase Authentication if auth available
-      if (auth && vData.firebaseUid) {
-        try {
-          await auth.updateUser(vData.firebaseUid, { emailVerified: true });
-        } catch (e) {
-          console.warn('Firebase Auth emailVerified update note:', e.message);
-        }
-      }
-
       return res.json({
         success: true,
-        message: '✅ គណនី Gmail ត្រូវបានផ្ទៀងផ្ទាត់ជោគជ័យជាមួយ Firebase!'
+        message: '✅ គណនី Gmail ត្រូវបានផ្ទៀងផ្ទាត់ជោគជ័យ!'
       });
     } catch (err) {
       console.error('Verify email code error:', err);
@@ -384,27 +885,25 @@ Student Question: ${userText}`;
       const vData = snap.val() || {};
 
       const newCode = Math.floor(100000 + Math.random() * 900000).toString();
-      let verificationLink = vData.verificationLink;
-
-      if (auth && !verificationLink) {
-        try {
-          verificationLink = await auth.generateEmailVerificationLink(cleanGmail);
-        } catch (e) {}
-      }
 
       await db.ref(`email_verifications/${emailKey}`).update({
         code: newCode,
-        verificationLink: verificationLink || null,
         createdAt: Date.now(),
-        expiresAt: Date.now() + 30 * 60 * 1000,
+        expiresAt: Date.now() + 15 * 60 * 1000,
         verified: false
+      });
+
+      const mailResult = await sendOtpEmail({
+        toEmail: cleanGmail,
+        fullName: vData.fullName || 'Student',
+        otpCode: newCode,
+        purpose: 'register'
       });
 
       return res.json({
         success: true,
-        message: 'លេខកូដផ្ទៀងផ្ទាត់ថ្មីត្រូវបានបង្កើតរួចរាល់!',
-        verificationCode: newCode,
-        verificationLink
+        message: 'លេខកូដផ្ទៀងផ្ទាត់ថ្មីត្រូវបានផ្ញើទៅកាន់ Gmail!',
+        verificationCode: mailResult.delivered ? null : newCode
       });
     } catch (err) {
       console.error('Resend email error:', err);
@@ -440,7 +939,7 @@ Student Question: ${userText}`;
    */
   router.post('/auth/login', async (req, res) => {
     try {
-      const { username, password } = req.body;
+      const { username, password, deviceId, userAgent } = req.body;
       if (!username || !password) {
         return res.status(400).json({ error: 'សូមបញ្ចូល Username និង Password!' });
       }
@@ -462,10 +961,11 @@ Student Question: ${userText}`;
         return res.status(401).json({ error: 'ពាក្យសម្ងាត់ (Password) មិនត្រឹមត្រូវទេ!' });
       }
 
-      // If this web user has linked their Telegram account, use their Telegram ID so all data is synced!
       const effectiveUserId = account.linkedTelegramId || account.userId;
       const isVIP = checkVIP ? await checkVIP(effectiveUserId) : false;
       const yearly = checkYearlyVIP ? await checkYearlyVIP(effectiveUserId) : { eligible: false };
+
+      const session = await createDeviceSession(effectiveUserId, deviceId, userAgent || req.headers['user-agent'], req.ip);
 
       return res.json({
         success: true,
@@ -480,7 +980,9 @@ Student Question: ${userText}`;
           isVIP,
           yearlyEligible: yearly.eligible,
           vipDetails: yearly
-        }
+        },
+        deviceId: session.deviceId,
+        sessionToken: session.sessionToken
       });
     } catch (err) {
       console.error('Login error:', err);
@@ -493,7 +995,7 @@ Student Question: ${userText}`;
    */
   router.post('/auth/sync-code', async (req, res) => {
     try {
-      const { code, currentUserId } = req.body;
+      const { code, currentUserId, deviceId, userAgent } = req.body;
       if (!code) {
         return res.status(400).json({ error: 'សូមបញ្ចូលលេខកូដ ៦ ខ្ទង់!' });
       }
@@ -514,7 +1016,6 @@ Student Question: ${userText}`;
 
       const telegramUserId = syncData.telegramId.toString();
 
-      // If user is currently logged in with a web account, link it
       if (currentUserId && currentUserId.startsWith('web_')) {
         const username = currentUserId.replace('web_', '');
         await db.ref(`web_users/${username}`).update({
@@ -526,13 +1027,14 @@ Student Question: ${userText}`;
       // Remove used sync code
       await db.ref(`sync_codes/${cleanCode}`).remove();
 
-      // Fetch Telegram profile
       const tgSnap = await db.ref(`users/${telegramUserId}`).once('value');
       const tgData = tgSnap.val() || {};
       const tgProfile = tgData.profile || {};
 
       const isVIP = checkVIP ? await checkVIP(telegramUserId) : false;
       const yearly = checkYearlyVIP ? await checkYearlyVIP(telegramUserId) : { eligible: false };
+
+      const session = await createDeviceSession(telegramUserId, deviceId, userAgent || req.headers['user-agent'], req.ip);
 
       return res.json({
         success: true,
@@ -547,7 +1049,9 @@ Student Question: ${userText}`;
           vipDetails: yearly,
           completedLessonsCount: Object.keys(tgData.completed_lessons || {}).length,
           certificatesCount: Object.keys(tgData.subject_certifications || {}).length
-        }
+        },
+        deviceId: session.deviceId,
+        sessionToken: session.sessionToken
       });
     } catch (err) {
       console.error('Sync code error:', err);

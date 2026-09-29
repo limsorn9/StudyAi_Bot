@@ -13,6 +13,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Battambang:wght@400;700;900&family=Inter:wght@400;500;600;700;800&family=Moul&family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 
+  <link rel="icon" type="image/png" href="/school_logo.png">
+  <link rel="apple-touch-icon" href="/school_logo.png">
+
   <link rel="stylesheet" href="/style.css">
 </head>
 <body class="dark-theme">
@@ -26,8 +29,8 @@
     <!-- Top Navigation Header -->
     <header class="navbar">
       <div class="nav-brand" onclick="navigateTo('dashboard')">
-        <div class="logo-badge">
-          <span>SS</span>
+        <div class="logo-badge school-logo-container">
+          <img src="/school_logo.png" alt="Teacher SSOnline Logo" class="brand-logo-img">
         </div>
         <div class="brand-text">
           <div class="brand-title">Teacher SSOnline</div>
@@ -112,13 +115,15 @@
             </div>
           </div>
           <div class="hero-art">
-            <div class="art-card glass-panel">
-              <div class="art-icon">🏛️</div>
-              <div class="art-title">វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស</div>
+            <div class="art-card glass-panel text-center">
+              <div class="art-logo-wrap">
+                <img src="/school_logo.png" alt="វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline" class="hero-school-logo">
+              </div>
+              <div class="art-title mt-2">វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស</div>
               <div class="art-sub">Teacher SSOnline</div>
               <div class="art-director">👨‍💼 នាយកសាលា៖ លីម សន (Lim Sorn)</div>
               <div class="art-seal">
-                <span>★ VERIFIED ★</span>
+                <span>★ OFFICIAL VERIFIED ★</span>
               </div>
             </div>
           </div>
@@ -589,95 +594,162 @@
 
   <!-- 1. LOGIN MODAL -->
   <div id="loginModal" class="modal-overlay hidden">
-    <div class="modal-card glass-panel">
+    <div class="modal-card glass-panel max-w-md">
       <div class="modal-header">
-        <div class="modal-title">🔐 ចូលប្រើប្រព័ន្ធ (Login)</div>
+        <div class="modal-title">🔐 ចូលរៀនលើវេបសាយ (Login)</div>
         <button class="modal-close" onclick="closeModal('loginModal')">✕</button>
       </div>
 
       <div class="modal-tabs">
-        <button class="tab-btn active" id="loginTabStandard" onclick="switchLoginTab('standard')">Username & Password</button>
-        <button class="tab-btn" id="loginTabSync" onclick="switchLoginTab('sync')">📱 កូដ Telegram (Sync)</button>
+        <button class="tab-btn active" id="loginTabTg" onclick="switchLoginTab('telegram')">📱 ចូលតាម Telegram</button>
+        <button class="tab-btn" id="loginTabEmail" onclick="switchLoginTab('email')">📧 ចូលតាម Gmail</button>
       </div>
 
-      <!-- Standard Login Form -->
-      <form id="standardLoginForm" onsubmit="handleStandardLogin(event)">
-        <div class="form-group">
-          <label>ឈ្មោះអ្នកប្រើ (Username)</label>
-          <input type="text" id="loginUsername" required placeholder="បញ្ចូល username របស់អ្នក">
-        </div>
-        <div class="form-group">
-          <label>ពាក្យសម្ងាត់ (Password)</label>
-          <input type="password" id="loginPassword" required placeholder="បញ្ចូលពាក្យសម្ងាត់">
-        </div>
-        <button type="submit" class="btn btn-primary btn-block btn-lg">
-          <span>ចូលគណនី (Login) 🚀</span>
-        </button>
-      </form>
-
-      <!-- Telegram Sync Code Login -->
-      <form id="syncCodeLoginForm" class="hidden" onsubmit="handleSyncCodeLogin(event)">
+      <!-- Option 1: Login via Telegram -->
+      <div id="loginSectionTg">
         <div class="sync-info-box">
-          💡 បើក <strong>Telegram Bot @TeacherSornAiBot</strong> រួចវាយពាក្យ <code>/link</code> ដើម្បីទទួលលេខកូដ ៦ ខ្ទង់។
+          🤖 <strong>ជម្រើសទី ១៖ ចូលអូតូដោយចុចលើ Telegram Bot</strong><br>
+          <span class="text-xs text-slate-300">ចុចប៊ូតុងខាងក្រោមដើម្បីបើក Bot ហើយប្រព័ន្ធនឹង Login លើ Browser នេះស្វ័យប្រវត្ត!</span>
         </div>
-        <div class="form-group">
-          <label>លេខកូដសម្គាល់ ៦ ខ្ទង់ (Sync Code)</label>
-          <input type="text" id="loginSyncCode" maxlength="6" required placeholder="ឧ. 123456" class="text-center font-mono">
-        </div>
-        <button type="submit" class="btn btn-cyan btn-block btn-lg">
-          <span>ចូលតាម Telegram (Instant Login) 📱</span>
+        <button type="button" class="btn btn-cyan btn-block btn-lg mb-3" onclick="startTelegramOneClickLogin()">
+          <span>🤖 ចូលរៀនតាម Telegram (1-Click Login)</span>
         </button>
-      </form>
 
-      <div class="modal-footer-note">
-        មិនទាន់មានគណនីមែនទេ? <a href="#" onclick="openRegisterModal(); closeModal('loginModal');">ចុះឈ្មោះទីនេះ (ភ្ជាប់ Gmail)</a>
+        <div class="divider-text"><span>ឬបញ្ចូលលេខកូដ ៦ ខ្ទង់</span></div>
+
+        <form id="syncCodeLoginForm" onsubmit="handleSyncCodeLogin(event)">
+          <div class="form-group">
+            <label>លេខកូដសម្គាល់ Telegram ៦ ខ្ទង់ (/link)</label>
+            <input type="text" id="loginSyncCode" maxlength="6" placeholder="ឧ. 123456" class="text-center font-mono tracking-widest text-xl">
+          </div>
+          <button type="submit" class="btn btn-outline btn-block">
+            <span>🔗 ចូលដោយប្រើកូដ Sync</span>
+          </button>
+        </form>
+      </div>
+
+      <!-- Option 2: Login via Gmail (OTP / Password) -->
+      <div id="loginSectionEmail" class="hidden">
+        <div class="gmail-notice-box">
+          <span class="g-icon">✉️</span>
+          <span>បញ្ចូល Gmail របស់អ្នកដើម្បីទទួលលេខកូដ OTP ៦ ខ្ទង់ ផ្ញើចូលប្រអប់សំបុត្រ Gmail ដោយផ្ទាល់!</span>
+        </div>
+
+        <form id="emailOtpLoginForm" onsubmit="handleSendLoginOtp(event)">
+          <div class="form-group">
+            <label>អាសយដ្ឋាន Gmail (@gmail.com)</label>
+            <input type="email" id="loginGmailInput" required placeholder="ឧ. yourname@gmail.com">
+          </div>
+          <button type="submit" id="btnSendLoginOtp" class="btn btn-gold btn-block btn-lg">
+            <span>📩 ផ្ញើលេខកូដ OTP ទៅ Gmail</span>
+          </button>
+        </form>
+
+        <form id="verifyLoginOtpForm" class="hidden mt-3" onsubmit="handleVerifyLoginOtp(event)">
+          <div class="form-group text-center">
+            <label>បញ្ចូលលេខកូដ OTP ៦ ខ្ទង់ដែលបានផ្ញើទៅ Gmail</label>
+            <input type="text" id="loginOtpCodeInput" maxlength="6" required placeholder="0 0 0 0 0 0" class="text-center font-mono text-2xl tracking-widest form-input">
+          </div>
+          <div id="loginOtpPreviewHint" class="verification-demo-hint hidden">
+            <span>💡 លេខកូដសម្គាល់: <strong id="loginOtpPreviewVal" class="text-amber-400 font-mono">------</strong></span>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block btn-lg mt-2">
+            <span>🚀 ផ្ទៀងផ្ទាត់ និងចូលរៀន (Login)</span>
+          </button>
+          <div class="text-center mt-2">
+            <button type="button" class="btn-link-action text-xs" onclick="resetEmailLoginForm()">← ប្រើ Gmail ផ្សេង</button>
+          </div>
+        </form>
+
+        <!-- Toggle for traditional password login -->
+        <div class="mt-3 text-center">
+          <button type="button" class="btn-link-action text-xs text-slate-400" onclick="togglePasswordLogin()">
+            🔐 ឬចូលដោយប្រើ Password
+          </button>
+        </div>
+
+        <form id="standardLoginForm" class="hidden mt-3" onsubmit="handleStandardLogin(event)">
+          <div class="form-group">
+            <label>Username ឬ Gmail</label>
+            <input type="text" id="loginUsername" placeholder="បញ្ចូល username">
+          </div>
+          <div class="form-group">
+            <label>ពាក្យសម្ងាត់ (Password)</label>
+            <input type="password" id="loginPassword" placeholder="បញ្ចូលពាក្យសម្ងាត់">
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">
+            <span>ចូលដោយ Password</span>
+          </button>
+        </form>
+      </div>
+
+      <div class="modal-footer-note mt-3">
+        មិនទាន់មានគណនីមែនទេ? <a href="#" onclick="openRegisterModal(); closeModal('loginModal');">ចុះឈ្មោះចូលរៀនទីនេះ</a>
       </div>
     </div>
   </div>
 
-  <!-- 2. REGISTER MODAL (Strict Gmail requirement) -->
+  <!-- 2. REGISTER MODAL (Telegram Auto-Enroll OR Gmail + OTP) -->
   <div id="registerModal" class="modal-overlay hidden">
-    <div class="modal-card glass-panel">
+    <div class="modal-card glass-panel max-w-md">
       <div class="modal-header">
-        <div class="modal-title">📝 ចុះឈ្មោះគណនីថ្មី (Register)</div>
+        <div class="modal-title">📝 ចុះឈ្មោះចូលរៀន (Course Registration)</div>
         <button class="modal-close" onclick="closeModal('registerModal')">✕</button>
       </div>
 
-      <div class="gmail-notice-box">
-        <span class="g-icon">📧</span>
-        <span>តម្រូវឱ្យភ្ជាប់ជាមួយគណនី <strong>Gmail (@gmail.com)</strong> ត្រឹមត្រូវដើម្បីធានាសុវត្ថិភាព និងទទួលវិញ្ញាបនបត្រ!</span>
+      <div class="modal-tabs">
+        <button class="tab-btn active" id="regTabGmail" onclick="switchRegTab('gmail')">📧 ចុះឈ្មោះតាម Gmail</button>
+        <button class="tab-btn" id="regTabTg" onclick="switchRegTab('telegram')">📱 ចុះឈ្មោះតាម Telegram</button>
       </div>
 
-      <form onsubmit="handleRegister(event)">
-        <div class="form-group">
-          <label>ឈ្មោះពេញ (Full Name សម្រាប់ដាក់លើវិញ្ញាបនបត្រ)</label>
-          <input type="text" id="regFullName" required placeholder="ឧ. លីម សន ឬ Lim Sorn">
+      <!-- Option A: Register via Gmail (Name + Gmail -> OTP to Gmail) -->
+      <div id="regSectionGmail">
+        <div class="gmail-notice-box">
+          <span class="g-icon">📧</span>
+          <span>បំពេញឈ្មោះ និង Gmail របស់អ្នក។ ប្រព័ន្ធនឹងផ្ញើលេខកូដ OTP ៦ ខ្ទង់ទៅកាន់ Gmail របស់អ្នកដើម្បីបញ្ជាក់ថាជា Gmail របស់អ្នកពិតប្រាកដ (មិនមែនយកពី Telegram ទេ)។</span>
         </div>
-        <div class="form-group">
-          <label>ឈ្មោះអ្នកប្រើ (Username)</label>
-          <input type="text" id="regUsername" required placeholder="អក្សរតូច និងលេខ ឧ. sorn123">
-        </div>
-        <div class="form-group">
-          <label>គណនី Gmail (@gmail.com)</label>
-          <input type="email" id="regGmail" required placeholder="ឧ. yourname@gmail.com">
-          <small class="form-hint">ត្រូវតែបញ្ចប់ដោយ @gmail.com</small>
-        </div>
-        <div class="form-group">
-          <label>ពាក្យសម្ងាត់ (Password)</label>
-          <input type="password" id="regPassword" required placeholder="យ៉ាងតិច ៤ តួអក្សរ">
-        </div>
-        <div class="form-group">
-          <label>កូដ Telegram Sync (មិនបង្ខំ - បើមាន)</label>
-          <input type="text" id="regSyncCode" maxlength="6" placeholder="បញ្ចូលកូដ ៦ ខ្ទង់ពី Bot បើចង់ Link ភ្លាមៗ">
-        </div>
-        <button type="submit" class="btn btn-gold btn-block btn-lg">
-          <span>ចុះឈ្មោះ និងបង្កើតគណនី 🎉</span>
-        </button>
-      </form>
 
-      <div class="modal-footer-note">
+        <form id="gmailRegisterForm" onsubmit="handleSendRegisterOtp(event)">
+          <div class="form-group">
+            <label>ឈ្មោះពេញ (Full Name សម្រាប់វិញ្ញាបនបត្រ)</label>
+            <input type="text" id="regFullName" required placeholder="ឧ. លីម សន ឬ Lim Sorn">
+          </div>
+          <div class="form-group">
+            <label>អាសយដ្ឋាន Gmail (@gmail.com)</label>
+            <input type="email" id="regGmail" required placeholder="ឧ. yourname@gmail.com">
+            <small class="form-hint">ត្រូវតែបញ្ចប់ដោយ @gmail.com</small>
+          </div>
+          <button type="submit" id="btnSubmitRegGmail" class="btn btn-gold btn-block btn-lg">
+            <span>📩 ផ្ញើលេខកូដ OTP ទៅ Gmail & ចុះឈ្មោះ</span>
+          </button>
+        </form>
+      </div>
+
+      <!-- Option B: Register via Telegram (Auto-enrolls into Telegram bot) -->
+      <div id="regSectionTg" class="hidden">
+        <div class="sync-info-box">
+          🤖 <strong>ចុះឈ្មោះចូលរៀនអូតូតាម Telegram Bot</strong><br>
+          <span class="text-xs text-slate-300">
+            គ្រាន់តែចុចប៊ូតុងខាងក្រោម ប្រព័ន្ធនឹងបើក Telegram Bot <strong>@TeacherSornAiBot</strong> ហើយចុះឈ្មោះអ្នកចូលរៀនភ្លាមៗដោយស្វ័យប្រវត្តតែម្តង!
+          </span>
+        </div>
+
+        <div class="text-center my-4">
+          <a href="https://t.me/TeacherSornAiBot?start=web_enroll" target="_blank" class="btn btn-cyan btn-block btn-lg" onclick="handleTelegramEnrollClick()">
+            <span>🤖 បើក Telegram Bot ដើម្បីចុះឈ្មោះអូតូ 🚀</span>
+          </a>
+        </div>
+
+        <div class="text-center text-xs text-slate-400">
+          បន្ទាប់ពីចុចចុះឈ្មោះលើ Bot រួច អ្នកអាចចូលរៀនលើ Telegram ឬយកលេខកូដ ៦ ខ្ទង់មកចូលរៀនលើ Browser នេះបានភ្លាមៗ!
+        </div>
+      </div>
+
+      <div class="modal-footer-note mt-3">
         មានគណនីរួចហើយ? <a href="#" onclick="openLoginModal(); closeModal('registerModal');">ចូលគណនីទីនេះ</a>
       </div>
+    </div>
+  </div>
     </div>
   </div>
 

@@ -138,6 +138,26 @@ body {
   box-shadow: 0 0 15px rgba(79, 70, 229, 0.4);
 }
 
+.logo-badge.school-logo-container {
+  background: transparent;
+  box-shadow: none;
+}
+
+.brand-logo-img {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: contain;
+  box-shadow: 0 0 16px rgba(6, 182, 212, 0.4);
+  border: 2px solid rgba(251, 191, 36, 0.5);
+  background: #fff;
+  transition: transform 0.3s ease;
+}
+
+.nav-brand:hover .brand-logo-img {
+  transform: scale(1.08) rotate(3deg);
+}
+
 .brand-title {
   font-family: var(--font-english);
   font-weight: 800;
@@ -501,6 +521,27 @@ body {
   position: relative;
   background: rgba(22, 32, 54, 0.85);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+
+.art-logo-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+.hero-school-logo {
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  object-fit: contain;
+  box-shadow: 0 0 24px rgba(6, 182, 212, 0.45);
+  border: 3px solid rgba(251, 191, 36, 0.6);
+  background: #fff;
+  transition: transform 0.4s ease;
+}
+
+.hero-school-logo:hover {
+  transform: scale(1.08) rotate(5deg);
 }
 
 .art-icon {

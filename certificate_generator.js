@@ -5,6 +5,8 @@
  */
 
 const QRCode = require('qrcode');
+const fs = require('fs');
+const path = require('path');
 
 /**
  * Format Grade Title
@@ -88,12 +90,25 @@ async function generateCertificateHTML(data) {
     console.error("QR Code Error:", err);
   }
 
+  // Load School Logo Base64
+  let schoolLogoDataUrl = '';
+  try {
+    const logoFile = path.join(__dirname, 'public', 'school_logo.png');
+    if (fs.existsSync(logoFile)) {
+      const b64 = fs.readFileSync(logoFile).toString('base64');
+      schoolLogoDataUrl = `data:image/png;base64,${b64}`;
+    }
+  } catch (err) {
+    console.error("School Logo Load Error:", err);
+  }
+
   return `<!DOCTYPE html>
 <html lang="km">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Certificate - ${studentName} - Teacher SSOnline</title>
+  <link rel="icon" type="image/png" href="${schoolLogoDataUrl || '/school_logo.png'}">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Battambang:wght@400;700;900&family=Cinzel:wght@600;800;900&family=Playfair+Display:ital,wght@0,600;0,800;1,400&family=Moul&display=swap" rel="stylesheet">
@@ -200,37 +215,49 @@ async function generateCertificateHTML(data) {
     }
 
     /* Top Section */
+    .cert-header-logo-row {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 2px;
+    }
+    .cert-header-logo {
+      width: 54px;
+      height: 54px;
+      border-radius: 50%;
+      object-fit: contain;
+      box-shadow: 0 2px 8px rgba(197, 160, 89, 0.4);
+    }
     .academy-header {
       font-family: 'Moul', cursive;
-      font-size: 22px;
+      font-size: 21px;
       color: #1e3a8a;
       letter-spacing: 0.5px;
       margin-bottom: 2px;
     }
     .sub-academy {
       font-family: 'Cinzel', serif;
-      font-size: 13px;
-      letter-spacing: 3px;
+      font-size: 12px;
+      letter-spacing: 2.5px;
       color: #c5a059;
       font-weight: 800;
       text-transform: uppercase;
-      margin-bottom: 12px;
+      margin-bottom: 10px;
     }
     .cert-title-kh {
       font-family: 'Moul', cursive;
-      font-size: 28px;
+      font-size: 26px;
       color: #c5a059;
       margin-bottom: 2px;
       text-shadow: 0 1px 2px rgba(0,0,0,0.08);
     }
     .cert-title-en {
       font-family: 'Cinzel', serif;
-      font-size: 16px;
+      font-size: 15px;
       font-weight: 900;
       color: #334155;
-      letter-spacing: 3px;
+      letter-spacing: 2.5px;
       text-transform: uppercase;
-      margin-bottom: 12px;
+      margin-bottom: 10px;
     }
     .presented-text {
       font-family: 'Playfair Display', serif;
@@ -352,24 +379,22 @@ async function generateCertificateHTML(data) {
       letter-spacing: 0.5px;
     }
 
-    .seal {
+    .seal-logo-wrap {
       width: 82px;
       height: 82px;
-      border: 3px double #c5a059;
-      border-radius: 50%;
       display: flex;
-      flex-direction: column;
-      justify-content: center;
       align-items: center;
-      background: #fdfaf3;
-      color: #9c7a36;
-      font-family: 'Cinzel', serif;
-      font-weight: 900;
-      box-shadow: 0 2px 8px rgba(197, 160, 89, 0.25);
+      justify-content: center;
     }
-    .seal-stars { font-size: 9px; }
-    .seal-title { font-size: 9px; letter-spacing: 1px; margin: 1px 0; }
-    .seal-inst { font-size: 7.5px; color: #1e3a8a; font-weight: 800; }
+    .cert-official-seal-img {
+      width: 82px;
+      height: 82px;
+      border-radius: 50%;
+      object-fit: contain;
+      box-shadow: 0 4px 14px rgba(197, 160, 89, 0.4);
+      border: 2px solid #c5a059;
+      background: #fff;
+    }
 
     .bottom-meta {
       font-size: 10px;
@@ -413,6 +438,9 @@ async function generateCertificateHTML(data) {
 
         <!-- Header -->
         <div>
+          <div class="cert-header-logo-row">
+            <img src="${schoolLogoDataUrl || '/school_logo.png'}" alt="Teacher SSOnline Logo" class="cert-header-logo" />
+          </div>
           <div class="academy-header">វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline</div>
           <div class="sub-academy">Teacher SSOnline English Institute • Automated Academy</div>
 
@@ -466,11 +494,8 @@ async function generateCertificateHTML(data) {
                 <div class="qr-text">SCAN TO VERIFY</div>
               </div>
 
-              <div class="seal">
-                <span class="seal-stars">★ ★ ★</span>
-                <span class="seal-title">OFFICIAL</span>
-                <span class="seal-title" style="color:#1e3a8a;">VERIFIED</span>
-                <span class="seal-inst">SSONLINE</span>
+              <div class="seal-logo-wrap">
+                <img src="${schoolLogoDataUrl || '/school_logo.png'}" alt="Official School Seal" class="cert-official-seal-img" />
               </div>
             </div>
 
