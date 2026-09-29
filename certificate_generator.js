@@ -273,24 +273,34 @@ async function generateCertificateHTML(data) {
     }
 
     /* -------- BODY -------- */
-    .cert-body { text-align: center; position: relative; z-index: 1; flex: 1; margin-top: 6px; }
-    .cert-institute-certifies {
-      font-size: 14px; color: #1e3a8a; font-weight: 700; margin-bottom: 2px;
+    .cert-body { text-align: center; position: relative; z-index: 1; flex: 1; margin-top: 10px; }
+    .cert-line-1 {
+      font-family: 'Khmer OS Muol Light', 'Khmer OS Moul Light', 'Moul', cursive;
+      font-size: 17px;
+      font-weight: normal;
+      color: #1e3a8a;
+      line-height: 1.6;
+      margin-bottom: 6px;
+      letter-spacing: 0.3px;
     }
-    .certifies-lbl {
-      font-family: 'Moul', cursive; font-size: 13.5px; color: #0f172a; margin-bottom: 6px;
+    .cert-line-2 {
+      font-family: 'Khmer OS Muol Light', 'Khmer OS Moul Light', 'Moul', cursive;
+      font-size: 16px;
+      font-weight: normal;
+      color: #0f172a;
+      line-height: 1.6;
+      margin-bottom: 12px;
+      letter-spacing: 0.3px;
     }
-    .name-row {
-      display: flex; align-items: baseline; justify-content: center; gap: 10px;
-      margin: 6px 0 10px 0;
-    }
-    .name-prefix { font-size: 15px; color: #334155; font-weight: bold; }
     .stu-name {
       display: inline-block;
-      font-family: 'Battambang', sans-serif;
-      font-size: 32px; font-weight: 900; color: #0f172a;
+      font-family: 'Khmer OS Muol Light', 'Khmer OS Moul Light', 'Moul', 'Battambang', sans-serif;
+      font-size: 34px;
+      font-weight: bold;
+      color: #0f172a;
       border-bottom: 2.5px solid #c5a059;
-      padding: 0 36px 4px 36px;
+      padding: 0 40px 6px 40px;
+      margin-bottom: 14px;
     }
     .achieve { font-size: 14px; color: #334155; line-height: 1.9; }
     .subj-red { font-size: 18px; font-weight: 900; color: #8b1c1c; }
@@ -462,16 +472,11 @@ async function generateCertificateHTML(data) {
 
       <div class="orn-div"><div class="orn-bar"></div><span class="orn-sym">❖</span><div class="orn-bar"></div></div>
 
-      <!-- BODY -->
+      <!-- BODY: 2 lines with FONT KHMER OS MOULIGHT -->
       <div class="cert-body">
-        <p class="cert-institute-certifies">
-          វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline
-        </p>
-        <p class="certifies-lbl">សូមបញ្ជាក់ថា ៖</p>
-        <div class="name-row">
-          <span class="name-prefix">ឈ្មោះ ៖</span>
-          <span class="stu-name">${studentName}</span>
-        </div>
+        <div class="cert-line-1">វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline</div>
+        <div class="cert-line-2">សូមប្រគល់ជូនសិស្សឈ្មោះ</div>
+        <div class="stu-name">${studentName}</div>
         <p class="achieve">
           បានប្រឡងបញ្ចប់ដោយជោគជ័យ${isAnnualExam ? 'នូវការប្រឡងបញ្ចប់មុខវិជ្ជាប្រចាំឆ្នាំ' : 'នូវវគ្គបណ្តុះបណ្តាល'}<br>
           <span class="subj-red">「 ${certTitle} 」</span>
