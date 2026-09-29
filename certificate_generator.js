@@ -29,6 +29,10 @@ function generateCertificateCard(data) {
   const examType = isAnnualExam ? '🏆 ការប្រឡងបញ្ចប់មុខវិជ្ជាប្រចាំឆ្នាំ' : '📚 ការប្រឡងបញ្ចប់មេរៀន';
   const certType = isAnnualExam ? 'វិញ្ញាបនបត្របញ្ចប់មុខវិជ្ជាប្រចាំឆ្នាំ' : 'វិញ្ញាបនបត្របញ្ចប់មេរៀនជោគជ័យ';
 
+  const baseUrl = process.env.RENDER_EXTERNAL_URL || process.env.BASE_URL || '';
+  const verifyWebUrl = baseUrl ? `${baseUrl}/cert/${certId}` : null;
+  const verifyTgUrl = `https://t.me/TeacherSornAiBot?start=verify_${certId}`;
+
   return (
     `╔════════════════════════════════════════════╗\n` +
     `   🎓 *វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline* 🎓\n` +
@@ -49,7 +53,8 @@ function generateCertificateCard(data) {
     `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
     `👨‍🏫 *គ្រូបន្ទុកថ្នាក់ (Instructor):* TeacherSornAiBot\n` +
     `👨‍💼 *នាយកសាលារៀន (School Director):* លីម សន (Lim Sorn)\n` +
-    `🌐 *ផ្ទៀងផ្ទាត់ QR Code:* \`https://t.me/TeacherSornAiBot?start=verify_${certId}\``
+    (verifyWebUrl ? `🌐 *មើលតាម Web:* ${verifyWebUrl}\n` : '') +
+    `📱 *ផ្ទៀងផ្ទាត់ QR Code:* \`${verifyTgUrl}\``
   );
 }
 
@@ -62,7 +67,11 @@ async function generateCertificateHTML(data) {
   const gradeTitle = getGradeTitle(grade);
   const certHeading = isAnnualExam ? 'វិញ្ញាបនបត្របញ្ចប់មុខវិជ្ជាប្រចាំឆ្នាំ' : 'វិញ្ញាបនបត្របញ្ចប់មេរៀនជោគជ័យ';
   const certSubheading = isAnnualExam ? 'ANNUAL SUBJECT FINAL EXAMINATION CERTIFICATE' : 'CERTIFICATE OF ACHIEVEMENT & COMPLETION';
-  const verifyUrl = `https://t.me/TeacherSornAiBot?start=verify_${certId}`;
+
+  const baseUrl = process.env.RENDER_EXTERNAL_URL || process.env.BASE_URL || '';
+  const verifyWebUrl = baseUrl ? `${baseUrl}/cert/${certId}` : null;
+  const verifyTgUrl = `https://t.me/TeacherSornAiBot?start=verify_${certId}`;
+  const verifyUrl = data.verifyUrl || verifyWebUrl || verifyTgUrl;
 
   // Generate QR Code Data URL
   let qrDataUrl = '';
@@ -388,8 +397,9 @@ async function generateCertificateHTML(data) {
   </style>
 </head>
 <body>
-  <div class="no-print">
+  <div class="no-print" style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-bottom: 20px;">
     <button class="print-btn" onclick="window.print()">🖨️ បោះពុម្ពទម្រង់ A4 ផ្តេក (Print / Save as PDF)</button>
+    <a href="${verifyTgUrl}" target="_blank" style="text-decoration:none;"><button class="print-btn" style="background:#0284c7;">🤖 ផ្ទៀងផ្ទាត់លើ Telegram</button></a>
   </div>
 
   <div class="cert-wrapper">

@@ -1948,6 +1948,9 @@ async function handleCertificateVerification(ctx, rawCertId) {
       );
     }
 
+    const baseUrl = process.env.RENDER_EXTERNAL_URL || process.env.BASE_URL || '';
+    const verifyWebUrl = baseUrl ? `${baseUrl}/cert/${cert.certId}` : null;
+
     const card = (
       `╔════════════════════════════════════════════╗\n` +
       `   ✅ *ការផ្ទៀងផ្ទាត់វិញ្ញាបនបត្រត្រឹមត្រូវ* ✅\n` +
@@ -1969,7 +1972,32 @@ async function handleCertificateVerification(ctx, rawCertId) {
       `✨ _វិញ្ញាបនបត្រនេះត្រូវបានចេញ និងកត់ត្រាជាផ្លូវការនៅក្នុងប្រព័ន្ធទិន្នន័យ Teacher SSOnline។_`
     );
 
-    await ctx.reply(card, { parse_mode: 'Markdown' });
+    const buttons = [];
+    if (verifyWebUrl) {
+      buttons.push([Markup.button.url('🌐 បើកមើលលើ Web Browser (A4 ផ្តេក)', verifyWebUrl)]);
+    }
+
+    await ctx.reply(card, {
+      parse_mode: 'Markdown',
+      reply_markup: buttons.length > 0 ? Markup.inlineKeyboard(buttons).reply_markup : undefined
+    });
+
+    // Send original HTML certificate file directly so the verifier can open and view it
+    try {
+      const certHtml = await generateCertificateHTML(cert);
+      const safeFilename = `Official_Certificate_${cert.certId}.html`;
+      await ctx.replyWithDocument(
+        { source: Buffer.from(certHtml, 'utf-8'), filename: safeFilename },
+        {
+          caption: `🎓 *ឯកសារវិញ្ញាបនបត្រផ្លូវការ (Official Certificate)*\n` +
+                   `📄 ទម្រង់ *A4 ផ្តេក (A4 Landscape)* របស់សិស្ស៖ *${cert.studentName}*\n\n` +
+                   `📥 លោកអ្នកអាចចុចទាញយកឯកសារនេះដើម្បីបើកមើលលើទូរសព្ទ/កុំព្យូទ័រ ឬ Save ជា PDF!`,
+          parse_mode: 'Markdown'
+        }
+      );
+    } catch (e) {
+      console.error("Verification cert send error:", e);
+    }
   } catch (err) {
     console.error("Verification error:", err);
     await ctx.reply('⚠️ មានបញ្ហាក្នុងការផ្ទៀងផ្ទាត់ សូមសាកល្បងម្តងទៀត!');
@@ -2912,6 +2940,63 @@ bot.action(/reject_(\d+)/, async (ctx) => {
 });
 
 app.get('/', (req, res) => res.send('StudyAi Curriculum Bot is running!'));
+
+// Public Web Certificate Viewer Endpoint (for anyone scanning QR code with phone camera)
+app.get(['/cert/:certId', '/verify/:certId'], async (req, res) => {
+  const certId = (req.params.certId || '').replace(/^CERT-/i, '').trim().toUpperCase();
+  if (!certId) {
+    return res.status(400).send('Invalid Certificate ID');
+  }
+
+  if (!db) {
+    return res.status(500).send('Database not connected. Please try again later.');
+  }
+
+  try {
+    const snapshot = await db.ref(`certificates/${certId}`).once('value');
+    const cert = snapshot.val();
+
+    if (!cert) {
+      return res.status(404).send(`
+        <!DOCTYPE html>
+        <html lang="km">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Certificate Not Found - Teacher SSOnline</title>
+          <link rel="preconnect" href="https://fonts.googleapis.com">
+          <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+          <link href="https://fonts.googleapis.com/css2?family=Battambang:wght@400;700&family=Moul&display=swap" rel="stylesheet">
+          <style>
+            body { font-family: 'Battambang', sans-serif; background: #0f172a; color: #f8fafc; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; }
+            .box { background: #1e293b; padding: 40px; border-radius: 16px; max-width: 500px; text-align: center; border: 1px solid #334155; box-shadow: 0 10px 25px rgba(0,0,0,0.4); }
+            h1 { font-family: 'Moul', cursive; color: #ef4444; font-size: 22px; margin-bottom: 15px; }
+            p { font-size: 15px; line-height: 1.6; color: #cbd5e1; }
+            .code { background: #0f172a; padding: 6px 14px; border-radius: 6px; font-family: monospace; font-size: 18px; color: #fbbf24; margin: 15px 0; display: inline-block; }
+            .btn { display: inline-block; background: #2563eb; color: #fff; text-decoration: none; padding: 10px 24px; border-radius: 8px; font-weight: bold; margin-top: 20px; }
+          </style>
+        </head>
+        <body>
+          <div class="box">
+            <h1>❌ រកមិនឃើញវិញ្ញាបនបត្រ</h1>
+            <div class="code">CERT-${certId}</div>
+            <p>លេខកូដវិញ្ញាបនបត្រនេះមិនមាននៅក្នុងប្រព័ន្ធទិន្នន័យរបស់ <strong>វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline</strong> ឡើយ។</p>
+            <p style="font-size: 13px; color: #94a3b8; margin-top: 10px;">សូមពិនិត្យមើលលេខកូដសម្គាល់ ឬស្កេន QR Code ឡើងវិញ។</p>
+            <a href="https://t.me/TeacherSornAiBot" class="btn">🤖 ចូលទៅកាន់ Telegram Bot</a>
+          </div>
+        </body>
+        </html>
+      `);
+    }
+
+    const html = await generateCertificateHTML(cert);
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(html);
+  } catch (err) {
+    console.error("Web certificate error:", err);
+    res.status(500).send('Internal Server Error while generating certificate');
+  }
+});
 
 app.listen(PORT, () => {
   console.log(`Bot running on port ${PORT}`);
