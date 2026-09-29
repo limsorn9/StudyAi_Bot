@@ -9,6 +9,8 @@ const express = require('express');
 const fs = require('fs');
 const irregularVerbs = require('./irregular_verbs.js');
 const { generateQuiz } = require('./quiz_generator.js');
+const { checkTTSLimit, recordTTSStart, recordTTSDone, checkAILimit, recordAIUsage, getTTSStats } = require('./rate_limiter.js');
+
 
 // In-memory quiz state: { userId: { questions, currentQ, score, lessonId, answers } }
 const quizState = {};
@@ -971,6 +973,14 @@ bot.on('text', async (ctx) => {
   const menuOptions = ['📚 បញ្ជីមេរៀន (Lessons)', '🔄 ប្តូរគ្រូ AI', '🕰️ ប្រវត្តិសិក្សា', '❓ ជំនួយ (Help)'];
   if (menuOptions.includes(userText)) return;
 
+  // AI rate limit check
+  const isVIP = await checkVIP(userId);
+  const aiCheck = checkAILimit(userId, isVIP);
+  if (!aiCheck.allowed) {
+    return ctx.reply(aiCheck.message, { parse_mode: 'Markdown' });
+  }
+  recordAIUsage(userId);
+
   await handleUserMessage(ctx, userId, userText);
 });
 
@@ -1089,14 +1099,26 @@ bot.action(/tts_(.+)/, async (ctx) => {
   const userId = ctx.match[1];
   if (ctx.from.id.toString() !== userId) return ctx.answerCbQuery("អ្នកមិនអាចស្តាប់សម្លេងនេះបានទេ។");
 
+  const isVIP = await checkVIP(userId);
+
+  // ⏱️ Rate limit check
+  const limitCheck = checkTTSLimit(userId, isVIP);
+  if (!limitCheck.allowed) {
+    await ctx.answerCbQuery('⛔ ប្រើប្រាស់ច្រើន!');
+    return ctx.reply(limitCheck.message, { parse_mode: 'Markdown' });
+  }
+
   ctx.answerCbQuery("កំពុងបង្កើតសម្លេង...");
   ctx.sendChatAction('record_voice');
+  recordTTSStart(userId);
 
   try {
     const snap = await db.ref(`users/${userId}/latestResponse`).once('value');
     let text = snap.val();
 
-    if (!text) return ctx.reply("រកមិនឃើញអត្ថបទដើម្បីអានទេ។");
+    if (!text) {
+      return ctx.reply("រកមិនឃើញអត្ថបទដើម្បីអានទេ។");
+    }
 
     // Clean text to avoid TTS reading emojis heavily
     text = text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '');
@@ -1117,9 +1139,19 @@ bot.action(/tts_(.+)/, async (ctx) => {
 
     const buffer = Buffer.concat(chunks);
     await ctx.replyWithVoice({ source: buffer });
+
+    // Show remaining TTS count warning for free users
+    if (!isVIP) {
+      const stats = getTTSStats(userId, false);
+      if (stats.remaining <= 3 && stats.remaining > 0) {
+        await ctx.reply(`📊 *សល់ TTS: ${stats.remaining}/${stats.limit} ដង* ថ្ងៃនេះ (Free)\n💎 Upgrade VIP ដើម្បីទទួលបាន 50 ដង/ថ្ងៃ!`, { parse_mode: 'Markdown' });
+      }
+    }
   } catch (error) {
     console.error("TTS Error:", error);
     ctx.reply("មិនអាចបង្កើតសម្លេងបានទេពេលនេះ។");
+  } finally {
+    recordTTSDone();
   }
 });
 
