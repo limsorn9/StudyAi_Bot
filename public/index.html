@@ -78,7 +78,8 @@
         </div>
 
         <div id="userProfileBadge" class="user-badge hidden" onclick="openProfileModal()">
-          <div class="avatar-ring">
+          <div class="avatar-ring" id="userAvatarRing">
+            <img id="userAvatarImg" class="hidden user-avatar-img" alt="Student Avatar">
             <span id="userAvatarChar">S</span>
           </div>
           <div class="user-info-text">
@@ -878,11 +879,17 @@
       </div>
 
       <div class="profile-details-card text-center">
-        <div class="profile-avatar-large">
+        <div class="profile-avatar-large cursor-pointer" id="profAvatarBox" onclick="closeModal('profileModal'); openStudentProfileSetupModal(false);" title="ចុចដើម្បីកែប្រែរូបថត ឬឈ្មោះ" style="position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+          <img id="profAvatarImg" class="hidden" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;" alt="Student Photo">
           <span id="profAvatarText">S</span>
         </div>
         <h3 id="profNameText" class="mt-2 text-xl font-bold">Lim Sorn</h3>
+        <div id="profKhmerNameText" class="text-sm text-cyan-400 font-medium"></div>
         <div id="profUsernameText" class="text-sm text-slate-400">@sorn123</div>
+
+        <button type="button" class="btn btn-primary btn-sm mt-3 w-full" onclick="closeModal('profileModal'); openStudentProfileSetupModal(false);">
+          <span>✏️ កែប្រែឈ្មោះ និងប្តូររូបថតសិស្ស (Edit Name & Photo)</span>
+        </button>
       </div>
 
       <div class="profile-info-list mt-4">
@@ -929,6 +936,91 @@
           🚪 ចាកចេញពីឧបករណ៍នេះ (Logout This Device)
         </button>
       </div>
+    </div>
+  </div>
+
+  <!-- 8. STUDENT PROFILE & PHOTO SETUP MODAL (ពេលចុះឈ្មោះរួច ឬពេលកែប្រែ) -->
+  <div id="studentProfileSetupModal" class="modal-overlay hidden">
+    <div class="modal-card glass-panel max-w-md">
+      <div class="modal-header">
+        <div class="modal-title">🧑‍🎓 ព័ត៌មាន និងរូបថតសិស្ស (Student Profile)</div>
+        <button class="modal-close" onclick="closeModal('studentProfileSetupModal')">✕</button>
+      </div>
+
+      <div class="text-xs text-slate-300 mb-3 text-center leading-relaxed p-2.5 bg-slate-800/80 border border-slate-700/60 rounded-xl">
+        🎉 សូមស្វាគមន៍! សូមបំពេញឈ្មោះពេញ និងបញ្ចូលរូបថតរបស់អ្នក ដើម្បីបង្ហាញលើ <strong>វិញ្ញាបនបត្រផ្លូវការ (Certificate)</strong> និងគណនីសិក្សា!
+      </div>
+
+      <form id="studentProfileSetupForm" onsubmit="handleSaveStudentProfile(event)">
+        <!-- Photo Upload Box -->
+        <div class="student-photo-setup-box text-center mb-4">
+          <div class="student-photo-preview-wrapper" id="studentPhotoWrapper" onclick="document.getElementById('studentPhotoFileInput').click()" title="ចុចដើម្បីជ្រើសរើសរូបថត">
+            <img id="studentPhotoPreviewImg" class="student-photo-preview-img hidden" alt="Student Photo">
+            <div id="studentPhotoPlaceholder" class="student-photo-placeholder">
+              <span id="studentPhotoPlaceholderIcon">📷</span>
+              <span class="photo-upload-hint">ចុចដាក់រូបថត</span>
+            </div>
+            <div class="photo-edit-badge">📷</div>
+          </div>
+          <input type="file" id="studentPhotoFileInput" accept="image/*" class="hidden" onchange="handleStudentPhotoSelected(event)">
+
+          <div class="photo-action-buttons mt-2 flex justify-center gap-2">
+            <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('studentPhotoFileInput').click()">
+              📁 ជ្រើសរើសរូបថត (Upload)
+            </button>
+            <button type="button" id="removePhotoBtn" class="btn btn-outline-danger btn-sm hidden" onclick="handleRemoveStudentPhoto()">
+              🗑️ លុបរូប
+            </button>
+          </div>
+
+          <!-- Quick Avatars Picker -->
+          <div class="quick-avatar-section mt-3">
+            <div class="text-xs text-slate-400 mb-1">ឬជ្រើសរើសរូបតំណាងសិស្ស (Avatars)៖</div>
+            <div class="quick-avatar-list">
+              <button type="button" class="avatar-pill-btn" onclick="selectPresetAvatar('👨‍🎓')">👨‍🎓</button>
+              <button type="button" class="avatar-pill-btn" onclick="selectPresetAvatar('👩‍🎓')">👩‍🎓</button>
+              <button type="button" class="avatar-pill-btn" onclick="selectPresetAvatar('🧑‍💻')">🧑‍💻</button>
+              <button type="button" class="avatar-pill-btn" onclick="selectPresetAvatar('👩‍🏫')">👩‍🏫</button>
+              <button type="button" class="avatar-pill-btn" onclick="selectPresetAvatar('🌟')">🌟</button>
+              <button type="button" class="avatar-pill-btn" onclick="selectPresetAvatar('🚀')">🚀</button>
+              <button type="button" class="avatar-pill-btn" onclick="selectPresetAvatar('🦁')">🦁</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Full Name Input -->
+        <div class="form-group mb-3">
+          <label for="studentFullNameInput" class="form-label font-bold text-slate-200">
+            👤 ឈ្មោះពេញរបស់សិស្ស (Full Name សម្រាប់វិញ្ញាបនបត្រ) <span class="text-rose-400">*</span>
+          </label>
+          <input type="text" id="studentFullNameInput" required placeholder="ឧទាហរណ៍៖ Sokha Chan ឬ ចាន់ សុខា" class="form-input">
+          <small class="text-xs text-slate-400 mt-1 block">ឈ្មោះនេះនឹងត្រូវបោះពុម្ពនៅលើវិញ្ញាបនបត្រប្រឡងជាប់របស់អ្នក។</small>
+        </div>
+
+        <!-- Khmer Name Input -->
+        <div class="form-group mb-3">
+          <label for="studentKhmerNameInput" class="form-label font-bold text-slate-200">
+            🇰🇭 ឈ្មោះជាភាសាខ្មែរ (Khmer Name - ស្រេចចិត្ត)
+          </label>
+          <input type="text" id="studentKhmerNameInput" placeholder="ឧទាហរណ៍៖ ចាន់ សុខា" class="form-input">
+        </div>
+
+        <!-- Phone / Contact Input -->
+        <div class="form-group mb-4">
+          <label for="studentPhoneInput" class="form-label font-bold text-slate-200">
+            📞 លេខទូរស័ព្ទ ឬ Telegram Contact
+          </label>
+          <input type="tel" id="studentPhoneInput" placeholder="ឧទាហរណ៍៖ 012 345 678" class="form-input">
+        </div>
+
+        <!-- Submit & Skip -->
+        <button type="submit" id="saveStudentProfileBtn" class="btn btn-gold btn-block btn-lg">
+          <span>💾 រក្សាទុកព័ត៌មានសិស្ស (Save Profile)</span>
+        </button>
+        <button type="button" class="btn btn-glass btn-block mt-2" onclick="closeModal('studentProfileSetupModal')">
+          <span>រំលងសិន (Skip for now)</span>
+        </button>
+      </form>
     </div>
   </div>
 

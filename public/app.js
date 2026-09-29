@@ -101,6 +101,9 @@ async function authenticateWithTelegram(tgUser) {
     if (data.success && data.user) {
       setCurrentUser(data.user);
       showToast(`🎉 ស្វាគមន៍ ${data.user.name} មកកាន់ Telegram Web App!`, 'success');
+      if (!data.user.photoUrl || !data.user.khmerName) {
+        setTimeout(() => openStudentProfileSetupModal(true), 600);
+      }
     }
   } catch (e) {
     console.error('Telegram auto-auth failed:', e);
@@ -161,6 +164,7 @@ function updateUserInterface() {
   const userBadge = document.getElementById('userProfileBadge');
   const userNameDisplay = document.getElementById('userNameDisplay');
   const userAvatarChar = document.getElementById('userAvatarChar');
+  const userAvatarImg = document.getElementById('userAvatarImg');
   const userVipStatusBadge = document.getElementById('userVipStatusBadge');
   const syncBanner = document.getElementById('syncNoticeBanner');
 
@@ -170,7 +174,20 @@ function updateUserInterface() {
 
     const name = STATE.currentUser.name || STATE.currentUser.username || 'Student';
     if (userNameDisplay) userNameDisplay.textContent = name;
-    if (userAvatarChar) userAvatarChar.textContent = name.charAt(0).toUpperCase();
+    
+    // Display student photo if available, otherwise show first character
+    const photo = STATE.currentUser.photoUrl;
+    if (photo && userAvatarImg) {
+      userAvatarImg.src = photo;
+      userAvatarImg.classList.remove('hidden');
+      if (userAvatarChar) userAvatarChar.classList.add('hidden');
+    } else {
+      if (userAvatarImg) userAvatarImg.classList.add('hidden');
+      if (userAvatarChar) {
+        userAvatarChar.classList.remove('hidden');
+        userAvatarChar.textContent = name.charAt(0).toUpperCase();
+      }
+    }
 
     const isVIP = !!STATE.currentUser.isVIP;
     if (userVipStatusBadge) {
@@ -205,6 +222,10 @@ async function refreshUserProfile() {
     const data = await res.json();
     if (data.success && data.profile) {
       const p = data.profile;
+      STATE.currentUser.name = p.name || STATE.currentUser.name;
+      STATE.currentUser.khmerName = p.khmerName || STATE.currentUser.khmerName;
+      STATE.currentUser.photoUrl = p.photoUrl || p.avatar || STATE.currentUser.photoUrl;
+      STATE.currentUser.phone = p.phone || STATE.currentUser.phone;
       STATE.currentUser.isVIP = p.isVIP;
       STATE.currentUser.vipDetails = p.vipDetails;
       STATE.currentUser.completedLessons = p.completedLessons;
@@ -1418,7 +1439,9 @@ function openProfileModal() {
   const isVip = u.isVIP ? `💎 VIP (${u.vipDetails?.daysRemaining || 30} ថ្ងៃ)` : 'Free Account';
 
   const avatar = document.getElementById('profAvatarText');
+  const avatarImg = document.getElementById('profAvatarImg');
   const nameTxt = document.getElementById('profNameText');
+  const khmerTxt = document.getElementById('profKhmerNameText');
   const unameTxt = document.getElementById('profUsernameText');
   const gmailTxt = document.getElementById('profGmailText');
   const tgTxt = document.getElementById('profTelegramStatus');
@@ -1426,8 +1449,29 @@ function openProfileModal() {
   const fBadge = document.getElementById('profFirebaseStatusBadge');
   const vBtn = document.getElementById('profVerifyEmailBtn');
 
-  if (avatar) avatar.textContent = name.charAt(0).toUpperCase();
+  // Display student photo if exists
+  if (u.photoUrl && avatarImg) {
+    avatarImg.src = u.photoUrl;
+    avatarImg.classList.remove('hidden');
+    if (avatar) avatar.classList.add('hidden');
+  } else {
+    if (avatarImg) avatarImg.classList.add('hidden');
+    if (avatar) {
+      avatar.classList.remove('hidden');
+      avatar.textContent = name.charAt(0).toUpperCase();
+    }
+  }
+
   if (nameTxt) nameTxt.textContent = name;
+  if (khmerTxt) {
+    if (u.khmerName) {
+      khmerTxt.textContent = `ឈ្មោះខ្មែរ៖ ${u.khmerName}`;
+      khmerTxt.classList.remove('hidden');
+    } else {
+      khmerTxt.textContent = '';
+      khmerTxt.classList.add('hidden');
+    }
+  }
   if (unameTxt) unameTxt.textContent = uname;
   if (gmailTxt) gmailTxt.textContent = gmail;
   if (tgTxt) tgTxt.textContent = isTg;
@@ -1458,6 +1502,204 @@ function handleLogout(silent = false) {
   if (!silent) {
     showToast('បានចាកចេញពីគណនីជោគជ័យ', 'info');
     navigateTo('dashboard');
+  }
+}
+
+// ------------------------------------------
+// STUDENT PROFILE & PHOTO MANAGEMENT
+// ------------------------------------------
+
+function handleStudentPhotoSelected(e) {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+
+  if (file.size > 8 * 1024 * 1024) {
+    return showToast('❌ ទំហំរូបថតធំពេក សូមជ្រើសរើសរូបក្រោម 8MB', 'error');
+  }
+
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    const img = new Image();
+    img.onload = function() {
+      // Compress using HTML5 canvas to max 450x450
+      const canvas = document.createElement('canvas');
+      const MAX_SIZE = 450;
+      let width = img.width;
+      let height = img.height;
+
+      if (width > height) {
+        if (width > MAX_SIZE) {
+          height *= MAX_SIZE / width;
+          width = MAX_SIZE;
+        }
+      } else {
+        if (height > MAX_SIZE) {
+          width *= MAX_SIZE / height;
+          height = MAX_SIZE;
+        }
+      }
+
+      canvas.width = Math.round(width);
+      canvas.height = Math.round(height);
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+      const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+      setStudentPhotoPreview(compressedDataUrl);
+      showToast('📷 បានបញ្ចូលរូបថតសិស្សជោគជ័យ!', 'success');
+    };
+    img.src = evt.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function setStudentPhotoPreview(url) {
+  STATE.tempStudentPhotoUrl = url;
+  const previewImg = document.getElementById('studentPhotoPreviewImg');
+  const placeholder = document.getElementById('studentPhotoPlaceholder');
+  const removeBtn = document.getElementById('removePhotoBtn');
+
+  if (url) {
+    if (previewImg) {
+      previewImg.src = url;
+      previewImg.classList.remove('hidden');
+    }
+    if (placeholder) placeholder.classList.add('hidden');
+    if (removeBtn) removeBtn.classList.remove('hidden');
+  } else {
+    if (previewImg) {
+      previewImg.src = '';
+      previewImg.classList.add('hidden');
+    }
+    if (placeholder) placeholder.classList.remove('hidden');
+    if (removeBtn) removeBtn.classList.add('hidden');
+  }
+}
+
+function handleRemoveStudentPhoto() {
+  const fileInput = document.getElementById('studentPhotoFileInput');
+  if (fileInput) fileInput.value = '';
+  setStudentPhotoPreview(null);
+  showToast('🗑️ បានលុបរូបថតសិស្ស', 'info');
+}
+
+function selectPresetAvatar(emoji) {
+  // Generate a high-res styled avatar using HTML canvas
+  const canvas = document.createElement('canvas');
+  canvas.width = 240;
+  canvas.height = 240;
+  const ctx = canvas.getContext('2d');
+
+  // Draw gradient background
+  const grad = ctx.createLinearGradient(0, 0, 240, 240);
+  grad.addColorStop(0, '#4f46e5');
+  grad.addColorStop(1, '#06b6d4');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 240, 240);
+
+  // Draw emoji
+  ctx.font = '120px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(emoji, 120, 130);
+
+  const dataUrl = canvas.toDataURL('image/png');
+  setStudentPhotoPreview(dataUrl);
+  showToast(`✨ បានជ្រើសរើសរូបតំណាង ${emoji}`, 'success');
+}
+
+function openStudentProfileSetupModal(isNew = false) {
+  if (!STATE.currentUser) {
+    openLoginModal();
+    return;
+  }
+
+  const u = STATE.currentUser;
+  const titleEl = document.getElementById('studentSetupModalTitle');
+  const bannerEl = document.getElementById('studentSetupModalBanner');
+
+  if (titleEl) {
+    titleEl.textContent = isNew
+      ? '🎉 រៀបចំឈ្មោះ និងរូបថតសិស្ស (Student Setup)'
+      : '✏️ កែប្រែឈ្មោះ និងប្តូររូបថតសិស្ស (Edit Profile)';
+  }
+
+  if (bannerEl) {
+    bannerEl.innerHTML = isNew
+      ? '🎉 <strong>សូមស្វាគមន៍!</strong> សូមបំពេញឈ្មោះពេញ និងបញ្ចូលរូបថតផ្ទាល់ខ្លួនរបស់អ្នក ដើម្បីបោះពុម្ពលើ <strong>វិញ្ញាបនបត្រផ្លូវការ (Official Certificate)</strong> និងគណនីសិក្សា!'
+      : '💡 លោកអ្នកអាចកែសម្រួលឈ្មោះជាភាសាខ្មែរ ភាសាអង់គ្លេស និងប្តូររូបថតសិស្សបានគ្រប់ពេលវេលា។';
+  }
+
+  const nameInput = document.getElementById('studentFullNameInput');
+  const khmerInput = document.getElementById('studentKhmerNameInput');
+  const phoneInput = document.getElementById('studentPhoneInput');
+
+  if (nameInput) nameInput.value = u.name || u.username || '';
+  if (khmerInput) khmerInput.value = u.khmerName || '';
+  if (phoneInput) phoneInput.value = u.phone || '';
+
+  setStudentPhotoPreview(u.photoUrl || null);
+  openModal('studentProfileSetupModal');
+}
+
+async function handleSaveStudentProfile(e) {
+  if (e) e.preventDefault();
+  if (!STATE.currentUser || !STATE.currentUser.id) {
+    return showToast('❌ សូមចូលគណនីជាមុនសិន', 'error');
+  }
+
+  const name = (document.getElementById('studentFullNameInput')?.value || '').trim();
+  const khmerName = (document.getElementById('studentKhmerNameInput')?.value || '').trim();
+  const phone = (document.getElementById('studentPhoneInput')?.value || '').trim();
+  const photoUrl = STATE.tempStudentPhotoUrl || null;
+
+  if (!name) {
+    return showToast('❌ សូមបញ្ចូលឈ្មោះពេញរបស់សិស្ស', 'error');
+  }
+
+  const saveBtn = document.getElementById('saveStudentProfileBtn');
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<span>⏳ កំពុងរក្សាទុក...</span>';
+  }
+
+  try {
+    const res = await fetch('/api/user/profile/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: STATE.currentUser.id,
+        name,
+        khmerName,
+        photoUrl,
+        phone
+      })
+    });
+
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'ការរក្សាទុកមិនជោគជ័យ');
+
+    // Update STATE
+    STATE.currentUser.name = data.user.name;
+    STATE.currentUser.khmerName = data.user.khmerName;
+    STATE.currentUser.photoUrl = data.user.photoUrl;
+    STATE.currentUser.phone = data.user.phone;
+
+    // Save to local storage
+    try {
+      localStorage.setItem('studyai_user_session', JSON.stringify(STATE.currentUser));
+    } catch (e) {}
+
+    updateUserInterface();
+    closeModal('studentProfileSetupModal');
+    showToast('🎉 បានរក្សាទុកឈ្មោះ និងរូបថតសិស្សដោយជោគជ័យ!', 'success');
+  } catch (err) {
+    showToast(err.message, 'error');
+  } finally {
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = '<span>💾 រក្សាទុកព័ត៌មានសិស្ស (Save Profile)</span>';
+    }
   }
 }
 
@@ -1705,6 +1947,10 @@ async function sendGoogleAuthToServer(payload) {
   closeModal('authWaitingModal');
   showToast(`🎉 ស្វាគមន៍ ${data.user.name}! ចូលគណនី Google (Gmail) ជោគជ័យ`, 'success');
   refreshUserProfile();
+
+  if (!data.user.photoUrl || !data.user.khmerName) {
+    setTimeout(() => openStudentProfileSetupModal(true), 600);
+  }
 }
 
 // ------------------------------------------
@@ -1780,6 +2026,9 @@ async function handleVerifyRegisterOtp(e) {
     closeModal('verifyEmailModal');
     showToast(`🎉 ${data.message || 'ចុះឈ្មោះ និងចូលគណនីជោគជ័យ!'}`, 'success');
     refreshUserProfile();
+
+    // Prompt student name & photo setup right after registration
+    setTimeout(() => openStudentProfileSetupModal(true), 500);
   } catch (err) {
     showToast(err.message, 'error');
   }
@@ -2006,6 +2255,10 @@ async function startTelegramOneClickLogin() {
           setCurrentUser(pollData.user, pollData.sessionToken, pollData.deviceId);
           showToast(`🎉 ស្វាគមន៍ ${pollData.user.name}! ផ្ទៀងផ្ទាត់សុវត្ថិភាព Telegram ជោគជ័យ`, 'success');
           refreshUserProfile();
+
+          if (!pollData.user.photoUrl || !pollData.user.khmerName) {
+            setTimeout(() => openStudentProfileSetupModal(true), 600);
+          }
         }
       } catch (e) {}
     }, 2000);

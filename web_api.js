@@ -171,11 +171,13 @@ Student Question: ${userText}`;
 
       let completedLessons = {};
       let subjectCerts = {};
+      let profile = {};
       if (db) {
         const snap = await db.ref(`users/${userId}`).once('value');
         const data = snap.val() || {};
         completedLessons = data.completed_lessons || {};
         subjectCerts = data.subject_certifications || {};
+        profile = data.profile || {};
       }
 
       const session = await createDeviceSession(userId, deviceId, userAgent || req.headers['user-agent'], req.ip);
@@ -184,8 +186,11 @@ Student Question: ${userText}`;
         success: true,
         user: {
           id: userId,
-          name: displayName,
-          username: username || '',
+          name: profile.name || displayName,
+          username: username || profile.username || '',
+          khmerName: profile.khmerName || null,
+          photoUrl: profile.photoUrl || profile.avatar || null,
+          phone: profile.phone || null,
           isTelegram: true,
           isVIP,
           yearlyEligible: yearly.eligible,
@@ -276,6 +281,9 @@ Student Question: ${userText}`;
             id: userId,
             name: profile.name || data.name || `User ${userId}`,
             username: profile.username || '',
+            khmerName: profile.khmerName || null,
+            photoUrl: profile.photoUrl || profile.avatar || null,
+            phone: profile.phone || null,
             isTelegram: true,
             isVIP,
             yearlyEligible: yearly.eligible,
@@ -424,12 +432,19 @@ Student Question: ${userText}`;
       // Create persistent session for this device
       const session = await createDeviceSession(userId, deviceId, userAgent || req.headers['user-agent'], req.ip);
 
+      // Fetch any existing profile details (photo, khmerName) if returning student
+      const snapProf = await db.ref(`users/${userId}/profile`).once('value');
+      const existingProf = snapProf.val() || {};
+
       return res.json({
         success: true,
         message: '🎉 ចុះឈ្មោះ និងផ្ទៀងផ្ទាត់គណនីជោគជ័យ!',
         user: {
           id: userId,
           name: cleanName,
+          khmerName: existingProf.khmerName || null,
+          photoUrl: existingProf.photoUrl || null,
+          phone: existingProf.phone || null,
           gmail: cleanGmail,
           gmailVerified: true,
           isVIP,
@@ -542,11 +557,12 @@ Student Question: ${userText}`;
       // Find user by email or auto-create
       let userId = null;
       let userName = vData.fullName || 'Student';
+      let pData = {};
       const emailMapSnap = await db.ref(`users_by_email/${emailKey}`).once('value');
       if (emailMapSnap.exists()) {
         userId = emailMapSnap.val();
         const pSnap = await db.ref(`users/${userId}/profile`).once('value');
-        const pData = pSnap.val() || {};
+        pData = pSnap.val() || {};
         if (pData.name) userName = pData.name;
       } else {
         const emailPrefix = cleanGmail.split('@')[0].replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || 'student';
@@ -574,6 +590,9 @@ Student Question: ${userText}`;
         user: {
           id: userId,
           name: userName,
+          khmerName: pData.khmerName || null,
+          photoUrl: pData.photoUrl || null,
+          phone: pData.phone || null,
           gmail: cleanGmail,
           gmailVerified: true,
           isVIP,
@@ -634,17 +653,27 @@ Student Question: ${userText}`;
         await db.ref(`users_by_email/${emailKey}`).set(userId);
       }
 
-      // Save user profile in Firebase with verified Gmail status
-      await db.ref(`users/${userId}/profile`).update({
-        name: cleanName,
+      // Save user profile in Firebase with verified Gmail status, preserving existing photo/Khmer name
+      const pSnap = await db.ref(`users/${userId}/profile`).once('value');
+      const pData = pSnap.val() || {};
+
+      const finalName = pData.name || cleanName;
+      const finalPhoto = photoUrl || pData.photoUrl || '';
+
+      const updates = {
+        name: finalName,
         gmail: cleanGmail,
         gmailVerified: true,
-        photoUrl: photoUrl || '',
-        googleId: googleId || '',
+        googleId: googleId || pData.googleId || '',
         lastWebLogin: Date.now(),
         isWebUser: true,
         authProvider: 'google'
-      });
+      };
+      if (finalPhoto) updates.photoUrl = finalPhoto;
+      if (pData.khmerName) updates.khmerName = pData.khmerName;
+      if (pData.phone) updates.phone = pData.phone;
+
+      await db.ref(`users/${userId}/profile`).update(updates);
 
       const isVIP = checkVIP ? await checkVIP(userId) : false;
       const yearly = checkYearlyVIP ? await checkYearlyVIP(userId) : { eligible: false };
@@ -655,10 +684,12 @@ Student Question: ${userText}`;
         message: '🎉 ចូលគណនីតាម Google (Gmail) ជោគជ័យ!',
         user: {
           id: userId,
-          name: cleanName,
+          name: finalName,
+          khmerName: pData.khmerName || null,
+          photoUrl: finalPhoto || null,
+          phone: pData.phone || null,
           gmail: cleanGmail,
           gmailVerified: true,
-          photoUrl: photoUrl || '',
           isVIP,
           yearlyEligible: yearly.eligible,
           vipDetails: yearly
@@ -939,6 +970,9 @@ Student Question: ${userText}`;
           user: {
             id: userId,
             name: profile.name || data.name,
+            khmerName: profile.khmerName || null,
+            photoUrl: profile.photoUrl || null,
+            phone: profile.phone || null,
             gmail: profile.gmail || data.email,
             isTelegram: !!userData.telegramId,
             isVIP,
@@ -1455,8 +1489,11 @@ Student Question: ${userText}`;
         message: 'ភ្ជាប់គណនី Telegram ដោយជោគជ័យ! ទិន្នន័យទាំងអស់ត្រូវបាន Sync ជាមួយគ្នា។',
         user: {
           id: telegramUserId,
-          name: syncData.name || tgProfile.name || `User ${telegramUserId}`,
+          name: tgProfile.name || syncData.name || `User ${telegramUserId}`,
           username: syncData.username || tgProfile.username || '',
+          khmerName: tgProfile.khmerName || null,
+          photoUrl: tgProfile.photoUrl || tgProfile.avatar || null,
+          phone: tgProfile.phone || null,
           isTelegram: true,
           isVIP,
           yearlyEligible: yearly.eligible,
@@ -1506,6 +1543,9 @@ Student Question: ${userText}`;
         profile: {
           id: userId,
           name: profile.name || `សិស្ស ID ${userId}`,
+          khmerName: profile.khmerName || null,
+          photoUrl: profile.photoUrl || profile.avatar || null,
+          phone: profile.phone || null,
           username: profile.username || '',
           gmail: profile.gmail || null,
           isVIP,
@@ -1523,6 +1563,44 @@ Student Question: ${userText}`;
     } catch (err) {
       console.error('Get profile error:', err);
       res.status(500).json({ error: 'Error loading user profile' });
+    }
+  });
+
+  router.post('/user/profile/update', async (req, res) => {
+    try {
+      const { userId, name, khmerName, photoUrl, phone } = req.body;
+      if (!userId) return res.status(400).json({ error: 'Missing userId' });
+      if (!name || !name.trim()) return res.status(400).json({ error: 'សូមបញ្ចូលឈ្មោះពេញរបស់សិស្ស' });
+
+      if (!db) return res.status(500).json({ error: 'Database disconnected' });
+
+      const updates = {
+        name: name.trim(),
+        updatedAt: Date.now()
+      };
+      if (khmerName !== undefined) updates.khmerName = (khmerName || '').trim();
+      if (photoUrl !== undefined) updates.photoUrl = photoUrl || null;
+      if (phone !== undefined) updates.phone = (phone || '').trim();
+
+      await db.ref(`users/${userId}/profile`).update(updates);
+
+      const snap = await db.ref(`users/${userId}/profile`).once('value');
+      const updatedProfile = snap.val() || {};
+
+      return res.json({
+        success: true,
+        message: 'បានរក្សាទុកព័ត៌មាន និងរូបថតសិស្សដោយជោគជ័យ!',
+        user: {
+          id: userId,
+          name: updatedProfile.name || name.trim(),
+          khmerName: updatedProfile.khmerName || null,
+          photoUrl: updatedProfile.photoUrl || null,
+          phone: updatedProfile.phone || null
+        }
+      });
+    } catch (err) {
+      console.error('Update profile error:', err);
+      res.status(500).json({ error: 'បរាជ័យក្នុងការរក្សាទុកព័ត៌មានសិស្ស' });
     }
   });
 
@@ -1913,6 +1991,16 @@ Student Question: ${userText}`;
       const snap = await db.ref(`certificates/${cleanCertId}`).once('value');
       const cert = snap.val();
       if (!cert) return res.status(404).send('Certificate not found');
+
+      // Populate student's updated photo and khmerName from their profile if present
+      if (cert.userId) {
+        try {
+          const userSnap = await db.ref(`users/${cert.userId}/profile`).once('value');
+          const userProf = userSnap.val() || {};
+          if (userProf.photoUrl && !cert.photoUrl) cert.photoUrl = userProf.photoUrl;
+          if (userProf.khmerName && !cert.khmerName) cert.khmerName = userProf.khmerName;
+        } catch (e) {}
+      }
 
       const html = await generateCertificateHTML(cert);
       res.setHeader('Content-Type', 'text/html; charset=utf-8');

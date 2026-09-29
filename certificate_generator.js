@@ -73,6 +73,19 @@ async function generateCertificateHTML(data) {
     ? 'ANNUAL SUBJECT FINAL EXAMINATION CERTIFICATE'
     : 'CERTIFICATE OF ACHIEVEMENT & COMPLETION';
 
+  let finalStudentName = studentName;
+  if (data.khmerName && data.khmerName.trim() && studentName && data.khmerName.trim() !== studentName.trim()) {
+    finalStudentName = `${data.khmerName} (${studentName})`;
+  } else if (data.khmerName && data.khmerName.trim()) {
+    finalStudentName = data.khmerName;
+  }
+
+  const studentPhotoTag = data.photoUrl ? `
+    <div class="stu-photo-frame" style="width: 82px; height: 104px; border: 2px solid #b8860b; border-radius: 4px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.15); background: #f8fafc;">
+      <img src="${data.photoUrl}" alt="Student Photo" style="width: 100%; height: 100%; object-fit: cover;">
+    </div>
+  ` : '';
+
   const baseUrl = process.env.RENDER_EXTERNAL_URL || process.env.BASE_URL || '';
   const botUser = process.env.TELEGRAM_BOT_USERNAME || 'StudyAiEngKH_bot';
   const verifyWebUrl = baseUrl ? `${baseUrl}/cert/${certId}` : null;
@@ -420,7 +433,7 @@ async function generateCertificateHTML(data) {
             <div class="hdr-name-kh">វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline</div>
             <div class="hdr-name-en">TEACHER SSONLINE ENGLISH LANGUAGE INSTITUTE</div>
           </div>
-          <div class="hdr-spacer"></div>
+          <div class="hdr-spacer" style="display: flex; justify-content: flex-end; align-items: center;">${studentPhotoTag}</div>
         </div>
 
         <div class="orn-div"><div class="orn-bar"></div><span class="orn-sym">✦</span><div class="orn-bar"></div></div>
@@ -437,7 +450,7 @@ async function generateCertificateHTML(data) {
         <div class="cert-body">
           <div class="cert-line-1">វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline</div>
           <div class="cert-line-2">សូមប្រគល់ជូនសិស្សឈ្មោះ</div>
-          <div class="stu-name">${studentName}</div>
+          <div class="stu-name">${finalStudentName}</div>
           <p class="achieve">
             បានប្រឡងបញ្ចប់ដោយជោគជ័យ${isAnnualExam ? 'នូវការប្រឡងបញ្ចប់មុខវិជ្ជាប្រចាំឆ្នាំ' : 'នូវវគ្គបណ្តុះបណ្តាល'}<br>
             <span class="subj-red">「 ${certTitle} 」</span>
