@@ -340,36 +340,33 @@ async function generateCertificateHTML(data) {
 
     /* Director Block (Right) - Authentic Cambodian administrative stamp & signature */
     .dir-block {
-      width: 350px; text-align: right;
-      display: flex; flex-direction: column; align-items: flex-end;
+      width: 400px;
+      display: flex; flex-direction: column; align-items: center;
       position: relative;
     }
     .dir-date-khmer {
-      font-size: 12px; color: #334155; line-height: 1.5; margin-bottom: 2px;
-      text-align: right;
+      font-size: 13px; color: #0f172a; line-height: 1.8; margin-bottom: 2px;
+      text-align: center;
     }
     .dir-role-kh {
-      font-family: 'Khmer OS Muol Light', 'Khmer OS Moul Light', 'Moul', cursive;
-      font-size: 13.5px; color: #0f172a;
-      margin-bottom: 4px;
-      text-align: right;
+      display: none; /* Hide role to match the requested layout */
     }
     /* Signature and Stamp Container */
     .sig-stamp-container {
       position: relative;
-      width: 340px;
-      height: 145px;
-      margin: 0 auto;
+      width: 100%;
+      height: 150px;
+      margin-top: 5px;
     }
-    /* Official stamp: positioned HIGHER so it aligns with the date (បាត់ដំបង) */
+    /* Official stamp: Centered below date */
     .stamp-official {
       position: absolute;
-      left: -12px;
-      top: -40px; /* ខិតលើ កម្ពស់ស្មើអក្សរបាត់ដំបង */
-      width: 200px;
-      height: 200px;
+      left: 50%;
+      top: -10px; 
+      width: 160px;
+      height: 160px;
+      transform: translateX(-60%) rotate(-6deg);
       object-fit: contain;
-      transform: rotate(-6deg);
       z-index: 2;
       filter: drop-shadow(0 2px 6px rgba(185,28,28,0.3));
       pointer-events: none;
@@ -377,29 +374,33 @@ async function generateCertificateHTML(data) {
     /* Director Signature: on the RIGHT */
     .sig-director {
       position: absolute;
-      right: 12px;
-      bottom: 15px;
-      width: 185px;
+      right: 15px;
+      bottom: 25px;
+      width: 170px;
       height: 95px;
       object-fit: contain;
       mix-blend-mode: multiply;
       z-index: 1;
     }
+    .dir-name-box {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      padding-right: 20px;
+      margin-top: -10px;
+    }
     .dir-name-underline {
-      width: 230px;
-      border-top: 1.5px solid #94a3b8;
-      margin-top: 4px;
-      padding-top: 5px;
-      text-align: right;
+      width: 200px;
+      border-top: 1px solid #94a3b8;
+      margin-bottom: 6px;
     }
     .dir-name-kh {
       font-family: 'Khmer OS Muol Light', 'Khmer OS Moul Light', 'Moul', cursive;
-      font-size: 17px; color: #c0000b; font-weight: 900;
-      text-align: right;
+      font-size: 16px; color: #c0000b; font-weight: 900;
     }
     .dir-name-en {
-      font-size: 11px; color: #64748b; font-weight: 700;
-      text-align: right;
+      font-size: 10.5px; color: #64748b; font-weight: 700;
     }
 
     @media print {
@@ -499,9 +500,10 @@ async function generateCertificateHTML(data) {
                 ${sigTag}
               </div>
 
-              <div class="dir-name-underline">
+              <div class="dir-name-box">
+                <div class="dir-name-underline"></div>
                 <div class="dir-name-kh">លីម សន</div>
-                <div class="dir-name-en">Lim Sorn (School Director)</div>
+                <div class="dir-name-en">Lim Sorn</div>
               </div>
             </div>
           </div>
