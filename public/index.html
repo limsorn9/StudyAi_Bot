@@ -750,8 +750,6 @@
       </div>
     </div>
   </div>
-    </div>
-  </div>
 
   <!-- 3. TELEGRAM SYNC MODAL -->
   <div id="syncModal" class="modal-overlay hidden">
@@ -845,61 +843,55 @@
     </div>
   </div>
 
-  <!-- 6. FIREBASE EMAIL VERIFICATION MODAL -->
+  <!-- 6. GMAIL OTP VERIFICATION MODAL -->
   <div id="verifyEmailModal" class="modal-overlay hidden">
     <div class="modal-card glass-panel max-w-md">
       <div class="modal-header">
-        <div class="modal-title">🔥 ផ្ទៀងផ្ទាត់គណនី Email (Firebase Auth)</div>
+        <div class="modal-title">✉️ ផ្ទៀងផ្ទាត់លេខកូដ OTP (Gmail)</div>
         <button class="modal-close" onclick="closeModal('verifyEmailModal')">✕</button>
       </div>
 
       <div class="verify-email-header text-center">
-        <div class="verify-icon">✉️</div>
+        <div class="verify-icon">📧</div>
         <h3 class="text-lg font-bold mt-2">ផ្ទៀងផ្ទាត់អាសយដ្ឋាន Gmail</h3>
         <p class="text-slate-300 text-sm mt-1">
-          ប្រព័ន្ធបានបញ្ជូនលេខកូដសម្ងាត់ ៦ ខ្ទង់ និងតំណភ្ជាប់ Firebase Email Verification ទៅកាន់៖
+          ប្រព័ន្ធបានបញ្ជូនលេខកូដសម្ងាត់ OTP ៦ ខ្ទង់ទៅកាន់ប្រអប់សំបុត្រ Gmail របស់អ្នក (មិនមែនយកពី Telegram ទេ) ដើម្បីបញ្ជាក់ថា Email នេះជារបស់អ្នកពិតប្រាកដ៖
         </p>
         <div id="verifyEmailDisplay" class="verify-email-badge">student@gmail.com</div>
       </div>
 
-      <form onsubmit="handleVerifyEmailCode(event)" class="mt-4">
+      <form onsubmit="handleVerifyRegisterOtp(event)" class="mt-4">
         <div class="form-group text-center">
-          <label>បញ្ចូលលេខកូដផ្ទៀងផ្ទាត់ ៦ ខ្ទង់ (OTP Code)</label>
+          <label>បញ្ចូលលេខកូដ OTP ៦ ខ្ទង់ពី Gmail</label>
           <input type="text" id="verifyOtpCodeInput" maxlength="6" required placeholder="0 0 0 0 0 0" class="text-center font-mono text-2xl tracking-widest form-input">
         </div>
 
-        <div id="verifyCodeDemoHint" class="verification-demo-hint">
+        <div id="verifyCodeDemoHint" class="verification-demo-hint hidden">
           <div class="flex items-center justify-between gap-2">
-            <span>💡 លេខកូដសម្គាល់ Firebase: <strong id="verifyCodeDemoVal" class="text-amber-400 font-mono">------</strong></span>
+            <span>💡 លេខកូដសម្គាល់ Gmail: <strong id="verifyCodeDemoVal" class="text-amber-400 font-mono">------</strong></span>
             <button type="button" class="btn btn-sm btn-outline" onclick="autoFillVerifyCode()">បំពេញស្វ័យប្រវត្ត</button>
           </div>
         </div>
 
         <button type="submit" class="btn btn-gold btn-block btn-lg mt-3">
-          <span>✅ បញ្ជាក់ការផ្ទៀងផ្ទាត់ (Verify Email)</span>
+          <span>✅ បញ្ជាក់ និងបង្កើតគណនី (Confirm & Register)</span>
         </button>
       </form>
 
       <div class="verify-modal-actions mt-3 flex justify-between items-center text-sm">
         <span class="text-slate-400">មិនបានទទួលលេខកូដ?</span>
-        <button type="button" class="btn-link-action" onclick="handleResendVerifyCode()">
+        <button type="button" class="btn-link-action" onclick="handleResendRegisterOtp()">
           🔄 ផ្ញើលេខកូដឡើងវិញ
         </button>
-      </div>
-
-      <div id="verifyFirebaseLinkWrapper" class="mt-3 text-center hidden">
-        <a id="verifyFirebaseLinkBtn" href="#" target="_blank" class="btn btn-outline btn-sm">
-          🔗 បើកតំណភ្ជាប់ផ្លូវការ Firebase Auth
-        </a>
       </div>
     </div>
   </div>
 
-  <!-- 7. USER PROFILE MODAL -->
+  <!-- 7. USER PROFILE MODAL & MULTI-DEVICE MANAGEMENT -->
   <div id="profileModal" class="modal-overlay hidden">
     <div class="modal-card glass-panel max-w-md">
       <div class="modal-header">
-        <div class="modal-title">👤 ព័ត៌មានគណនី (My Profile)</div>
+        <div class="modal-title">👤 ព័ត៌មានគណនី & គ្រប់គ្រង Device</div>
         <button class="modal-close" onclick="closeModal('profileModal')">✕</button>
       </div>
 
@@ -917,7 +909,7 @@
           <span id="profGmailText" class="val">sorn@gmail.com</span>
         </div>
         <div class="prof-item">
-          <span class="label">🔥 ស្ថានភាព Firebase:</span>
+          <span class="label">🔥 ស្ថានភាព Gmail:</span>
           <span id="profFirebaseStatusBadge" class="badge-status unverified">⚠️ Not Verified</span>
         </div>
         <div class="prof-item">
@@ -930,15 +922,29 @@
         </div>
       </div>
 
+      <!-- Active Logged-in Devices Section -->
+      <div class="profile-devices-section mt-4 pt-3 border-t border-slate-700">
+        <div class="flex items-center justify-between mb-1">
+          <div class="text-sm font-bold text-slate-200">📱 ឧបករណ៍ដែលបានចូល (Active Devices)</div>
+          <button type="button" class="btn-link-action text-xs" onclick="loadUserDevices()">🔄 Refresh</button>
+        </div>
+        <div class="text-xs text-slate-400 mb-2">
+          Browser នឹងចងចាំគណនីរហូត។ នៅពេលអ្នកចុច "ផ្តាច់" លើឧបករណ៍ណា នោះ Browser នោះនឹងភ្លេចគណនីរបស់អ្នកភ្លាមៗ!
+        </div>
+        <div id="profileDevicesList" class="devices-list">
+          <div class="text-xs text-slate-500 text-center py-2">កំពុងផ្ទុកបញ្ជីឧបករណ៍...</div>
+        </div>
+      </div>
+
       <div class="profile-actions mt-4 flex flex-col gap-2">
         <button id="profVerifyEmailBtn" class="btn btn-gold btn-block hidden" onclick="openVerifyEmailModalForCurrent()">
-          ✉️ ផ្ទៀងផ្ទាត់ Firebase Gmail ឥឡូវនេះ
+          ✉️ ផ្ទៀងផ្ទាត់ Gmail ឥឡូវនេះ
         </button>
         <button id="profSyncTelegramBtn" class="btn btn-outline btn-block" onclick="closeModal('profileModal'); openSyncModal();">
           📱 ភ្ជាប់ជាមួយ Telegram Bot
         </button>
         <button class="btn btn-outline-danger btn-block" onclick="handleLogout()">
-          🚪 ចាកចេញពីគណនី (Logout)
+          🚪 ចាកចេញពីឧបករណ៍នេះ (Logout This Device)
         </button>
       </div>
     </div>

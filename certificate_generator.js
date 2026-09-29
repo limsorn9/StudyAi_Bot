@@ -102,6 +102,18 @@ async function generateCertificateHTML(data) {
     console.error("School Logo Load Error:", err);
   }
 
+  // Load School Stamp Base64 (ត្រាសាលារៀន ពណ៌ក្រហមផ្លូវការ)
+  let schoolStampDataUrl = '';
+  try {
+    const stampFile = path.join(__dirname, 'public', 'school_stamp.png');
+    if (fs.existsSync(stampFile)) {
+      const b64 = fs.readFileSync(stampFile).toString('base64');
+      schoolStampDataUrl = `data:image/png;base64,${b64}`;
+    }
+  } catch (err) {
+    console.error("School Stamp Load Error:", err);
+  }
+
   return `<!DOCTYPE html>
 <html lang="km">
 <head>
@@ -330,6 +342,29 @@ async function generateCertificateHTML(data) {
       width: 240px;
       text-align: center;
     }
+    .director-sig-col {
+      position: relative;
+    }
+    .sig-stamp-container {
+      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .official-red-stamp {
+      position: absolute;
+      width: 104px;
+      height: 104px;
+      top: -38px;
+      right: 22px;
+      object-fit: contain;
+      pointer-events: none;
+      opacity: 0.94;
+      transform: rotate(-6deg);
+      filter: drop-shadow(0 2px 4px rgba(185, 28, 28, 0.25));
+      mix-blend-mode: multiply;
+      z-index: 2;
+    }
     .sig-name {
       font-family: 'Playfair Display', serif;
       font-size: 22px;
@@ -337,6 +372,8 @@ async function generateCertificateHTML(data) {
       color: #1e3a8a;
       margin-bottom: 4px;
       font-weight: 700;
+      position: relative;
+      z-index: 1;
     }
     .sig-title {
       border-top: 1.5px solid #94a3b8;
@@ -499,9 +536,12 @@ async function generateCertificateHTML(data) {
               </div>
             </div>
 
-            <!-- Right: School Director -->
-            <div class="sig-col">
-              <div class="sig-name">លីម សន</div>
+            <!-- Right: School Director with Official Red Stamp (ត្រាសាលារៀន) -->
+            <div class="sig-col director-sig-col">
+              <div class="sig-stamp-container">
+                <img src="${schoolStampDataUrl || '/school_stamp.png'}" alt="ត្រាសាលារៀន" class="official-red-stamp" />
+                <div class="sig-name">លីម សន</div>
+              </div>
               <div class="sig-title">នាយកសាលារៀន (School Director)</div>
               <div class="sig-sub">Director: Lim Sorn</div>
             </div>
