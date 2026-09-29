@@ -258,21 +258,52 @@
           <p>ជ្រើសរើសរៀនថ្នាក់ដំបូង (អ្នកគ្រូ ពិសិដ្ឋ) ឬថ្នាក់ទូទៅ ១២ ខែ (គ្រូសន)</p>
         </div>
 
-        <!-- Course Level Switcher: Beginner (Teacher Piseth) vs 12 Months (Teacher Sorn) -->
+        <!-- Course Level Switcher: 5 Levels with lock states -->
         <div class="course-level-switch-wrap mb-4">
-          <div class="course-level-switcher glass-panel">
+          <div class="course-level-switcher-5 glass-panel">
+            <!-- Level 1: Beginner (unlocked) -->
             <button class="course-level-btn active" id="courseLevelBeginnerBtn" onclick="switchCourseLevel('beginner')">
               <span class="course-icon">👩‍🏫</span>
               <div class="course-btn-text">
-                <span class="course-badge">ថ្នាក់ដំបូង • English for Children (១ថ្ងៃ ១អក្សរ ១ពាក្យ ១ល្បះ)</span>
+                <span class="course-badge">ថ្នាក់ដំបូង • English for Children</span>
                 <span class="course-title">ថ្នាក់ដំបូង (អ្នកគ្រូ ពិសិដ្ឋ AI)</span>
+                <span class="course-sub">A–Z • ២៦ ថ្ងៃ</span>
               </div>
             </button>
+            <!-- Level 2: Elementary (locked until Beginner graduated) -->
+            <button class="course-level-btn locked-level" id="courseLevelElementaryBtn" onclick="switchCourseLevel('elementary')">
+              <span class="course-icon">🔒</span>
+              <div class="course-btn-text">
+                <span class="course-badge">កម្រិតបឋម • Elementary</span>
+                <span class="course-title">កម្រិតបឋម</span>
+                <span class="course-sub lock-hint">ប្រឡងបញ្ចប់ថ្នាក់ដំបូងជាមុន</span>
+              </div>
+            </button>
+            <!-- Level 3: Intermediate (locked) -->
+            <button class="course-level-btn locked-level" id="courseLevelIntermediateBtn" onclick="switchCourseLevel('intermediate')">
+              <span class="course-icon">🔒</span>
+              <div class="course-btn-text">
+                <span class="course-badge">កម្រិតមធ្យម • Intermediate</span>
+                <span class="course-title">កម្រិតមធ្យម</span>
+                <span class="course-sub lock-hint">ទូរស្ករ</span>
+              </div>
+            </button>
+            <!-- Level 4: Advanced (locked) -->
+            <button class="course-level-btn locked-level" id="courseLevelAdvancedBtn" onclick="switchCourseLevel('advanced')">
+              <span class="course-icon">🔒</span>
+              <div class="course-btn-text">
+                <span class="course-badge">កម្រិតឧត្តម • Advanced</span>
+                <span class="course-title">កម្រិតឧត្តម</span>
+                <span class="course-sub lock-hint">ទូរស្ករ</span>
+              </div>
+            </button>
+            <!-- Level 5: General 12 Months (unlocked for all) -->
             <button class="course-level-btn" id="courseLevelStandardBtn" onclick="switchCourseLevel('standard')">
               <span class="course-icon">👨‍🏫</span>
               <div class="course-btn-text">
                 <span class="course-badge">ថ្នាក់ទូទៅ • ១២ ខែ</span>
                 <span class="course-title">ថ្នាក់ទូទៅ ១២ ខែ (គ្រូសន AI)</span>
+                <span class="course-sub">288 មេរៀន</span>
               </div>
             </button>
           </div>

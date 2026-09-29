@@ -19,6 +19,8 @@ const STATE = {
   allVerbsData: {},
   courseLevel: 'beginner',
   beginnerCourse: null,
+  beginnerStatus: { passedCount: 0, totalLessons: 26, passedLessons: [], isGraduated: false, beginnerCert: null },
+  isBeginnerFinalExam: false,
   activeTutor: 'piseth',
   studioTutor: 'piseth'
 };
@@ -38,6 +40,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   if (STATE.currentUser) {
     refreshUserProfile();
+    loadBeginnerStatus();
   }
 });
 
@@ -308,6 +311,10 @@ async function refreshUserProfile() {
 
       updateUserInterface();
       renderCurriculumWeeks();
+      // Re-fetch beginner status after profile refresh to update locking/progress
+      loadBeginnerStatus().then(() => {
+        if (STATE.courseLevel === 'beginner') renderBeginnerWeeks();
+      });
     }
   } catch (e) {
     console.error('Failed to refresh profile:', e);
@@ -377,12 +384,55 @@ async function loadCurriculum() {
   }
 }
 
+async function loadBeginnerStatus() {
+  const userId = STATE.currentUser?.id;
+  if (!userId) return;
+  try {
+    const res = await fetch(`/api/beginner/status/${userId}`);
+    const data = await res.json();
+    if (data.success) {
+      STATE.beginnerStatus = data;
+      // Update Elementary button lock state
+      const elemBtn = document.getElementById('courseLevelElementaryBtn');
+      if (elemBtn && data.isGraduated) {
+        elemBtn.classList.remove('locked-level');
+        elemBtn.querySelector('.course-icon').textContent = '🎓';
+        const lockHint = elemBtn.querySelector('.lock-hint');
+        if (lockHint) lockHint.textContent = 'ជំហ្សើររៀន';
+      }
+    }
+  } catch (e) { /* silent */ }
+}
+
 function switchCourseLevel(level) {
+  // Locked levels: elementary, intermediate, advanced need graduation
+  if (level === 'elementary') {
+    if (!STATE.beginnerStatus?.isGraduated) {
+      const passedCount = STATE.beginnerStatus?.passedCount || 0;
+      showToast(`🔒 ថ្នាក់នេះត្រូវការប្រឡងបញ្ចប់ថ្នាក់ដំបូង (English for Children) ជាមុន!\n(បច្ចុប្បន្ន: ${passedCount}/26 ថ្ងៃ)`, 'error', 4000);
+      return;
+    }
+  } else if (level === 'intermediate' || level === 'advanced') {
+    showToast('🔒 កម្រិតនេះកំពុងរៀបចំ! ត្រូវបំពេញថ្នាក់ទាបជាង ហើយប្រឡងជ្រះជ្រា ទើបចូលបានទេ 🚧', 'warning', 4000);
+    return;
+  }
+
   STATE.courseLevel = level;
-  const begBtn = document.getElementById('courseLevelBeginnerBtn');
-  const stdBtn = document.getElementById('courseLevelStandardBtn');
-  if (begBtn) begBtn.classList.toggle('active', level === 'beginner');
-  if (stdBtn) stdBtn.classList.toggle('active', level === 'standard');
+
+  // Update active states for all 5 buttons
+  ['courseLevelBeginnerBtn', 'courseLevelElementaryBtn', 'courseLevelIntermediateBtn', 'courseLevelAdvancedBtn', 'courseLevelStandardBtn'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) btn.classList.remove('active');
+  });
+  const activeId = {
+    beginner: 'courseLevelBeginnerBtn',
+    elementary: 'courseLevelElementaryBtn',
+    intermediate: 'courseLevelIntermediateBtn',
+    advanced: 'courseLevelAdvancedBtn',
+    standard: 'courseLevelStandardBtn'
+  }[level];
+  const activeBtn = document.getElementById(activeId);
+  if (activeBtn) activeBtn.classList.add('active');
 
   const monthsBar = document.getElementById('monthsTabsBar');
   const instructorCard = document.getElementById('curriculumInstructorCard');
@@ -457,34 +507,111 @@ function renderBeginnerWeeks() {
   }
 
   const completed = STATE.currentUser?.completedLessons || {};
+  const status = STATE.beginnerStatus;
+  const passedLessons = new Set(status.passedLessons || []);
+  const passedCount = status.passedCount || 0;
+  const isGraduated = status.isGraduated || false;
 
-  container.innerHTML = course.weeks.map(w => `
-    <div class="week-card glass-panel beginner-week-card">
-      <div class="week-header">
-        <div class="week-title-wrap">
-          <div class="week-title">📅 ${w.title} (${w.lessons.length} ថ្ងៃ)</div>
-          ${w.description ? `<div class="week-desc text-xs text-slate-400 mt-0.5">${w.description}</div>` : ''}
+  // Build flat lesson index (bl1 to bl26)
+  const allLessons = [];
+  course.weeks.forEach(w => w.lessons.forEach(l => allLessons.push({ wId: w.id, lid: l.id })));
+
+  // Beginner Final Exam Card at top
+  const finalPct = Math.round((passedCount / 26) * 100);
+  const finalExamHTML = `
+    <div class="beginner-final-exam-card">
+      <div class="final-exam-header">
+        <div class="final-exam-icon">${isGraduated ? '🎓' : '📜'}</div>
+        <div class="final-exam-info">
+          <h3>${isGraduated ? '✅ ប្រឡងបញ្ចប់ --- ជោគជ័យ!' : 'ការប្រឡងបញ្ចប់ថ្នាក់ដំបូង'}</h3>
+          <p>${isGraduated
+            ? 'អ្នកបានសម្រេចថ្នាក់ដំបូង! ទទួលបានវិញ្ញាបនបត្រជោគជ័យ 🏆'
+            : `ត្រូវប្រឡងជាប់គ្រប់ ២៦ ថ្ងៃ ទើបអាចប្រឡងបញ្ចប់ & ចូលរៀនថ្នាក់បន្ទាប់`
+          }</p>
         </div>
-        <span class="badge badge-emerald">👩‍🏫 អ្នកគ្រូ ពិសិដ្ឋ AI</span>
       </div>
-      <div class="lessons-grid">
-        ${w.lessons.map(l => {
-          const key = `beginner-${w.id}-${l.id}`;
-          const isComp = !!completed[key];
-          const grade = isComp ? completed[key].grade || 'A' : null;
-          return `
-            <div class="lesson-item-card beginner-lesson-item ${isComp ? 'completed' : ''}" onclick="openLesson('beginner', '${w.id}', '${l.id}')">
-              <div class="l-info">
-                <div class="l-title">${l.title}</div>
-                <div class="l-status">${isComp ? `✅ ជាប់និទ្ទេស ${grade}` : '📖 ១ ថ្ងៃ ១ អក្សរ ១ ពាក្យ ១ ល្បះ'}</div>
-              </div>
-              <div class="l-icon">${isComp ? '🏆' : '➡️'}</div>
-            </div>
-          `;
-        }).join('')}
+      <div class="final-exam-progress">
+        <div class="final-exam-progress-label">
+          <span>ជ្រើសរើសថ្ងៃបានប្រឡងជាប់: ${passedCount}/26</span>
+          <span>${finalPct}%</span>
+        </div>
+        <div class="final-exam-progress-bar">
+          <div class="final-exam-progress-fill" style="width: ${finalPct}%"></div>
+        </div>
       </div>
+      ${isGraduated
+        ? `<div class="graduated-badge">🎓 ប្រឡងបញ្ចប់ជោគជ័យ! វិញ្ញាបនបត្រ: <strong>${status.beginnerCert?.certId || ' គ្មាន'}</strong></div>
+           <button class="btn-final-exam" style="margin-top:10px" onclick="openCertificatePreview('${status.beginnerCert?.certId || ''}')">📜 មើលវិញ្ញាបនបត្រ</button>`
+        : `<button class="btn-final-exam" ${passedCount < 26 ? 'disabled' : ''} onclick="startBeginnerFinalExam()">
+            ${passedCount < 26 ? `🔒 ប្រឡងបញ្ចប់ (ខ្វះ ${26 - passedCount} ថ្ងៃ)` : '🎓 ចូលប្រឡងបញ្ចប់ (20 សំណួរ)'}
+           </button>`
+      }
     </div>
-  `).join('');
+  `;
+
+  const weeksHTML = course.weeks.map(w => {
+    const lessonsHTML = w.lessons.map((l, wLessonIdx) => {
+      const dbKey = `beginner-${w.id}-${l.id}`;
+      const isComp = !!completed[dbKey] || passedLessons.has(l.id);
+      const grade = isComp ? (completed[dbKey]?.grade || 'A') : null;
+
+      // Sequential lock: lesson N requires lesson N-1 passed
+      // bl1 is always unlocked; bl2 requires bl1, etc.
+      const lessonNum = parseInt((l.id || '').replace('bl', ''));
+      const isUnlocked = lessonNum <= 1 || passedLessons.has(`bl${lessonNum - 1}`);
+      const isLocked = !isUnlocked;
+
+      return `
+        <div class="lesson-item-card beginner-lesson-item ${isComp ? 'completed' : ''} ${isLocked ? 'lesson-locked' : ''}" 
+             onclick="${isLocked ? `showToast('🔒 ត្រូវប្រឡងជាប់ថ្ងៃទី${lessonNum - 1} ជាមុន!', 'warning')` : `openLesson('beginner', '${w.id}', '${l.id}')`}">
+          <div class="l-info">
+            <div class="l-title">${isLocked ? '🔒 ' : ''}${l.title}</div>
+            <div class="l-status">${isComp ? `✅ ជាប់និទ្ទេស ${grade}` : (isLocked ? '🔒 ចាំប្រឡងថ្ងៃកន្លងទៅ' : '📖 ១ ថ្ងៃ ១ អក្សរ ១ ពាក្យ ១ ល្បះ')}</div>
+          </div>
+          <div class="l-icon">${isComp ? '🏆' : (isLocked ? '🔒' : '➡️')}</div>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="week-card glass-panel beginner-week-card">
+        <div class="week-header">
+          <div class="week-title-wrap">
+            <div class="week-title">📅 ${w.title} (${w.lessons.length} ថ្ងៃ)</div>
+            ${w.description ? `<div class="week-desc text-xs text-slate-400 mt-0.5">${w.description}</div>` : ''}
+          </div>
+          <span class="badge badge-emerald">👩‍🏫 អ្នកគ្រូ ពិសិដ្ឋ AI</span>
+        </div>
+        <div class="lessons-grid">${lessonsHTML}</div>
+      </div>
+    `;
+  }).join('');
+
+  container.innerHTML = finalExamHTML + weeksHTML;
+}
+
+async function startBeginnerFinalExam() {
+  const userId = STATE.currentUser?.id;
+  if (!userId) { showToast('❌ ត្រូវ Login ជាមុន', 'error'); return; }
+
+  try {
+    showToast('⏳ កំពុងរៀបចំវិញ្ញាសាប្រឡងបញ្ចប់ (20 សំណួរ)...', 'info');
+    const res = await fetch(`/api/quiz/start?type=beginner_final&userId=${userId}`);
+    const data = await res.json();
+
+    if (!data.success) {
+      if (data.isLocked) {
+        showToast(data.error, 'error', 5000);
+        return;
+      }
+      throw new Error(data.error || 'Failed to start final exam');
+    }
+
+    STATE.isBeginnerFinalExam = true;
+    launchQuizEngine(data, 'BEGINNER FINAL EXAM');
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
 }
 
 function renderMonthsTabs() {
@@ -2769,34 +2896,95 @@ function showQuizResultModal(result) {
   const actions = document.getElementById('resActionsContainer');
   const reviewList = document.getElementById('resReviewList');
 
+  const isBeginnerFinal = result.isBeginnerFinal || STATE.isBeginnerFinalExam;
+  const isBeginnerLesson = STATE.currentLesson?.monthId === 'beginner' && !isBeginnerFinal;
+  STATE.isBeginnerFinalExam = false; // reset
+
   gradeCircle.textContent = result.grade;
   gradeTitle.textContent = result.gradeTitle || `និទ្ទេស ${result.grade}`;
   scoreText.textContent = `${result.score} / ${result.total} ពិន្ទុ (${result.percent}%)`;
 
   if (result.isPassed) {
     gradeCircle.style.background = 'linear-gradient(135deg, #10b981, #06b6d4)';
-    feedback.innerHTML = `🎉 <strong>អបអរសាទរយ៉ាងក្រៃលែង!</strong> អ្នកបានប្រឡងជាប់និទ្ទេស <strong>${result.grade}</strong> ហើយទទួលបានវិញ្ញាបនបត្រផ្លូវការទម្រង់ A4 ផ្តេក!`;
 
-    actions.innerHTML = `
-      <button class="btn btn-gold btn-lg" onclick="openCertificatePreview('${result.certId}')">
-        <span>📜 មើលវិញ្ញាបនបត្រ A4 ផ្តេក</span>
-      </button>
-      <button class="btn btn-outline" onclick="closeModal('quizResultModal'); navigateTo('curriculum');">
-        <span>📚 បន្តរៀនមេរៀនបន្ទាប់</span>
-      </button>
-    `;
+    if (isBeginnerFinal && result.certId) {
+      // Graduation!
+      feedback.innerHTML = `🎓 <strong>អបអរសាទរ! អ្នកបានសម្រេចថ្នាក់ដំបូង!</strong> ទទួលបានវិញ្ញាបនបត្របញ្ចប់ការសិក្សា English for Children (A-Z)!`;
+      actions.innerHTML = `
+        <button class="btn btn-gold btn-lg" onclick="openCertificatePreview('${result.certId}')">
+          <span>🎓 មើលវិញ្ញាបនបត្របញ្ចប់ថ្នាក់ដំបូង</span>
+        </button>
+        <button class="btn btn-outline" onclick="closeModal('quizResultModal'); navigateTo('curriculum'); loadBeginnerStatus();">
+          <span>🔓 ចូលរៀនថ្នាក់បន្ទាប់</span>
+        </button>
+      `;
+      // Reload beginner status to reflect graduation
+      loadBeginnerStatus().then(() => renderBeginnerWeeks());
+    } else if (isBeginnerLesson) {
+      // Daily lesson passed (1/1) - no certificate!
+      feedback.innerHTML = `✅ <strong>ល្អណាស់!</strong> អ្នកបានប្រឡងជាប់មេរៀនថ្ងៃនេះ! <br>(<strong>ចំណាំ:</strong> ការប្រឡងប្រចាំថ្ងៃ មិនទទួលបានវិញ្ញាបនបត្រឡើយ — ប្រឡងបញ្ចប់ ២៦ ថ្ងៃ ទើបបានវិញ្ញាបនបត្រ!)`;
+      actions.innerHTML = `
+        <button class="btn btn-primary" onclick="closeModal('quizResultModal'); navigateTo('curriculum'); refreshUserProfile();">
+          <span>📚 បន្តរៀនមេរៀនបន្ទាប់</span>
+        </button>
+        <button class="btn btn-outline" onclick="closeModal('quizResultModal');">
+          <span>📖 អានមេរៀនទៀត</span>
+        </button>
+      `;
+      refreshUserProfile();
+    } else if (result.certId) {
+      // Annual exam or standard lesson with cert
+      feedback.innerHTML = `🎉 <strong>អបអរសាទរយ៉ាងក្រៃលែង!</strong> អ្នកបានប្រឡងជាប់និទ្ទេស <strong>${result.grade}</strong> ហើយទទួលបានវិញ្ញាបនបត្រផ្លូវការទម្រង់ A4 ផ្តេក!`;
+      actions.innerHTML = `
+        <button class="btn btn-gold btn-lg" onclick="openCertificatePreview('${result.certId}')">
+          <span>📜 មើលវិញ្ញាបនបត្រ A4 ផ្តេក</span>
+        </button>
+        <button class="btn btn-outline" onclick="closeModal('quizResultModal'); navigateTo('curriculum');">
+          <span>📚 បន្តរៀនមេរៀនបន្ទាប់</span>
+        </button>
+      `;
+    } else {
+      feedback.innerHTML = `✅ <strong>ប្រឡងជាប់!</strong> ការប្រឡងត្រូវបានកត់ត្រានៅក្នុងប្រវត្តិ។`;
+      actions.innerHTML = `
+        <button class="btn btn-primary" onclick="closeModal('quizResultModal'); refreshUserProfile();">
+          <span>📚 បន្ត</span>
+        </button>
+      `;
+    }
   } else {
     gradeCircle.style.background = 'linear-gradient(135deg, #f43f5e, #e11d48)';
-    feedback.innerHTML = `💪 <strong>ព្យាយាមម្តងទៀតណា៎!</strong> អ្នកទទួលបាន ${result.percent}%។ ដើម្បីទទួលបានវិញ្ញាបនបត្រ អ្នកត្រូវប្រឡងជាប់ចាប់ពី 70% (និទ្ទេស A, B, ឬ C) ឡើងទៅ។`;
 
-    actions.innerHTML = `
-      <button class="btn btn-primary" onclick="closeModal('quizResultModal'); startCurrentLessonQuiz();">
-        <span>🔄 ប្រឡងម្តងទៀត</span>
-      </button>
-      <button class="btn btn-outline" onclick="closeModal('quizResultModal');">
-        <span>📖 អានមេរៀនឡើងវិញ</span>
-      </button>
-    `;
+    if (isBeginnerLesson) {
+      feedback.innerHTML = `❌ <strong>មិនទាន់ជាប់ទេ!</strong> អ្នកត្រូវឆ្លើយឱ្យបាន 1/1 ទើបរៀនមេរៀនបន្ទាប់បាន! <strong>ព្យាយាមម្តងទៀត!</strong>`;
+      actions.innerHTML = `
+        <button class="btn btn-primary" onclick="closeModal('quizResultModal'); startCurrentLessonQuiz();">
+          <span>🔄 ប្រឡងម្តងទៀត (១ សំណួរ)</span>
+        </button>
+        <button class="btn btn-outline" onclick="closeModal('quizResultModal');">
+          <span>📖 អានមេរៀនម្តងទៀត</span>
+        </button>
+      `;
+    } else if (isBeginnerFinal) {
+      feedback.innerHTML = `❌ <strong>មិនទាន់ជាប់ទេ!</strong> ប្រឡងបញ្ចប់ ត្រូវការ ≥70% (14/20)។ ព្យាយាមម្តងទៀត!`;
+      actions.innerHTML = `
+        <button class="btn btn-primary" onclick="closeModal('quizResultModal'); startBeginnerFinalExam();">
+          <span>🔄 ប្រឡងបញ្ចប់ម្តងទៀត</span>
+        </button>
+        <button class="btn btn-outline" onclick="closeModal('quizResultModal');">
+          <span>📚 ត្រឡប់ទៅ</span>
+        </button>
+      `;
+    } else {
+      feedback.innerHTML = `💪 <strong>ព្យាយាមម្តងទៀតណា៎!</strong> អ្នកទទួលបាន ${result.percent}%។ ដើម្បីទទួលបានវិញ្ញាបនបត្រ អ្នកត្រូវប្រឡងជាប់ចាប់ពី 70% (និទ្ទេស A, B, ឬ C) ឡើងទៅ។`;
+      actions.innerHTML = `
+        <button class="btn btn-primary" onclick="closeModal('quizResultModal'); startCurrentLessonQuiz();">
+          <span>🔄 ប្រឡងម្តងទៀត</span>
+        </button>
+        <button class="btn btn-outline" onclick="closeModal('quizResultModal');">
+          <span>📖 អានមេរៀនឡើងវិញ</span>
+        </button>
+      `;
+    }
   }
 
   // Populate Review
@@ -2810,6 +2998,7 @@ function showQuizResultModal(result) {
 
   modal.classList.remove('hidden');
 }
+
 
 // ==========================================
 // 7. ANNUAL EXAMS CENTER

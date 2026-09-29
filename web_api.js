@@ -7,7 +7,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const Groq = require('groq-sdk');
 const OpenAI = require('openai');
 
-const { generateQuiz, generateAnnualSubjectQuiz, SUBJECT_EXAMS } = require('./quiz_generator.js');
+const { generateQuiz, generateBeginnerFinalExam, generateAnnualSubjectQuiz, SUBJECT_EXAMS } = require('./quiz_generator.js');
 const { generateCertificateCard, generateCertificateHTML, getGradeTitle } = require('./certificate_generator.js');
 const { redeemLicenseKey, getUserLicenseInfo } = require('./license_manager.js');
 const irregularVerbs = require('./irregular_verbs.js');
@@ -2339,7 +2339,7 @@ Provide practical English pronunciation coaching:
   });
 
   /**
-   * Get Quiz Questions (Lesson or Annual Exam)
+   * Get Quiz Questions (Lesson, Annual Exam, or Beginner Final Exam)
    */
   router.get('/quiz/start', async (req, res) => {
     try {
@@ -2347,7 +2347,36 @@ Provide practical English pronunciation coaching:
       let rawQuestions = [];
       let quizTitle = '';
 
-      if (type === 'annual') {
+      if (type === 'beginner_final') {
+        // Beginner Final Exam (20 questions covering all 26 letters A-Z)
+        // Strictly verify that student has passed all 26 lessons (bl1 to bl26)
+        if (userId && db) {
+          const userSnap = await db.ref(`users/${userId}`).once('value');
+          const userData = userSnap.val() || {};
+          const completed = userData.completed_lessons || {};
+
+          let passedLessons = 0;
+          for (let i = 1; i <= 26; i++) {
+            const lid = `bl${i}`;
+            const hasPassed = Object.entries(completed).some(([k, v]) => {
+              return k.includes(`-${lid}`) && (v.isPassed || ['A', 'B', 'C'].includes(v.grade) || (v.percent && v.percent >= 70));
+            });
+            if (hasPassed) passedLessons++;
+          }
+
+          if (passedLessons < 26) {
+            return res.status(403).json({
+              error: `🔒 អ្នកត្រូវប្រឡងជាប់គ្រប់ ២៦ ថ្ងៃនៃថ្នាក់ដំបូងជាមុនសិន ទើបមានសិទ្ធិប្រឡងបញ្ចប់! (បច្ចុប្បន្នជាប់ ${passedLessons}/26 ថ្ងៃ, នៅខ្វះ ${26 - passedLessons} ថ្ងៃទៀត។ បើធ្លាក់តែ១មេរៀន គឺគ្មានសិទ្ធិប្រឡងបញ្ចប់ឡើយ)`,
+              isLocked: true,
+              passedCount: passedLessons,
+              totalRequired: 26
+            });
+          }
+        }
+
+        rawQuestions = generateBeginnerFinalExam();
+        quizTitle = 'ការប្រឡងបញ្ចប់ថ្នាក់ដំបូង (Beginner Final Graduation Exam)';
+      } else if (type === 'annual') {
         if (!SUBJECT_EXAMS[subjectKey]) {
           return res.status(400).json({ error: 'Invalid annual subject key' });
         }
@@ -2370,6 +2399,24 @@ Provide practical English pronunciation coaching:
         let qList = [];
         let l = null;
         if (monthId === 'beginner' || monthId === 'm0') {
+          // Sequential unlock check for Beginner Lesson: Day N requires Day N-1 passed!
+          const lessonNum = parseInt((lessonId || '').replace('bl', ''));
+          if (lessonNum > 1 && userId && db) {
+            const prevLessonId = `bl${lessonNum - 1}`;
+            const userSnap = await db.ref(`users/${userId}`).once('value');
+            const userData = userSnap.val() || {};
+            const completed = userData.completed_lessons || {};
+            const prevPassed = Object.entries(completed).some(([k, v]) => {
+              return k.includes(`-${prevLessonId}`) && (v.isPassed || ['A', 'B', 'C'].includes(v.grade) || (v.percent && v.percent >= 70));
+            });
+            if (!prevPassed) {
+              return res.status(403).json({
+                error: `🔒 សូមប្រឡងជាប់មេរៀនថ្ងៃទី ${lessonNum - 1} ជាមុនសិន ទើបអាចចូលប្រឡងមេរៀនថ្ងៃទី ${lessonNum} បាន!`,
+                isLocked: true
+              });
+            }
+          }
+
           const w = beginnerCourse.weeks.find(w => w.id === weekId);
           l = w?.lessons.find(l => l.id === lessonId);
           qList = l ? generateQuiz(l) : [];
@@ -2387,9 +2434,34 @@ Provide practical English pronunciation coaching:
         return res.status(404).json({ error: 'មិនអាចបង្កើតសំណួរសម្រាប់មេរៀននេះបានទេ' });
       }
 
+      // Robustly normalize raw questions
+      const normalizedQuestions = rawQuestions.map(q => {
+        const questionText = q.question || q.q || '';
+        let optionsList = q.options || q.c || [];
+        if (q.c && Array.isArray(q.c)) {
+          optionsList = q.c.map(c => (typeof c === 'string' ? c.replace(/^[A-D]\)\s*/, '') : c));
+        }
+        let correctIdx = 0;
+        if (typeof q.correct === 'number') {
+          correctIdx = q.correct;
+        } else if (q.a) {
+          correctIdx = ['A', 'B', 'C', 'D'].indexOf(q.a);
+          if (correctIdx === -1) correctIdx = 0;
+        } else if (q.answer && Array.isArray(optionsList)) {
+          correctIdx = optionsList.indexOf(q.answer);
+          if (correctIdx === -1) correctIdx = 0;
+        }
+        return {
+          question: questionText,
+          options: optionsList,
+          correct: correctIdx,
+          explanation: q.explanation || ''
+        };
+      });
+
       // Create a quiz session with question ID and without sending correct answers to client
       const sessionId = 'qs_' + Math.random().toString(36).substring(2, 10);
-      const safeQuestions = rawQuestions.map((q, idx) => ({
+      const safeQuestions = normalizedQuestions.map((q, idx) => ({
         id: idx,
         question: q.question,
         options: q.options
@@ -2397,7 +2469,7 @@ Provide practical English pronunciation coaching:
 
       // Store in memory for secure verification
       activeQuizSessions.set(sessionId, {
-        rawQuestions,
+        rawQuestions: normalizedQuestions,
         createdAt: Date.now(),
         type,
         monthId,
@@ -2411,7 +2483,7 @@ Provide practical English pronunciation coaching:
         success: true,
         sessionId,
         quizTitle,
-        total: rawQuestions.length,
+        total: normalizedQuestions.length,
         questions: safeQuestions
       });
     } catch (err) {
@@ -2462,8 +2534,10 @@ Provide practical English pronunciation coaching:
       else if (percent >= 70) grade = 'C';
       else if (percent >= 60) grade = 'D';
 
-      const isPassed = ['A', 'B', 'C'].includes(grade);
+      // For 1-question beginner daily quiz: must be 1/1 (100%) to pass!
+      const isPassed = total === 1 ? score === 1 : ['A', 'B', 'C'].includes(grade);
       const isAnnualExam = type === 'annual';
+      const isBeginnerFinal = type === 'beginner_final';
 
       let certId = null;
       let certData = null;
@@ -2472,18 +2546,55 @@ Provide practical English pronunciation coaching:
         const effectiveName = studentName || `សិស្ស ID ${userId}`;
         const dateStr = new Date().toLocaleDateString('km-KH');
 
-        // Check if existing certId exists
-        const refPath = isAnnualExam
-          ? `users/${userId}/subject_certifications/${subjectKey}`
-          : `users/${userId}/completed_lessons/${monthId}-${weekId}-${lessonId}`;
-
         try {
-          const prevSnap = await db.ref(refPath).once('value');
-          const prevVal = prevSnap.val();
-          certId = (prevVal && prevVal.certId) ? prevVal.certId : Math.random().toString(36).substring(2, 8).toUpperCase();
+          if (isBeginnerFinal) {
+            // Beginner Final Graduation Exam: issue official Graduation Certificate
+            const prevSnap = await db.ref(`users/${userId}/beginner_certification`).once('value');
+            const prevVal = prevSnap.val();
+            certId = prevVal && prevVal.certId ? prevVal.certId : 'BEG' + Math.random().toString(36).substring(2, 7).toUpperCase();
 
-          // Save completion record
-          if (isAnnualExam) {
+            await db.ref(`users/${userId}/beginner_certification`).set({
+              certId,
+              title: 'វិញ្ញាបនបត្របញ្ចប់ការសិក្សា ថ្នាក់ភាសាអង់គ្លេសដំបូង (English for Children)',
+              studentName: effectiveName,
+              grade,
+              score,
+              total,
+              percent,
+              dateStr,
+              completedAt: Date.now()
+            });
+
+            // Mark graduated to unlock Elementary level
+            await db.ref(`users/${userId}/beginner_graduated`).set(true);
+
+            // Save global certificate record for QR Code
+            certData = {
+              certId,
+              userId: userId.toString(),
+              studentName: effectiveName,
+              title: 'វិញ្ញាបនបត្របញ្ចប់ការសិក្សា ថ្នាក់ភាសាអង់គ្លេសដំបូង (English for Children - A to Z)',
+              lessonTitle: quizTitle,
+              grade,
+              score,
+              total,
+              percent,
+              dateStr,
+              isAnnualExam: false,
+              isBeginnerFinal: true,
+              issuedAt: Date.now(),
+              director: 'លីម សន (Lim Sorn)',
+              instructor: 'អ្នកគ្រូ ពិសិដ្ឋ (Teacher Piseth AI)',
+              schoolName: 'វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline'
+            };
+
+            await db.ref(`certificates/${certId}`).set(certData);
+          } else if (isAnnualExam) {
+            // Annual Subject Exam: issue subject certificate
+            const prevSnap = await db.ref(`users/${userId}/subject_certifications/${subjectKey}`).once('value');
+            const prevVal = prevSnap.val();
+            certId = prevVal && prevVal.certId ? prevVal.certId : Math.random().toString(36).substring(2, 8).toUpperCase();
+
             await db.ref(`users/${userId}/subject_certifications/${subjectKey}`).set({
               certId,
               subjectKey,
@@ -2496,15 +2607,40 @@ Provide practical English pronunciation coaching:
               dateStr,
               completedAt: Date.now()
             });
+
+            // Save global certificate record for QR Code
+            certData = {
+              certId,
+              userId: userId.toString(),
+              studentName: effectiveName,
+              title: quizTitle,
+              lessonTitle: quizTitle,
+              grade,
+              score,
+              total,
+              percent,
+              dateStr,
+              isAnnualExam: true,
+              isBeginnerFinal: false,
+              subjectKey,
+              lessonId: null,
+              issuedAt: Date.now(),
+              director: 'លីម សន (Lim Sorn)',
+              instructor: 'គ្រូសន (Teacher Sorn AI)',
+              schoolName: 'វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline'
+            };
+
+            await db.ref(`certificates/${certId}`).set(certData);
           } else {
+            // Daily Lesson Quiz: Record completion & unlock progression, but NO CERTIFICATE!
             const lessonKey = `${monthId}-${weekId}-${lessonId}`;
             await db.ref(`users/${userId}/completed_lessons/${lessonKey}`).set({
-              certId,
               lessonId: lessonKey,
               lessonTitle: quizTitle,
               monthId,
               weekId,
               studentName: effectiveName,
+              isPassed,
               grade,
               score,
               total,
@@ -2512,30 +2648,9 @@ Provide practical English pronunciation coaching:
               dateStr,
               completedAt: Date.now()
             });
+            certId = null;
+            certData = null;
           }
-
-          // Save global certificate record for QR Code
-          certData = {
-            certId,
-            userId: userId.toString(),
-            studentName: effectiveName,
-            title: quizTitle,
-            lessonTitle: quizTitle,
-            grade,
-            score,
-            total,
-            percent,
-            dateStr,
-            isAnnualExam,
-            subjectKey: isAnnualExam ? subjectKey : null,
-            lessonId: isAnnualExam ? null : `${monthId}-${weekId}-${lessonId}`,
-            issuedAt: Date.now(),
-            director: 'លីម សន (Lim Sorn)',
-            instructor: 'TeacherSornAiBot',
-            schoolName: 'វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline'
-          };
-
-          await db.ref(`certificates/${certId}`).set(certData);
         } catch (e) {
           console.error('Quiz completion database error:', e);
         }
@@ -2554,6 +2669,7 @@ Provide practical English pronunciation coaching:
         gradeTitle: getGradeTitle(grade),
         certId,
         certData,
+        isBeginnerFinal,
         review
       });
     } catch (err) {
@@ -2563,7 +2679,7 @@ Provide practical English pronunciation coaching:
   });
 
   // ==========================================
-  // 5. CERTIFICATES & REFRESH ENDPOINTS
+  // 5. CERTIFICATES & STATUS ENDPOINTS
   // ==========================================
 
   router.get('/certificates/:userId', async (req, res) => {
@@ -2575,21 +2691,60 @@ Provide practical English pronunciation coaching:
       const snap = await db.ref(`users/${userId}`).once('value');
       const data = snap.val() || {};
       const annualCerts = data.subject_certifications || {};
-      const lessonComps = data.completed_lessons || {};
+      const beginnerCert = data.beginner_certification || null;
 
       const list = [];
-      for (const [key, val] of Object.entries(annualCerts)) {
-        list.push({ ...val, subjectKey: key, isAnnualExam: true });
+      // 1. Beginner Final Graduation Certificate
+      if (beginnerCert && beginnerCert.certId) {
+        list.push({
+          ...beginnerCert,
+          isBeginnerFinal: true,
+          isAnnualExam: false,
+          instructor: 'អ្នកគ្រូ ពិសិដ្ឋ (Teacher Piseth AI)',
+          title: beginnerCert.title || 'វិញ្ញាបនបត្របញ្ចប់ការសិក្សា ថ្នាក់ភាសាអង់គ្លេសដំបូង (English for Children)'
+        });
       }
-      for (const [key, val] of Object.entries(lessonComps)) {
-        if (['A', 'B', 'C'].includes(val.grade) || (val.percent && val.percent >= 70)) {
-          list.push({ ...val, lessonId: key, isAnnualExam: false });
-        }
+      // 2. Annual Subject Certifications
+      for (const [key, val] of Object.entries(annualCerts)) {
+        list.push({ ...val, subjectKey: key, isAnnualExam: true, isBeginnerFinal: false });
       }
 
       res.json({ success: true, certificates: list });
     } catch (err) {
       res.status(500).json({ error: 'Failed to fetch certificates' });
+    }
+  });
+
+  router.get('/beginner/status/:userId', async (req, res) => {
+    try {
+      const { userId } = req.params;
+      if (!userId || !db) {
+        return res.json({ success: true, passedCount: 0, totalLessons: 26, isGraduated: false, passedLessons: [] });
+      }
+
+      const snap = await db.ref(`users/${userId}`).once('value');
+      const data = snap.val() || {};
+      const completed = data.completed_lessons || {};
+      const passedLessons = [];
+
+      for (let i = 1; i <= 26; i++) {
+        const lid = `bl${i}`;
+        const hasPassed = Object.entries(completed).some(([k, v]) => {
+          return k.includes(`-${lid}`) && (v.isPassed || ['A', 'B', 'C'].includes(v.grade) || (v.percent && v.percent >= 70));
+        });
+        if (hasPassed) passedLessons.push(lid);
+      }
+
+      res.json({
+        success: true,
+        passedCount: passedLessons.length,
+        totalLessons: 26,
+        passedLessons,
+        isGraduated: !!(data.beginner_graduated || data.beginner_certification),
+        beginnerCert: data.beginner_certification || null
+      });
+    } catch (e) {
+      res.status(500).json({ error: 'Failed to fetch beginner status' });
     }
   });
 

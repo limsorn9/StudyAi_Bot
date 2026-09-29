@@ -26,16 +26,22 @@ function getGradeTitle(grade) {
  * Generate Telegram Markdown Certificate Card
  */
 function generateCertificateCard(data) {
-  const { studentName, userId, grade, score, total, percent, dateStr, certId, isAnnualExam } = data;
+  const { studentName, userId, grade, score, total, percent, dateStr, certId, isAnnualExam, isBeginnerFinal } = data;
   const certTitle = data.title || data.lessonTitle || 'ភាសាអង់គ្លេស';
   const gradeTitle = getGradeTitle(grade);
-  const examType = isAnnualExam ? '🏆 ការប្រឡងបញ្ចប់មុខវិជ្ជាប្រចាំឆ្នាំ' : '📚 ការប្រឡងបញ្ចប់មេរៀន';
-  const certType = isAnnualExam ? 'វិញ្ញាបនបត្របញ្ចប់មុខវិជ្ជាប្រចាំឆ្នាំ' : 'វិញ្ញាបនបត្របញ្ចប់មេរៀនជោគជ័យ';
+  const examType = isBeginnerFinal
+    ? '🎓 ការប្រឡងបញ្ចប់ថ្នាក់ដំបូង (Beginner Final Exam)'
+    : (isAnnualExam ? '🏆 ការប្រឡងបញ្ចប់មុខវិជ្ជាប្រចាំឆ្នាំ' : '📚 ការប្រឡងបញ្ចប់មេរៀន');
+  const certType = isBeginnerFinal
+    ? 'វិញ្ញាបនបត្របញ្ចប់ការសិក្សា ថ្នាក់ដំបូង (A-Z)'
+    : (isAnnualExam ? 'វិញ្ញាបនបត្របញ្ចប់មុខវិជ្ជាប្រចាំឆ្នាំ' : 'វិញ្ញាបនបត្របញ្ចប់មេរៀនជោគជ័យ');
 
   const baseUrl = process.env.RENDER_EXTERNAL_URL || process.env.BASE_URL || '';
   const botUser = process.env.TELEGRAM_BOT_USERNAME || 'StudyAiEngKH_bot';
   const verifyWebUrl = baseUrl ? `${baseUrl}/cert/${certId}` : null;
   const verifyTgUrl = `https://t.me/${botUser}?start=verify_${certId}`;
+
+  const instructorName = isBeginnerFinal ? 'អ្នកគ្រូ ពិសិដ្ឋ (Teacher Piseth AI)' : `@${botUser}`;
 
   return (
     `╔════════════════════════════════════════════╗\n` +
@@ -43,7 +49,7 @@ function generateCertificateCard(data) {
     `        *TEACHER SSONLINE ENGLISH INSTITUTE*\n` +
     `╚════════════════════════════════════════════╝\n\n` +
     `📜 *${certType}*\n` +
-    `*(CERTIFICATE OF ACHIEVEMENT & COMPLETION)*\n\n` +
+    `*(CERTIFICATE OF ACHIEVEMENT & GRADUATION)*\n\n` +
     `វិទ្យាស្ថានសូមបញ្ជាក់ដោយមោទនភាពថា សិស្សានុសិស្ស៖\n\n` +
     `👤 ឈ្មោះ៖ *${studentName}* (ID: \`${userId}\`)\n\n` +
     `បានប្រឡងបញ្ចប់ដោយជោគជ័យលើ៖\n` +
@@ -55,7 +61,7 @@ function generateCertificateCard(data) {
     `📅 កាលបរិច្ឆេទចេញ៖ *${dateStr}*\n` +
     `📜 លេខកូដសម្គាល់៖ \`CERT-${certId}\`\n` +
     `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
-    `👨‍🏫 *គ្រូបន្ទុកថ្នាក់ (Instructor):* @${botUser}\n` +
+    `👩‍🏫 *គ្រូបន្ទុកថ្នាក់ (Instructor):* ${instructorName}\n` +
     `👨‍💼 *នាយកសាលារៀន (School Director):* លីម សន (Lim Sorn)\n` +
     (verifyWebUrl ? `🌐 *មើលតាម Web:* ${verifyWebUrl}\n` : '') +
     `📱 *ផ្ទៀងផ្ទាត់ QR Code:* \`${verifyTgUrl}\``
@@ -69,9 +75,12 @@ async function generateCertificateHTML(data) {
   const { studentName, userId, grade, score, total, percent, dateStr, certId, isAnnualExam } = data;
   const certTitle = data.title || data.lessonTitle || 'ភាសាអង់គ្លេស';
   const gradeTitle = getGradeTitle(grade);
-  const certSubheading = isAnnualExam
-    ? 'ANNUAL SUBJECT FINAL EXAMINATION CERTIFICATE'
-    : 'CERTIFICATE OF ACHIEVEMENT & COMPLETION';
+  const isBeginnerFinal = data.isBeginnerFinal || false;
+  const certSubheading = isBeginnerFinal
+    ? 'CERTIFICATE OF GRADUATION – BEGINNER FOUNDATION (A-Z)'
+    : (isAnnualExam
+      ? 'ANNUAL SUBJECT FINAL EXAMINATION CERTIFICATE'
+      : 'CERTIFICATE OF ACHIEVEMENT & COMPLETION');
 
   let finalStudentName = studentName;
   if (data.khmerName && data.khmerName.trim() && studentName && data.khmerName.trim() !== studentName.trim()) {
@@ -487,7 +496,7 @@ async function generateCertificateHTML(data) {
           <div class="cert-line-2">សូមប្រគល់ជូនសិស្សឈ្មោះ</div>
           <div class="stu-name">${finalStudentName}</div>
           <p class="achieve">
-            បានប្រឡងបញ្ចប់ដោយជោគជ័យ${isAnnualExam ? 'នូវការប្រឡងបញ្ចប់មុខវិជ្ជាប្រចាំឆ្នាំ' : 'នូវវគ្គបណ្តុះបណ្តាល'}<br>
+            បានប្រឡងបញ្ចប់ដោយជោគជ័យ${isBeginnerFinal ? 'នូវវគ្គបណ្តុះបណ្តាលភាសាអង់គ្លេសកម្រិតដំបូង (English for Children - A to Z)' : (isAnnualExam ? 'នូវការប្រឡងបញ្ចប់មុខវិជ្ជាប្រចាំឆ្នាំ' : 'នូវវគ្គបណ្តុះបណ្តាល')}<br>
             <span class="subj-red">「 ${certTitle} 」</span>
           </p>
           <p class="official-decree-note">

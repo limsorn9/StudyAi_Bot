@@ -353,11 +353,6 @@ function generateBeginnerQuiz(lesson) {
   const sentEn = lesson.sentence || (sentenceMatch ? sentenceMatch[1].trim() : `This is an ${wordEn.toLowerCase()}.`);
   const sentKh = sentenceMatch ? sentenceMatch[2].trim() : `នេះគឺជា ${wordKh}។`;
 
-  // Letter Alphabet pool
-  const allLetters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-  const wrongLetters = shuffle(allLetters.filter(l => l !== letter)).slice(0, 3);
-  const letterOpts = shuffle([letter, ...wrongLetters]);
-
   // Vocab wrong options
   const sampleWords = [
     { en: 'Apple', kh: 'ផ្លែប៉ោម' },
@@ -371,58 +366,92 @@ function generateBeginnerQuiz(lesson) {
     { en: 'Tree', kh: 'ដើមឈើ' }
   ];
   const wrongVocab = shuffle(sampleWords.filter(w => w.en.toLowerCase() !== wordEn.toLowerCase())).slice(0, 3);
+  const qOpts = shuffle([wordKh, ...wrongVocab.map(w => w.kh)]);
 
-  // Question 1: Letter Identification
-  const q1 = {
-    question: `តើតួអក្សរប្រចាំថ្ងៃនេះជាអក្សរអ្វី? (Letter of the day)`,
-    options: letterOpts,
-    answer: letter,
-    explanation: `មេរៀនថ្ងៃនេះគឺរៀនអំពីតួអក្សរ ${letter}!`
-  };
-
-  // Question 2: Word meaning (English to Khmer)
-  const q2Opts = shuffle([wordKh, ...wrongVocab.map(w => w.kh)]);
-  const q2 = {
-    question: `ពាក្យ "${wordEn}" ប្រែជាភាសាខ្មែរថាអ្វី?`,
-    options: q2Opts,
+  // Single Question for daily lesson quiz (1 Day = 1 Letter, 1 Word, 1 Sentence)
+  const q = {
+    question: `តើពាក្យ "${wordEn}" (តួអក្សរ ${letter}) ប្រែជាភាសាខ្មែរថាអ្វី?`,
+    options: qOpts,
+    correct: qOpts.indexOf(wordKh),
     answer: wordKh,
-    explanation: `ពាក្យ "${wordEn}" ប្រែជាភាសាខ្មែរថា "${wordKh}"។`
+    explanation: `ត្រឹមត្រូវហើយ! តួអក្សរ ${letter} សម្រាប់ពាក្យ "${wordEn}" ប្រែជាភាសាខ្មែរថា "${wordKh}"។ (ឧទាហរណ៍៖ "${sentEn}" = "${sentKh}")`
   };
 
-  // Question 3: Word meaning (Khmer to English)
-  const q3Opts = shuffle([wordEn, ...wrongVocab.map(w => w.en)]);
-  const q3 = {
-    question: `ពាក្យ "${wordKh}" សរសេរជាភាសាអង់គ្លេសថាអ្វី?`,
-    options: q3Opts,
-    answer: wordEn,
-    explanation: `ពាក្យ "${wordKh}" សរសេរជាភាសាអង់គ្លេសថា "${wordEn}"។`
-  };
+  return [q];
+}
 
-  // Question 4: Sentence Meaning
-  const sampleSentences = [
-    'នេះគឺជាសៀវភៅរបស់ខ្ញុំ។',
-    'សត្វឆ្កែនេះគួរឱ្យស្រឡាញ់ណាស់។',
-    'ខ្ញុំញ៉ាំពងមាន់មួយគ្រាប់។',
-    'ព្រះអាទិត្យភ្លឺចិញ្ចែងចិញ្ចាច។'
-  ];
-  const wrongSents = shuffle(sampleSentences.filter(s => s !== sentKh)).slice(0, 3);
-  const q4Opts = shuffle([sentKh, ...wrongSents]);
-  const q4 = {
-    question: `ល្បះ "${sentEn}" ប្រែជាភាសាខ្មែរថាអ្វី?`,
-    options: q4Opts,
-    answer: sentKh,
-    explanation: `"${sentEn}" ប្រែថា "${sentKh}"។`
-  };
+function generateBeginnerFinalExam() {
+  const beginnerCourse = require('./beginner_curriculum.js');
+  const allLessons = [];
+  beginnerCourse.weeks.forEach(w => {
+    w.lessons.forEach(l => allLessons.push(l));
+  });
 
-  // Question 5: First letter of word
-  const q5 = {
-    question: `តើពាក្យ "${wordEn}" ចាប់ផ្តើមឡើងដោយតួអក្សរអ្វី?`,
-    options: letterOpts,
-    answer: letter,
-    explanation: `ពាក្យ "${wordEn}" ចាប់ផ្តើមដោយតួអក្សរ "${letter}" (${letter} is for ${wordEn})!`
-  };
+  const selectedLessons = shuffle(allLessons).slice(0, 20);
+  const questions = [];
+  const allLetters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
-  return [q1, q2, q3, q4, q5];
+  selectedLessons.forEach((l, idx) => {
+    const letter = (l.letter || 'A').toUpperCase();
+    const wordEn = l.word || 'Apple';
+    const wordKh = l.content.match(/🔑 វាក្យសព្ទប្រចាំថ្ងៃ[\s\S]*?1\.\s*(?:🇬🇧\s*)?(.+?)\s*=\s*(?:🇰🇭\s*)?([^\n]+)/)?.[2]?.trim() || 'ផ្លែប៉ោម';
+    const sentEn = l.sentence || 'This is an apple.';
+    const sentKh = l.content.match(/💡 ល្បះគំរូប្រចាំថ្ងៃ[\s\S]*?1\.\s*(?:🇬🇧\s*)?([^\n]+)\n\s*(?:🇰🇭\s*)?\(?([^\n\)]+)\)?/)?.[2]?.trim() || 'នេះគឺជាផ្លែប៉ោមមួយផ្លែ។';
+
+    const type = idx % 4;
+    if (type === 0) {
+      const wrong = shuffle(allLetters.filter(x => x !== letter)).slice(0, 3);
+      const opts = shuffle([`${letter}${letter.toLowerCase()}`, ...wrong.map(x => `${x}${x.toLowerCase()}`)]);
+      const ans = `${letter}${letter.toLowerCase()}`;
+      questions.push({
+        question: `[សំណួរទី ${idx + 1}] តើតួអក្សរណាជាអក្សរធំ និងតូចត្រឹមត្រូវសម្រាប់អក្សរ "${letter}"?`,
+        options: opts,
+        correct: opts.indexOf(ans),
+        answer: ans,
+        explanation: `អក្សរ ${letter} សរសេរជាអក្សរធំ ${letter} និងអក្សរតូច ${letter.toLowerCase()}។`
+      });
+    } else if (type === 1) {
+      const otherWords = shuffle(allLessons.filter(x => (x.letter || '').toUpperCase() !== letter)).slice(0, 3);
+      const wrongKh = otherWords.map(x => x.content.match(/🔑 វាក្យសព្ទប្រចាំថ្ងៃ[\s\S]*?1\.\s*(?:🇬🇧\s*)?(.+?)\s*=\s*(?:🇰🇭\s*)?([^\n]+)/)?.[2]?.trim() || 'សៀវភៅ');
+      const opts = shuffle([wordKh, ...wrongKh]);
+      questions.push({
+        question: `[សំណួរទី ${idx + 1}] ពាក្យ "${wordEn}" ប្រែជាភាសាខ្មែរថាអ្វី?`,
+        options: opts,
+        correct: opts.indexOf(wordKh),
+        answer: wordKh,
+        explanation: `"${wordEn}" ប្រែថា "${wordKh}"។`
+      });
+    } else if (type === 2) {
+      const otherSentences = [
+        'នេះគឺជាសៀវភៅរបស់ខ្ញុំ។',
+        'សត្វឆ្កែនេះគួរឱ្យស្រឡាញ់ណាស់។',
+        'ខ្ញុំញ៉ាំពងមាន់មួយគ្រាប់។',
+        'ព្រះអាទិត្យភ្លឺចិញ្ចែងចិញ្ចាច។',
+        'ខ្ញុំផឹកទឹកស្អាតរាល់ថ្ងៃ។'
+      ];
+      const wrongS = shuffle(otherSentences.filter(s => s !== sentKh)).slice(0, 3);
+      const opts = shuffle([sentKh, ...wrongS]);
+      questions.push({
+        question: `[សំណួរទី ${idx + 1}] ល្បះ "${sentEn}" មានន័យជាភាសាខ្មែរដូចម្តេច?`,
+        options: opts,
+        correct: opts.indexOf(sentKh),
+        answer: sentKh,
+        explanation: `"${sentEn}" ប្រែថា "${sentKh}"។`
+      });
+    } else {
+      const wrong = shuffle(allLetters.filter(x => x !== letter)).slice(0, 3);
+      const opts = shuffle([letter, ...wrong]);
+      questions.push({
+        question: `[សំណួរទី ${idx + 1}] តើពាក្យ "${wordEn}" ចាប់ផ្តើមដោយតួអក្សរអ្វី?`,
+        options: opts,
+        correct: opts.indexOf(letter),
+        answer: letter,
+        explanation: `ពាក្យ "${wordEn}" ចាប់ផ្តើមដោយតួអក្សរ "${letter}"!`
+      });
+    }
+  });
+
+  return questions;
 }
 
 function generateQuiz(lessonOrCurriculum, monthId, weekId, lessonId) {
@@ -444,7 +473,7 @@ function generateQuiz(lessonOrCurriculum, monthId, weekId, lessonId) {
   const title = lesson.title || '';
   const content = lesson.content || '';
 
-  // Beginner Daily Lessons (1 Day = 1 Letter, 1 Word, 1 Sentence)
+  // Beginner Daily Lessons (1 Day = 1 Letter, 1 Word, 1 Sentence) - Exactly 1 Question
   if (monthId === 'beginner' || (lesson.id && lesson.id.startsWith('bl')) || title.includes('English for Children') || title.includes('ថ្ងៃទី')) {
     return generateBeginnerQuiz(lesson);
   }
@@ -468,6 +497,7 @@ function generateQuiz(lessonOrCurriculum, monthId, weekId, lessonId) {
 
 module.exports = {
   generateQuiz,
+  generateBeginnerFinalExam,
   generateAnnualSubjectQuiz,
   SUBJECT_EXAMS
 };
