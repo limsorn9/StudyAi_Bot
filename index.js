@@ -377,8 +377,8 @@ const generateAndSendTTS = async (ctx, text) => {
 // Persistent Reply Keyboard Menu
 const mainMenuKeyboard = Markup.keyboard([
   ['📚 បញ្ជីមេរៀន (Lessons)', '🎓 ប្រឡងបញ្ចប់មុខវិជ្ជា'],
-  ['🕰️ ប្រវត្តិសិក្សា', '💎 គណនី VIP (Upgrade)'],
-  ['❓ ជំនួយ (Help)']
+  ['📜 វិញ្ញាបនបត្ររបស់ខ្ញុំ', '🕰️ ប្រវត្តិសិក្សា'],
+  ['💎 គណនី VIP (Upgrade)', '❓ ជំនួយ (Help)']
 ]).resize();
 
 // Check Membership Button
@@ -1228,7 +1228,10 @@ async function displayLessonContent(ctx, monthId, weekId, lessonId, userId) {
   ];
 
   if (isCompleted) {
-    keyboardRows.push([Markup.button.callback('➡️ ទៅមេរៀនបន្ទាប់', `next_lesson_${monthId}-${weekId}-${lessonId}`)]);
+    keyboardRows.push([
+      Markup.button.callback('📜 ទទួល/Refresh វិញ្ញាបនបត្រ', `refresh_lesson_cert_${monthId}-${weekId}-${lessonId}`),
+      Markup.button.callback('➡️ ទៅមេរៀនបន្ទាប់', `next_lesson_${monthId}-${weekId}-${lessonId}`)
+    ]);
   }
   keyboardRows.push([Markup.button.callback('🔙 ត្រឡប់ទៅបញ្ជីមេរៀន', `week_${monthId}-${weekId}`)]);
 
@@ -1319,6 +1322,7 @@ bot.action(/lesson_([^-]+)-([^-]+)-(.+)/, async (ctx) => {
     return ctx.reply(promptText, {
       parse_mode: 'Markdown',
       reply_markup: Markup.inlineKeyboard([
+        [Markup.button.callback('📜 ទទួល/Refresh វិញ្ញាបនបត្រ', `refresh_lesson_cert_${monthId}-${weekId}-${lessonId}`)],
         [Markup.button.callback('📖 រៀនមេរៀននេះម្តងទៀត', `relearn_${monthId}-${weekId}-${lessonId}`)],
         [Markup.button.callback('➡️ ទៅមេរៀនបន្ទាប់', `next_lesson_${monthId}-${weekId}-${lessonId}`)],
         [Markup.button.callback('🔙 ត្រឡប់ទៅបញ្ជីមេរៀន', `week_${monthId}-${weekId}`)]
@@ -1750,29 +1754,53 @@ async function handleQuizSubmission(ctx, userId) {
 
   // IF PASSED (Grade A, B, C): Mark Completed & Issue Certificate
   if (isPassed) {
+    const studentName = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ') || `សិស្ស ID ${userId}`;
+    let certId = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const dateStr = new Date().toLocaleDateString('km-KH');
+
+    // Check if user already had a certId for this subject/lesson to preserve QR codes
+    if (db) {
+      try {
+        const refPath = state.isAnnualExam
+          ? `users/${userId}/subject_certifications/${state.subjectKey}`
+          : `users/${userId}/completed_lessons/${state.lessonId}`;
+        const prevSnap = await db.ref(refPath).once('value');
+        const prevData = prevSnap.val();
+        if (prevData && prevData.certId) {
+          certId = prevData.certId;
+        }
+      } catch (e) {}
+    }
+
     // 1. Mark lesson or subject completed in Firebase
     if (db) {
       try {
         if (state.isAnnualExam) {
           await db.ref(`users/${userId}/subject_certifications/${state.subjectKey}`).set({
+            certId,
             subjectKey: state.subjectKey,
             subjectTitle: titleText,
+            studentName,
             grade,
             score,
             total,
             percent,
+            dateStr,
             completedAt: Date.now()
           });
         } else {
           await db.ref(`users/${userId}/completed_lessons/${state.lessonId}`).set({
+            certId,
             lessonId: state.lessonId,
             lessonTitle: state.lessonTitle,
             monthId: state.monthId,
             weekId: state.weekId,
+            studentName,
             grade,
             score,
             total,
             percent,
+            dateStr,
             completedAt: Date.now()
           });
         }
@@ -1780,10 +1808,6 @@ async function handleQuizSubmission(ctx, userId) {
         console.error("Firebase completion record error:", err);
       }
     }
-
-    const studentName = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ') || `សិស្ស ID ${userId}`;
-    const certId = Math.random().toString(36).substring(2, 8).toUpperCase();
-    const dateStr = new Date().toLocaleDateString('km-KH');
 
     const certData = {
       studentName,
@@ -1814,6 +1838,7 @@ async function handleQuizSubmission(ctx, userId) {
           dateStr,
           isAnnualExam: !!state.isAnnualExam,
           subjectKey: state.subjectKey || null,
+          lessonId: state.lessonId || null,
           issuedAt: Date.now(),
           director: 'លីម សន (Lim Sorn)',
           instructor: 'TeacherSornAiBot',
@@ -1859,6 +1884,7 @@ async function handleQuizSubmission(ctx, userId) {
         {
           parse_mode: 'Markdown',
           reply_markup: Markup.inlineKeyboard([
+            [Markup.button.callback('📜 វិញ្ញាបនបត្ររបស់ខ្ញុំ', 'my_certificates_menu')],
             [Markup.button.callback('🎓 ប្រឡងមុខវិជ្ជាផ្សេងទៀត', 'annual_exams_menu')],
             [Markup.button.callback('📚 ត្រឡប់ទៅកម្មវិធីសិក្សា', 'back_to_months')]
           ]).reply_markup
@@ -1871,6 +1897,7 @@ async function handleQuizSubmission(ctx, userId) {
         {
           parse_mode: 'Markdown',
           reply_markup: Markup.inlineKeyboard([
+            [Markup.button.callback('📜 ទទួល/Refresh វិញ្ញាបនបត្រ', `refresh_lesson_cert_${state.lessonId}`)],
             [Markup.button.callback('➡️ ទៅមេរៀនបន្ទាប់', `next_lesson_${state.lessonId}`)],
             [Markup.button.callback('📖 រៀនមេរៀននេះម្តងទៀត', `relearn_${state.lessonId}`)],
             [Markup.button.callback('🔙 ត្រឡប់ទៅបញ្ជីមេរៀន', `week_${state.monthId}-${state.weekId}`)]
@@ -2005,6 +2032,356 @@ async function handleCertificateVerification(ctx, rawCertId) {
 }
 
 /**
+ * Refresh and Re-send Certificate
+ * Updates Firebase record with latest student name & institute signatures,
+ * regenerates luxury A4 Landscape HTML certificate and Telegram Card,
+ * and delivers them to the student on Telegram.
+ */
+async function refreshAndSendCertificate(ctx, userId, certInfo) {
+  const currentStudentName = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ') || `សិស្ស ID ${userId}`;
+  const certId = certInfo.certId || Math.random().toString(36).substring(2, 8).toUpperCase();
+  const dateStr = certInfo.dateStr || new Date().toLocaleDateString('km-KH');
+  const titleText = certInfo.title || certInfo.subjectTitle || certInfo.lessonTitle || (certInfo.isAnnualExam ? 'ការប្រឡងបញ្ចប់មុខវិជ្ជាប្រចាំឆ្នាំ' : 'វិញ្ញាបនបត្របញ្ចប់មេរៀន');
+
+  const certData = {
+    certId,
+    userId: userId.toString(),
+    studentName: currentStudentName,
+    title: titleText,
+    lessonTitle: titleText,
+    grade: certInfo.grade || 'A',
+    score: certInfo.score ?? 10,
+    total: certInfo.total ?? 10,
+    percent: certInfo.percent ?? (certInfo.score && certInfo.total ? Math.round((certInfo.score / certInfo.total) * 100) : 100),
+    dateStr,
+    isAnnualExam: !!certInfo.isAnnualExam
+  };
+
+  // 1. Update global certificates collection in Firebase
+  if (db) {
+    try {
+      await db.ref(`certificates/${certId}`).update({
+        certId,
+        userId: userId.toString(),
+        studentName: currentStudentName,
+        title: titleText,
+        grade: certData.grade,
+        score: certData.score,
+        total: certData.total,
+        percent: certData.percent,
+        dateStr,
+        isAnnualExam: certData.isAnnualExam,
+        subjectKey: certInfo.subjectKey || null,
+        lessonId: certInfo.lessonId || null,
+        director: 'លីម សន (Lim Sorn)',
+        instructor: 'TeacherSornAiBot',
+        schoolName: 'វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline',
+        lastRefreshedAt: Date.now()
+      });
+
+      // Backfill certId and studentName to user's completion record
+      if (certInfo.isAnnualExam && certInfo.subjectKey) {
+        await db.ref(`users/${userId}/subject_certifications/${certInfo.subjectKey}`).update({
+          certId,
+          studentName: currentStudentName
+        });
+      } else if (certInfo.lessonId) {
+        await db.ref(`users/${userId}/completed_lessons/${certInfo.lessonId}`).update({
+          certId,
+          studentName: currentStudentName
+        });
+      }
+    } catch (err) {
+      console.error("Firebase cert update error:", err);
+    }
+  }
+
+  // 2. Send Telegram Certificate Card
+  const certCard = generateCertificateCard(certData);
+  await ctx.reply(
+    `🔄 *វិញ្ញាបនបត្រត្រូវបាន Refresh និងអាប់ដេតជោគជ័យ!* 🎉\n\n` +
+    `👤 *ម្ចាស់វិញ្ញាបនបត្រ៖* ${currentStudentName}\n` +
+    `🔑 *លេខកូដសម្គាល់៖* \`${certId}\`\n\n` +
+    certCard,
+    { parse_mode: 'Markdown' }
+  );
+
+  // 3. Send Printable HTML Certificate File with QR Code (A4 Landscape)
+  try {
+    const certHtml = await generateCertificateHTML(certData);
+    const safeFilename = certInfo.isAnnualExam
+      ? `Official_Certificate_Annual_${certInfo.subjectKey || 'Exam'}_${certId}.html`
+      : `Official_Certificate_${certInfo.lessonId || 'Lesson'}_${certId}.html`;
+
+    await ctx.replyWithDocument(
+      { source: Buffer.from(certHtml, 'utf-8'), filename: safeFilename },
+      {
+        caption: `🎓 *វិញ្ញាបនបត្រផ្លូវការដែលបាន Refresh ថ្មី (Refreshed Certificate)*\n` +
+                 `🏫 *វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline*\n` +
+                 `👤 ម្ចាស់វិញ្ញាបនបត្រ៖ *${currentStudentName}*\n` +
+                 `👨‍💼 នាយកសាលារៀន៖ *លីម សន (Lim Sorn)*\n` +
+                 `👨‍🏫 គ្រូបន្ទុកថ្នាក់៖ *TeacherSornAiBot*\n` +
+                 `📄 ទម្រង់ *A4 ផ្តេក (A4 Landscape)* មាន *QR Code Verified* ស្កេនផ្ទៀងផ្ទាត់បាន!\n\n` +
+                 `📥 លោកអ្នកអាចទាញយកឯកសារនេះទុក ឬចុច *Print / Save as PDF* បានភ្លាមៗ! 🎉`,
+        parse_mode: 'Markdown'
+      }
+    );
+  } catch (e) {
+    console.error("Refresh Certificate document send error:", e);
+  }
+}
+
+/**
+ * Send "My Certificates" Menu
+ * Lists all earned certificates (Annual Exams & Lessons)
+ * Provides buttons to Refresh individual certificates or Refresh All
+ */
+async function sendMyCertificatesMenu(ctx) {
+  const userId = ctx.from.id.toString();
+  const studentName = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ') || `សិស្ស ID ${userId}`;
+
+  // Check channel membership
+  if (!(await isMember(ctx.from.id))) {
+    return ctx.reply('🔒 សូមចូលឆានែល @ssonlinechanel ជាមុនសិន!', {
+      reply_markup: Markup.inlineKeyboard([
+        [Markup.button.url('📢 ចូលឆានែល', CHANNEL_URL)],
+        [Markup.button.callback('✅ ខ្ញុំបានចូលហើយ', 'check_membership')]
+      ]).reply_markup
+    });
+  }
+
+  if (!db) {
+    return ctx.reply('⚠️ ប្រព័ន្ធទិន្នន័យមិនទាន់ភ្ជាប់!');
+  }
+
+  try {
+    const userSnap = await db.ref(`users/${userId}`).once('value');
+    const userData = userSnap.val() || {};
+    const annualCerts = userData.subject_certifications || {};
+    const lessonComps = userData.completed_lessons || {};
+
+    const annualList = [];
+    for (const [key, val] of Object.entries(annualCerts)) {
+      annualList.push({ ...val, subjectKey: key });
+    }
+
+    const lessonList = [];
+    for (const [key, val] of Object.entries(lessonComps)) {
+      if (['A', 'B', 'C'].includes(val.grade) || (val.percent && val.percent >= 70)) {
+        lessonList.push({ ...val, lessonId: key });
+      }
+    }
+
+    const totalCerts = annualList.length + lessonList.length;
+
+    if (totalCerts === 0) {
+      const emptyMsg = (
+        `╔════════════════════════════════════════════╗\n` +
+        `   📜 *វិញ្ញាបនបត្ររបស់ខ្ញុំ (My Certificates)* 📜\n` +
+        `╚════════════════════════════════════════════╝\n\n` +
+        `សួស្តី ${studentName}! អ្នកមិនទាន់មានវិញ្ញាបនបត្រនៅឡើយទេ។\n\n` +
+        `💡 *ដើម្បីទទួលបានវិញ្ញាបនបត្រផ្លូវការទម្រង់ A4 ផ្តេក (A4 Landscape) & QR Code Verified៖*\n` +
+        `1️⃣ បញ្ចប់មេរៀននីមួយៗ និងប្រឡង Quiz ជាប់និទ្ទេស A, B, ឬ C\n` +
+        `2️⃣ ឬចូលរួមការប្រឡងបញ្ចប់មុខវិជ្ជាប្រចាំឆ្នាំ (Annual Exams) 🎓\n\n` +
+        `👇 សូមជ្រើសរើសដើម្បីចាប់ផ្តើមរៀន និងប្រឡង៖`
+      );
+
+      const emptyKeyboard = Markup.inlineKeyboard([
+        [Markup.button.callback('📚 ទៅកាន់បញ្ជីមេរៀន (Lessons)', 'back_to_months')],
+        [Markup.button.callback('🎓 មណ្ឌលប្រឡងប្រចាំឆ្នាំ (Annual Exams)', 'annual_exams_menu')]
+      ]);
+
+      if (ctx.callbackQuery) {
+        try {
+          return await ctx.editMessageText(emptyMsg, {
+            parse_mode: 'Markdown',
+            reply_markup: emptyKeyboard.reply_markup
+          });
+        } catch (e) {}
+      }
+      return ctx.reply(emptyMsg, {
+        parse_mode: 'Markdown',
+        reply_markup: emptyKeyboard.reply_markup
+      });
+    }
+
+    // Has certificates
+    let text = (
+      `╔════════════════════════════════════════════╗\n` +
+      `   📜 *វិញ្ញាបនបត្ររបស់ខ្ញុំ (My Certificates)* 📜\n` +
+      `╚════════════════════════════════════════════╝\n\n` +
+      `👤 សិស្ស៖ *${studentName}* (ID: \`${userId}\`)\n` +
+      `🏆 វិញ្ញាបនបត្រសរុបសម្រេចបាន៖ *${totalCerts}* ច្បាប់\n\n` +
+      `🔄 *មុខងារ Refresh វិញ្ញាបនបត្រ៖*\n` +
+      `_ប្រសិនបើអ្នកចង់អាប់ដេតឈ្មោះថ្មី, កែប្រែទម្រង់ ឬទទួលឯកសារ A4 ផ្តេកជាថ្មី សូមចុចប៊ូតុង Refresh ខាងក្រោម៖_\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`
+    );
+
+    const buttons = [];
+
+    if (annualList.length > 0) {
+      text += `\n🎓 *វិញ្ញាបនបត្រប្រឡងបញ្ចប់មុខវិជ្ជាប្រចាំឆ្នាំ៖*\n`;
+      annualList.forEach((c, idx) => {
+        const subjTitle = c.subjectTitle || (SUBJECT_EXAMS[c.subjectKey] && SUBJECT_EXAMS[c.subjectKey].title) || c.subjectKey;
+        const certCode = c.certId ? ` [កូដ៖ \`${c.certId}\`]` : '';
+        const pct = c.percent || (c.score && c.total ? Math.round((c.score / c.total) * 100) : 100);
+        text += `${idx + 1}. *${subjTitle}* — និទ្ទេស *${c.grade}* (${pct}%)${certCode}\n`;
+        const shortName = subjTitle.split('(')[0].trim();
+        buttons.push([
+          Markup.button.callback(`🔄 Refresh វិញ្ញាបនបត្រ ${shortName}`, `refresh_annual_cert_${c.subjectKey}`)
+        ]);
+      });
+    }
+
+    if (lessonList.length > 0) {
+      text += `\n📚 *វិញ្ញាបនបត្របញ្ចប់មេរៀន (Lesson Certificates)៖*\n`;
+      lessonList.slice(0, 5).forEach((c, idx) => {
+        const lTitle = c.lessonTitle || c.lessonId;
+        const certCode = c.certId ? ` [កូដ៖ \`${c.certId}\`]` : '';
+        text += `${idx + 1}. *${lTitle}* — និទ្ទេស *${c.grade}*${certCode}\n`;
+        const shortTitle = lTitle.length > 25 ? lTitle.substring(0, 22) + '...' : lTitle;
+        buttons.push([
+          Markup.button.callback(`🔄 Refresh ${shortTitle}`, `refresh_lesson_cert_${c.lessonId}`)
+        ]);
+      });
+
+      if (lessonList.length > 5) {
+        text += `_...និងមេរៀនផ្សេងទៀតសរុប ${lessonList.length} មេរៀន_\n`;
+      }
+    }
+
+    // Refresh All button
+    buttons.unshift([Markup.button.callback('🔄 Refresh វិញ្ញាបនបត្រទាំងអស់ (Refresh All)', 'refresh_all_certs')]);
+    buttons.push([Markup.button.callback('🎓 មណ្ឌលប្រឡងប្រចាំឆ្នាំ', 'annual_exams_menu')]);
+    buttons.push([Markup.button.callback('🔙 ត្រឡប់ទៅកម្មវិធីសិក្សា', 'back_to_months')]);
+
+    if (ctx.callbackQuery) {
+      try {
+        return await ctx.editMessageText(text, {
+          parse_mode: 'Markdown',
+          reply_markup: Markup.inlineKeyboard(buttons).reply_markup
+        });
+      } catch (e) {}
+    }
+    return ctx.reply(text, {
+      parse_mode: 'Markdown',
+      reply_markup: Markup.inlineKeyboard(buttons).reply_markup
+    });
+  } catch (err) {
+    console.error("sendMyCertificatesMenu error:", err);
+    ctx.reply('⚠️ មានបញ្ហាក្នុងការទាញយកទិន្នន័យវិញ្ញាបនបត្រ សូមព្យាយាមម្តងទៀត!');
+  }
+}
+
+// Commands & Listeners for My Certificates
+bot.command(['mycerts', 'certificates', 'cert', 'certs', 'mycertificate'], sendMyCertificatesMenu);
+bot.hears('📜 វិញ្ញាបនបត្ររបស់ខ្ញុំ', sendMyCertificatesMenu);
+
+// Callback to show My Certificates Menu
+bot.action('my_certificates_menu', async (ctx) => {
+  await ctx.answerCbQuery();
+  await sendMyCertificatesMenu(ctx);
+});
+
+// Action to refresh individual annual certificate
+bot.action(/refresh_annual_cert_([a-z]+)/, async (ctx) => {
+  await ctx.answerCbQuery('🔄 កំពុង Refresh វិញ្ញាបនបត្រ...');
+  const subjectKey = ctx.match[1];
+  const userId = ctx.from.id.toString();
+  if (!db) return ctx.reply('⚠️ ប្រព័ន្ធទិន្នន័យមិនទាន់ភ្ជាប់!');
+
+  const snap = await db.ref(`users/${userId}/subject_certifications/${subjectKey}`).once('value');
+  const certInfo = snap.val();
+  if (!certInfo) {
+    return ctx.reply('❌ មិនមានព័ត៌មានវិញ្ញាបនបត្រសម្រាប់មុខវិជ្ជានេះទេ ឬអ្នកមិនទាន់បានប្រឡងជាប់!');
+  }
+
+  await refreshAndSendCertificate(ctx, userId, { ...certInfo, subjectKey, isAnnualExam: true });
+});
+
+// Action to refresh individual lesson certificate
+bot.action(/refresh_lesson_cert_(.+)/, async (ctx) => {
+  await ctx.answerCbQuery('🔄 កំពុង Refresh វិញ្ញាបនបត្រ...');
+  const lessonKey = ctx.match[1];
+  const userId = ctx.from.id.toString();
+  if (!db) return ctx.reply('⚠️ ប្រព័ន្ធទិន្នន័យមិនទាន់ភ្ជាប់!');
+
+  const snap = await db.ref(`users/${userId}/completed_lessons/${lessonKey}`).once('value');
+  let certInfo = snap.val();
+
+  if (!certInfo) {
+    // Attempt lookup from curriculum if not in completed_lessons
+    const parts = lessonKey.split('-');
+    if (parts.length === 3) {
+      const [mId, wId, lId] = parts;
+      const mData = curriculum.months.find(m => m.id === mId);
+      const wData = mData ? mData.weeks.find(w => w.id === wId) : null;
+      const lData = wData ? wData.lessons.find(l => l.id === lId) : null;
+      if (lData) {
+        certInfo = {
+          lessonId: lessonKey,
+          lessonTitle: lData.title,
+          monthId: mId,
+          weekId: wId,
+          grade: 'A',
+          score: 10,
+          total: 10,
+          percent: 100
+        };
+      }
+    }
+  }
+
+  if (!certInfo) {
+    return ctx.reply('❌ មិនមានព័ត៌មានវិញ្ញាបនបត្រសម្រាប់មេរៀននេះទេ ឬអ្នកមិនទាន់បានប្រឡងជាប់!');
+  }
+
+  await refreshAndSendCertificate(ctx, userId, { ...certInfo, lessonId: lessonKey, isAnnualExam: false });
+});
+
+// Action to refresh all certificates
+bot.action('refresh_all_certs', async (ctx) => {
+  await ctx.answerCbQuery('🔄 កំពុង Refresh វិញ្ញាបនបត្រទាំងអស់...');
+  const userId = ctx.from.id.toString();
+  if (!db) {
+    return ctx.reply('⚠️ ប្រព័ន្ធទិន្នន័យមិនទាន់ភ្ជាប់!');
+  }
+
+  const userSnap = await db.ref(`users/${userId}`).once('value');
+  const userData = userSnap.val() || {};
+  const annualCerts = userData.subject_certifications || {};
+  const lessonComps = userData.completed_lessons || {};
+
+  const certList = [];
+  for (const [key, val] of Object.entries(annualCerts)) {
+    certList.push({ ...val, subjectKey: key, isAnnualExam: true });
+  }
+  for (const [key, val] of Object.entries(lessonComps)) {
+    if (['A', 'B', 'C'].includes(val.grade) || (val.percent && val.percent >= 70)) {
+      certList.push({ ...val, lessonId: key, isAnnualExam: false });
+    }
+  }
+
+  if (certList.length === 0) {
+    return ctx.reply('ℹ️ អ្នកមិនទាន់មានវិញ្ញាបនបត្រសម្រាប់ Refresh នៅឡើយទេ!');
+  }
+
+  await ctx.reply(`🔄 *កំពុងរៀបចំ និង Refresh វិញ្ញាបនបត្រសរុប ${certList.length} ច្បាប់ជូនអ្នក... សូមរង់ចាំមួយភ្លែត!* ⏳`, { parse_mode: 'Markdown' });
+
+  for (const certInfo of certList) {
+    await refreshAndSendCertificate(ctx, userId, certInfo);
+  }
+
+  await ctx.reply(`✅ *ការ Refresh វិញ្ញាបនបត្រទាំងអស់ត្រូវបានបញ្ចប់ដោយជោគជ័យ!* 🎉\nទម្រង់ A4 ផ្តេក និង QR Code ត្រូវបានធ្វើបច្ចុប្បន្នភាពរួចរាល់។`, {
+    parse_mode: 'Markdown',
+    reply_markup: Markup.inlineKeyboard([
+      [Markup.button.callback('📜 ត្រឡប់ទៅបញ្ជីវិញ្ញាបនបត្រ', 'my_certificates_menu')],
+      [Markup.button.callback('🔙 ត្រឡប់ទៅកម្មវិធីសិក្សា', 'back_to_months')]
+    ]).reply_markup
+  });
+});
+
+/**
  * Display Annual Exams Menu
  */
 async function sendAnnualExamsMenu(ctx) {
@@ -2068,14 +2445,24 @@ async function sendAnnualExamsMenu(ctx) {
     });
   }
 
+  // Fetch passed certifications for user to display checkmarks
+  let userCerts = {};
+  if (db) {
+    try {
+      const snap = await db.ref(`users/${userId}/subject_certifications`).once('value');
+      userCerts = snap.val() || {};
+    } catch (e) {}
+  }
+
   const buttons = [
-    [Markup.button.callback('📘 1. វេយ្យាករណ៍ (Grammar in Use)', 'start_annual_grammar')],
-    [Markup.button.callback('🗣️ 2. ការសន្ទនា (Conversation & Speaking)', 'start_annual_conversation')],
-    [Markup.button.callback('📖 3. វាក្យសព្ទ (Vocabulary & Idioms)', 'start_annual_vocabulary')],
-    [Markup.button.callback('⚡ 4. កិរិយាសព្ទ (Verbs & Irregular Verbs)', 'start_annual_verbs')],
-    [Markup.button.callback('🎨 5. គុណនាម (Adjectives & Descriptions)', 'start_annual_adjectives')],
-    [Markup.button.callback('✍️ 6. ការបង្កើតល្បះ (Sentence Construction)', 'start_annual_sentences')],
-    [Markup.button.callback('🏆 7. ប្រឡងបញ្ចប់រួមប្រចាំឆ្នាំ (Grand Exam)', 'start_annual_grand')],
+    [Markup.button.callback(userCerts['grammar'] ? `✅ 📘 1. វេយ្យាករណ៍ (${userCerts['grammar'].grade})` : '📘 1. វេយ្យាករណ៍ (Grammar in Use)', 'start_annual_grammar')],
+    [Markup.button.callback(userCerts['conversation'] ? `✅ 🗣️ 2. ការសន្ទនា (${userCerts['conversation'].grade})` : '🗣️ 2. ការសន្ទនា (Conversation & Speaking)', 'start_annual_conversation')],
+    [Markup.button.callback(userCerts['vocabulary'] ? `✅ 📖 3. វាក្យសព្ទ (${userCerts['vocabulary'].grade})` : '📖 3. វាក្យសព្ទ (Vocabulary & Idioms)', 'start_annual_vocabulary')],
+    [Markup.button.callback(userCerts['verbs'] ? `✅ ⚡ 4. កិរិយាសព្ទ (${userCerts['verbs'].grade})` : '⚡ 4. កិរិយាសព្ទ (Verbs & Irregular Verbs)', 'start_annual_verbs')],
+    [Markup.button.callback(userCerts['adjectives'] ? `✅ 🎨 5. គុណនាម (${userCerts['adjectives'].grade})` : '🎨 5. គុណនាម (Adjectives & Descriptions)', 'start_annual_adjectives')],
+    [Markup.button.callback(userCerts['sentences'] ? `✅ ✍️ 6. ការបង្កើតល្បះ (${userCerts['sentences'].grade})` : '✍️ 6. ការបង្កើតល្បះ (Sentence Construction)', 'start_annual_sentences')],
+    [Markup.button.callback(userCerts['grand'] ? `✅ 🏆 7. ប្រឡងបញ្ចប់រួម (${userCerts['grand'].grade})` : '🏆 7. ប្រឡងបញ្ចប់រួមប្រចាំឆ្នាំ (Grand Exam)', 'start_annual_grand')],
+    [Markup.button.callback('📜 វិញ្ញាបនបត្ររបស់ខ្ញុំ (My Certificates)', 'my_certificates_menu')],
     [Markup.button.callback('🔙 ត្រឡប់ទៅកម្មវិធីសិក្សា', 'back_to_months')]
   ];
 
@@ -2094,7 +2481,7 @@ async function sendAnnualExamsMenu(ctx) {
     `   👨‍💼 ចេញដោយនាយកសាលារៀន៖ *លីម សន (Lim Sorn)*\n` +
     `   👨‍🏫 គ្រូបន្ទុកថ្នាក់៖ *TeacherSornAiBot*\n` +
     `   🛡️ មានភ្ជាប់ *QR Code Verified* ស្កេនផ្ទៀងផ្ទាត់លើ Telegram!\n\n` +
-    `👇 *សូមជ្រើសរើសមុខវិជ្ជាដែលអ្នកចង់ប្រឡង៖*`
+    `👇 *សូមជ្រើសរើសមុខវិជ្ជាដែលអ្នកចង់ប្រឡង ឬចុចមើលវិញ្ញាបនបត្ររបស់អ្នក៖*`
   );
 
   if (ctx.callbackQuery) {
@@ -2454,6 +2841,8 @@ bot.on('text', async (ctx) => {
   // Ignore persistent menu clicks
   const menuOptions = [
     '📚 បញ្ជីមេរៀន (Lessons)',
+    '🎓 ប្រឡងបញ្ចប់មុខវិជ្ជា',
+    '📜 វិញ្ញាបនបត្ររបស់ខ្ញុំ',
     '🔄 ប្តូរគ្រូ AI',
     '🕰️ ប្រវត្តិសិក្សា',
     '❓ ជំនួយ (Help)',
