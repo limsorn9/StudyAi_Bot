@@ -666,8 +666,8 @@
             <label>បញ្ចូលលេខកូដ OTP ៦ ខ្ទង់ដែលបានផ្ញើទៅ Gmail</label>
             <input type="text" id="loginOtpCodeInput" maxlength="6" required placeholder="0 0 0 0 0 0" class="text-center font-mono text-2xl tracking-widest form-input">
           </div>
-          <div id="loginOtpPreviewHint" class="verification-demo-hint hidden">
-            <span>💡 លេខកូដសម្គាល់: <strong id="loginOtpPreviewVal" class="text-amber-400 font-mono">------</strong></span>
+          <div class="text-xs text-slate-400 text-center my-2">
+            📩 សូមបើកប្រអប់សំបុត្រ Gmail (Inbox / Spam) របស់អ្នកដើម្បីយកលេខកូដសម្ងាត់ OTP ៦ ខ្ទង់
           </div>
           <button type="submit" class="btn btn-primary btn-block btn-lg mt-2">
             <span>🚀 ផ្ទៀងផ្ទាត់ និងចូលរៀន (Login)</span>
@@ -896,13 +896,9 @@
           <input type="text" id="verifyOtpCodeInput" maxlength="6" required placeholder="0 0 0 0 0 0" class="text-center font-mono text-2xl tracking-widest form-input">
         </div>
 
-        <div id="verifyCodeDemoHint" class="verification-demo-hint hidden">
-          <div class="flex items-center justify-between gap-2">
-            <span>💡 លេខកូដសម្គាល់ Gmail: <strong id="verifyCodeDemoVal" class="text-amber-400 font-mono">------</strong></span>
-            <button type="button" class="btn btn-sm btn-outline" onclick="autoFillVerifyCode()">បំពេញស្វ័យប្រវត្ត</button>
-          </div>
+        <div class="text-xs text-slate-300 text-center my-3 p-3 bg-slate-800/80 border border-slate-700/60 rounded-xl leading-relaxed">
+          📩 លេខកូដសម្ងាត់ OTP ៦ ខ្ទង់ត្រូវបានផ្ញើទៅកាន់ <strong>Gmail Inbox</strong> របស់អ្នកដោយផ្ទាល់។ សូមបើក Gmail (Inbox ឬ Spam) ដើម្បីយកលេខកូដមកផ្ទៀងផ្ទាត់។
         </div>
-
         <button type="submit" class="btn btn-gold btn-block btn-lg mt-3">
           <span>✅ បញ្ជាក់ និងបង្កើតគណនី (Confirm & Register)</span>
         </button>

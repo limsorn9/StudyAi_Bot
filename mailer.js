@@ -9,9 +9,11 @@ function getTransporter() {
   const pass = process.env.GMAIL_APP_PASSWORD || process.env.GMAIL_PASS || process.env.SMTP_PASS || process.env.EMAIL_PASS;
 
   if (user && pass) {
+    const cleanUser = user.trim();
+    const cleanPass = pass.replace(/\s+/g, '');
     return nodemailer.createTransport({
       service: 'gmail',
-      auth: { user, pass }
+      auth: { user: cleanUser, pass: cleanPass }
     });
   }
 
@@ -21,7 +23,7 @@ function getTransporter() {
       host: process.env.SMTP_HOST,
       port: parseInt(process.env.SMTP_PORT) || 587,
       secure: process.env.SMTP_SECURE === 'true',
-      auth: user && pass ? { user, pass } : undefined
+      auth: user && pass ? { user: user.trim(), pass: pass.replace(/\s+/g, '') } : undefined
     });
   }
 
@@ -96,7 +98,8 @@ async function sendOtpEmail({ toEmail, fullName, otpCode, purpose = 'register' }
 
   if (transporter) {
     try {
-      const fromSender = process.env.GMAIL_USER || 'Teacher SSOnline <noreply@ssonline.edu.kh>';
+      const senderUser = (process.env.GMAIL_USER || process.env.SMTP_USER || '').trim();
+      const fromSender = senderUser ? `"Teacher SSOnline English Academy" <${senderUser}>` : 'Teacher SSOnline <noreply@ssonline.edu.kh>';
       const info = await transporter.sendMail({
         from: fromSender,
         to: cleanEmail,
@@ -105,18 +108,16 @@ async function sendOtpEmail({ toEmail, fullName, otpCode, purpose = 'register' }
         html: htmlContent
       });
 
-      console.log(`✅ [GMAIL SENT] Sent OTP ${otpCode} to ${cleanEmail} (MsgID: ${info.messageId})`);
-      return { success: true, delivered: true, previewCode: otpCode };
+      console.log(`✅ [GMAIL SENT] Sent OTP to ${cleanEmail} (MsgID: ${info.messageId})`);
+      return { success: true, delivered: true };
     } catch (err) {
       console.error(`❌ [GMAIL SEND ERROR] To: ${cleanEmail}:`, err.message);
-      // Fallback: log to console so system still functions during development or if credentials expire
-      console.log(`🔑 [OTP CONSOLE FALLBACK] To: ${cleanEmail} | OTP Code: ${otpCode}`);
-      return { success: true, delivered: false, previewCode: otpCode, error: err.message };
+      return { success: false, delivered: false, error: err.message };
     }
   } else {
     // No transporter configured yet, log clearly
-    console.log(`ℹ️ [GMAIL DISPATCH - MOCK/DEV] To: ${cleanEmail} | OTP Code: ${otpCode}`);
-    return { success: true, delivered: false, previewCode: otpCode, note: 'SMTP not configured' };
+    console.warn(`⚠️ [GMAIL NOT CONFIGURED] Cannot send email to ${cleanEmail}. GMAIL_USER and GMAIL_APP_PASSWORD are required.`);
+    return { success: false, delivered: false, note: 'SMTP not configured', error: 'Server មិនទាន់កំណត់ GMAIL_USER និង GMAIL_APP_PASSWORD ក្នុង Environment Variables' };
   }
 }
 

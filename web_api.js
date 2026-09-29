@@ -340,11 +340,17 @@ Student Question: ${userText}`;
         purpose: 'register'
       });
 
+      if (!mailResult.delivered) {
+        return res.status(503).json({
+          success: false,
+          error: `⚠️ មិនទាន់អាចបញ្ជូនលេខកូដទៅកាន់ ${cleanGmail} បានទេ (${mailResult.error || 'Server មិនទាន់កំណត់ GMAIL_APP_PASSWORD'})! សូមទាក់ទង Admin ឬចុះឈ្មោះតាម Telegram / Google Sign-In ជំនួសវិញ។`
+        });
+      }
+
       return res.json({
         success: true,
-        message: 'លេខកូដ OTP ៦ ខ្ទង់ត្រូវបានផ្ញើចូលទៅកាន់ Gmail របស់អ្នក!',
-        email: cleanGmail,
-        previewCode: mailResult.delivered ? null : otpCode // Non-blocking preview for testing if SMTP not configured
+        message: `លេខកូដ OTP ៦ ខ្ទង់ត្រូវបានផ្ញើចូលទៅកាន់ប្រអប់សំបុត្រ Gmail (${cleanGmail}) របស់អ្នករួចរាល់ហើយ! សូមពិនិត្យមើល Inbox ឬ Spam។`,
+        email: cleanGmail
       });
     } catch (err) {
       console.error('Send register OTP error:', err);
@@ -484,11 +490,17 @@ Student Question: ${userText}`;
         purpose: 'login'
       });
 
+      if (!mailResult.delivered) {
+        return res.status(503).json({
+          success: false,
+          error: `⚠️ មិនទាន់អាចបញ្ជូនលេខកូដទៅកាន់ ${cleanGmail} បានទេ (${mailResult.error || 'Server មិនទាន់កំណត់ GMAIL_APP_PASSWORD'})! សូមទាក់ទង Admin ឬចូលតាម Google / Telegram ជំនួសវិញ។`
+        });
+      }
+
       return res.json({
         success: true,
-        message: 'លេខកូដ OTP សម្រាប់ចូលគណនីត្រូវបានផ្ញើចូលទៅកាន់ Gmail របស់អ្នក!',
-        email: cleanGmail,
-        previewCode: mailResult.delivered ? null : otpCode
+        message: `លេខកូដ OTP សម្រាប់ចូលគណនីត្រូវបានផ្ញើចូលទៅកាន់ប្រអប់សំបុត្រ Gmail (${cleanGmail}) របស់អ្នករួចរាល់ហើយ! សូមពិនិត្យមើល Inbox ឬ Spam។`,
+        email: cleanGmail
       });
     } catch (err) {
       console.error('Send login OTP error:', err);

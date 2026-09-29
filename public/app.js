@@ -1426,11 +1426,11 @@ async function handleSendRegisterOtp(e) {
 
     STATE.pendingRegisterName = fullName;
     STATE.pendingVerifyEmail = gmail;
-    STATE.pendingVerifyCode = data.previewCode || null;
+    STATE.pendingVerifyCode = null;
 
     closeModal('registerModal');
-    openVerifyEmailModal(gmail, data.previewCode, null);
-    showToast(`✅ ${data.message || 'បានផ្ញើលេខកូដ ៦ ខ្ទង់ទៅ Gmail!'}`, 'success');
+    openVerifyEmailModal(gmail, null, null);
+    showToast(`✅ ${data.message || 'បានផ្ញើលេខកូដ OTP ៦ ខ្ទង់ទៅកាន់ប្រអប់សំបុត្រ Gmail!'}`, 'success');
   } catch (err) {
     showToast(err.message, 'error');
   } finally {
@@ -1470,10 +1470,9 @@ async function handleVerifyRegisterOtp(e) {
   }
 }
 
-function openVerifyEmailModal(gmail, verificationCode, verificationLink) {
+function openVerifyEmailModal(gmail) {
   STATE.pendingVerifyEmail = gmail;
-  STATE.pendingVerifyCode = verificationCode;
-  STATE.pendingVerifyLink = verificationLink;
+  STATE.pendingVerifyCode = null;
 
   const emailDisp = document.getElementById('verifyEmailDisplay');
   if (emailDisp) emailDisp.textContent = gmail;
@@ -1482,17 +1481,6 @@ function openVerifyEmailModal(gmail, verificationCode, verificationLink) {
   if (codeInput) {
     codeInput.value = '';
     setTimeout(() => codeInput.focus(), 300);
-  }
-
-  const hintBox = document.getElementById('verifyCodeDemoHint');
-  const codeVal = document.getElementById('verifyCodeDemoVal');
-  if (hintBox && codeVal) {
-    if (verificationCode) {
-      hintBox.classList.remove('hidden');
-      codeVal.textContent = verificationCode;
-    } else {
-      hintBox.classList.add('hidden');
-    }
   }
 
   openModal('verifyEmailModal');
@@ -1508,18 +1496,16 @@ function openVerifyEmailModalForCurrent() {
   })
     .then(res => res.json())
     .then(data => {
-      openVerifyEmailModal(STATE.currentUser.gmail, data.previewCode, null);
+      if (data.success) {
+        showToast('✅ បានផ្ញើលេខកូដ OTP ទៅកាន់ប្រអប់សំបុត្រ Gmail!', 'success');
+        openVerifyEmailModal(STATE.currentUser.gmail);
+      } else {
+        showToast(data.error || 'ផ្ញើលេខកូដមិនបាន', 'error');
+      }
     })
     .catch(() => {
-      openVerifyEmailModal(STATE.currentUser.gmail, null, null);
+      openVerifyEmailModal(STATE.currentUser.gmail);
     });
-}
-
-function autoFillVerifyCode() {
-  if (STATE.pendingVerifyCode) {
-    const input = document.getElementById('verifyOtpCodeInput');
-    if (input) input.value = STATE.pendingVerifyCode;
-  }
 }
 
 async function handleResendRegisterOtp() {
@@ -1537,16 +1523,7 @@ async function handleResendRegisterOtp() {
     const data = await res.json();
     if (!data.success) throw new Error(data.error || 'ផ្ញើលេខកូដមិនបាន');
 
-    showToast('✅ លេខកូដ OTP ថ្មីត្រូវបានផ្ញើទៅ Gmail!', 'success');
-    if (data.previewCode) {
-      STATE.pendingVerifyCode = data.previewCode;
-      const hintBox = document.getElementById('verifyCodeDemoHint');
-      const codeVal = document.getElementById('verifyCodeDemoVal');
-      if (hintBox && codeVal) {
-        hintBox.classList.remove('hidden');
-        codeVal.textContent = data.previewCode;
-      }
-    }
+    showToast('✅ លេខកូដ OTP ថ្មីត្រូវបានផ្ញើទៅកាន់ប្រអប់សំបុត្រ Gmail!', 'success');
   } catch (err) {
     showToast(err.message, 'error');
   }
@@ -1582,7 +1559,7 @@ async function handleSendLoginOtp(e) {
     if (!data.success) throw new Error(data.error || 'ផ្ញើ OTP មិនជោគជ័យ');
 
     STATE.pendingLoginEmail = gmail;
-    STATE.pendingLoginOtp = data.previewCode || null;
+    STATE.pendingLoginOtp = null;
 
     // Toggle form to verify OTP form
     const emailForm = document.getElementById('emailOtpLoginForm');
@@ -1590,20 +1567,13 @@ async function handleSendLoginOtp(e) {
     if (emailForm) emailForm.classList.add('hidden');
     if (verifyForm) verifyForm.classList.remove('hidden');
 
-    const hintBox = document.getElementById('loginOtpPreviewHint');
-    const previewVal = document.getElementById('loginOtpPreviewVal');
-    if (hintBox && previewVal) {
-      if (data.previewCode) {
-        hintBox.classList.remove('hidden');
-        previewVal.textContent = data.previewCode;
-        const otpInput = document.getElementById('loginOtpCodeInput');
-        if (otpInput) otpInput.value = data.previewCode;
-      } else {
-        hintBox.classList.add('hidden');
-      }
+    const otpInput = document.getElementById('loginOtpCodeInput');
+    if (otpInput) {
+      otpInput.value = '';
+      setTimeout(() => otpInput.focus(), 300);
     }
 
-    showToast(`✅ ${data.message || 'បានផ្ញើលេខកូដ OTP ទៅ Gmail!'}`, 'success');
+    showToast(`✅ ${data.message || 'បានផ្ញើលេខកូដ OTP ទៅកាន់ប្រអប់សំបុត្រ Gmail!'}`, 'success');
   } catch (err) {
     showToast(err.message, 'error');
   } finally {
