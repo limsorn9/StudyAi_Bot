@@ -522,15 +522,27 @@ bot.action(/lesson_([^-]+)-([^-]+)-(.+)/, async (ctx) => {
     timestamp: Date.now()
   });
 
+  const isVIP = await checkVIP(userId);
+
   await ctx.reply(lessonData.content, 
     Markup.inlineKeyboard([
-      [Markup.button.callback('🔊 អានជាសំឡេង (Listen)', `tts_${userId}`)],
-      [Markup.button.callback('📝 ប្រឡងបញ្ចប់មេរៀន (Quiz)', `quiz_start_${monthId}-${weekId}-${lessonId}`)],
+      [Markup.button.callback(isVIP ? '🔊 អានជាសំឡេង (Listen)' : '🔒 🔊 អានជាសំឡេង (VIP)', `tts_${userId}`)],
+      [Markup.button.callback(isVIP ? '📝 ប្រឡងបញ្ចប់មេរៀន (Quiz)' : '🔒 📝 ប្រឡងបញ្ចប់មេរៀន (VIP)', `quiz_start_${monthId}-${weekId}-${lessonId}`)],
       [Markup.button.callback('🔙 ត្រឡប់ទៅបញ្ជីមេរៀន', `week_${monthId}-${weekId}`)]
     ])
   );
   
-  await ctx.reply(`💬 គ្រូ AI ជំនាញផ្នែក "${lessonData.title.split(':')[1].trim()}" នៅទីនេះហើយ! បើមានចម្ងល់សូមឆាតសួរ។`);
+  if (isVIP) {
+    const topicName = lessonData.title.includes(':') ? lessonData.title.split(':')[1].trim() : lessonData.title;
+    await ctx.reply(`💬 គ្រូ AI ជំនាញផ្នែក "${topicName}" នៅទីនេះហើយ! បើមានចម្ងល់សូមឆាតសួរ។`);
+  } else {
+    await ctx.reply(
+      `💡 *អ្នកកំពុងប្រើប្រាស់គណនី Free*\n` +
+      `• អាចអានមេរៀនបានធម្មតា ✅\n` +
+      `• ចង់ស្តាប់សំឡេង, សួរគ្រូ AI និងប្រឡង Quiz សូមដំឡើងទៅ *VIP* 💎`,
+      { parse_mode: 'Markdown' }
+    );
+  }
 });
 
 
