@@ -340,6 +340,91 @@ function generateAnnualSubjectQuiz(curriculum, subjectKey, count = 20) {
  * - generateQuiz(lesson)
  * - generateQuiz(curriculum, monthId, weekId, lessonId)
  */
+function generateBeginnerQuiz(lesson) {
+  const content = lesson.content || '';
+  const letterMatch = content.match(/តួអក្សរ៖\s*([A-Za-z]+)/);
+  const letter = (lesson.letter || (letterMatch ? letterMatch[1].charAt(0) : 'A')).toUpperCase();
+  
+  const vocabMatch = content.match(/🔑 វាក្យសព្ទប្រចាំថ្ងៃ[\s\S]*?1\.\s*(?:🇬🇧\s*)?(.+?)\s*=\s*(?:🇰🇭\s*)?([^\n]+)/);
+  const wordEn = lesson.word || (vocabMatch ? vocabMatch[1].trim() : 'Apple');
+  const wordKh = vocabMatch ? vocabMatch[2].trim() : 'ផ្លែប៉ោម';
+
+  const sentenceMatch = content.match(/💡 ល្បះគំរូប្រចាំថ្ងៃ[\s\S]*?1\.\s*(?:🇬🇧\s*)?([^\n]+)\n\s*(?:🇰🇭\s*)?\(?([^\n\)]+)\)?/);
+  const sentEn = lesson.sentence || (sentenceMatch ? sentenceMatch[1].trim() : `This is an ${wordEn.toLowerCase()}.`);
+  const sentKh = sentenceMatch ? sentenceMatch[2].trim() : `នេះគឺជា ${wordKh}។`;
+
+  // Letter Alphabet pool
+  const allLetters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+  const wrongLetters = shuffle(allLetters.filter(l => l !== letter)).slice(0, 3);
+  const letterOpts = shuffle([letter, ...wrongLetters]);
+
+  // Vocab wrong options
+  const sampleWords = [
+    { en: 'Apple', kh: 'ផ្លែប៉ោម' },
+    { en: 'Book', kh: 'សៀវភៅ' },
+    { en: 'Cat', kh: 'សត្វឆ្មា' },
+    { en: 'Dog', kh: 'សត្វឆ្កែ' },
+    { en: 'Egg', kh: 'ពងមាន់' },
+    { en: 'Fish', kh: 'សត្វត្រី' },
+    { en: 'Hat', kh: 'មួក' },
+    { en: 'Sun', kh: 'ព្រះអាទិត្យ' },
+    { en: 'Tree', kh: 'ដើមឈើ' }
+  ];
+  const wrongVocab = shuffle(sampleWords.filter(w => w.en.toLowerCase() !== wordEn.toLowerCase())).slice(0, 3);
+
+  // Question 1: Letter Identification
+  const q1 = {
+    question: `តើតួអក្សរប្រចាំថ្ងៃនេះជាអក្សរអ្វី? (Letter of the day)`,
+    options: letterOpts,
+    answer: letter,
+    explanation: `មេរៀនថ្ងៃនេះគឺរៀនអំពីតួអក្សរ ${letter}!`
+  };
+
+  // Question 2: Word meaning (English to Khmer)
+  const q2Opts = shuffle([wordKh, ...wrongVocab.map(w => w.kh)]);
+  const q2 = {
+    question: `ពាក្យ "${wordEn}" ប្រែជាភាសាខ្មែរថាអ្វី?`,
+    options: q2Opts,
+    answer: wordKh,
+    explanation: `ពាក្យ "${wordEn}" ប្រែជាភាសាខ្មែរថា "${wordKh}"។`
+  };
+
+  // Question 3: Word meaning (Khmer to English)
+  const q3Opts = shuffle([wordEn, ...wrongVocab.map(w => w.en)]);
+  const q3 = {
+    question: `ពាក្យ "${wordKh}" សរសេរជាភាសាអង់គ្លេសថាអ្វី?`,
+    options: q3Opts,
+    answer: wordEn,
+    explanation: `ពាក្យ "${wordKh}" សរសេរជាភាសាអង់គ្លេសថា "${wordEn}"។`
+  };
+
+  // Question 4: Sentence Meaning
+  const sampleSentences = [
+    'នេះគឺជាសៀវភៅរបស់ខ្ញុំ។',
+    'សត្វឆ្កែនេះគួរឱ្យស្រឡាញ់ណាស់។',
+    'ខ្ញុំញ៉ាំពងមាន់មួយគ្រាប់។',
+    'ព្រះអាទិត្យភ្លឺចិញ្ចែងចិញ្ចាច។'
+  ];
+  const wrongSents = shuffle(sampleSentences.filter(s => s !== sentKh)).slice(0, 3);
+  const q4Opts = shuffle([sentKh, ...wrongSents]);
+  const q4 = {
+    question: `ល្បះ "${sentEn}" ប្រែជាភាសាខ្មែរថាអ្វី?`,
+    options: q4Opts,
+    answer: sentKh,
+    explanation: `"${sentEn}" ប្រែថា "${sentKh}"។`
+  };
+
+  // Question 5: First letter of word
+  const q5 = {
+    question: `តើពាក្យ "${wordEn}" ចាប់ផ្តើមឡើងដោយតួអក្សរអ្វី?`,
+    options: letterOpts,
+    answer: letter,
+    explanation: `ពាក្យ "${wordEn}" ចាប់ផ្តើមដោយតួអក្សរ "${letter}" (${letter} is for ${wordEn})!`
+  };
+
+  return [q1, q2, q3, q4, q5];
+}
+
 function generateQuiz(lessonOrCurriculum, monthId, weekId, lessonId) {
   let lesson = lessonOrCurriculum;
 
@@ -358,6 +443,11 @@ function generateQuiz(lessonOrCurriculum, monthId, weekId, lessonId) {
 
   const title = lesson.title || '';
   const content = lesson.content || '';
+
+  // Beginner Daily Lessons (1 Day = 1 Letter, 1 Word, 1 Sentence)
+  if (monthId === 'beginner' || (lesson.id && lesson.id.startsWith('bl')) || title.includes('English for Children') || title.includes('ថ្ងៃទី')) {
+    return generateBeginnerQuiz(lesson);
+  }
 
   // Try extracting vocabulary first if available in lesson
   const vocabQuestions = generateVocabQuiz(content, 'vocab');

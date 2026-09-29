@@ -399,16 +399,16 @@ function switchCourseLevel(level) {
           <div class="instructor-details">
             <div class="instructor-name-row">
               <h3 class="instructor-name">អ្នកគ្រូ ពិសិដ្ឋ (Teacher Piseth AI)</h3>
-              <span class="badge badge-emerald">✓ ថ្នាក់ដំបូង • មូលដ្ឋានគ្រឹះ</span>
+              <span class="badge badge-emerald">✓ ថ្នាក់ដំបូង • English for Children</span>
             </div>
             <p class="instructor-bio">
-              ${STATE.beginnerCourse?.teacher?.description || 'បង្រៀនកូនៗ និងប្អូនៗចាប់ពីកម្រិតដំបូង គ្មានមូលដ្ឋាន ឱ្យចេះអាន ចេះសរសេរ ចេះប្រកប និងសន្ទនាសាមញ្ញៗដោយទំនុកចិត្ត'}
+              បង្រៀនកូនៗ និងប្អូនៗតាមក្បួន English for Children "១ ថ្ងៃ៖ ១ អក្សរ ១ ពាក្យ ១ ល្បះ" ច្បាស់លាស់ ងាយចាំ និងសប្បាយរីករាយបំផុត!
             </p>
             <div class="instructor-badges-list">
-              <span class="pill-chip">🔤 សូរសព្ទ Phonics A-Z</span>
-              <span class="pill-chip">🔢 រាប់លេខ & ពណ៌</span>
-              <span class="pill-chip">💬 ស្វាគមន៍ & ណែនាំខ្លួន</span>
-              <span class="pill-chip">📚 ២៤ មេរៀនគ្រឹះ</span>
+              <span class="pill-chip">🔤 ២៦ ថ្ងៃ (A ដល់ Z)</span>
+              <span class="pill-chip">🍎 ១ ថ្ងៃ ១ ពាក្យ & Logo</span>
+              <span class="pill-chip">💬 ១ ថ្ងៃ ១ ល្បះ & សន្ទនា</span>
+              <span class="pill-chip">🔊 សំឡេងអ្នកគ្រូពិសិដ្ឋ AI</span>
             </div>
           </div>
         </div>
@@ -462,10 +462,10 @@ function renderBeginnerWeeks() {
     <div class="week-card glass-panel beginner-week-card">
       <div class="week-header">
         <div class="week-title-wrap">
-          <div class="week-title">🌟 ${w.title} (${w.lessons.length} មេរៀន)</div>
+          <div class="week-title">📅 ${w.title} (${w.lessons.length} ថ្ងៃ)</div>
           ${w.description ? `<div class="week-desc text-xs text-slate-400 mt-0.5">${w.description}</div>` : ''}
         </div>
-        <span class="badge badge-emerald">👩‍🏫 អ្នកគ្រូ ពិសិដ្ឋ</span>
+        <span class="badge badge-emerald">👩‍🏫 អ្នកគ្រូ ពិសិដ្ឋ AI</span>
       </div>
       <div class="lessons-grid">
         ${w.lessons.map(l => {
@@ -476,7 +476,7 @@ function renderBeginnerWeeks() {
             <div class="lesson-item-card beginner-lesson-item ${isComp ? 'completed' : ''}" onclick="openLesson('beginner', '${w.id}', '${l.id}')">
               <div class="l-info">
                 <div class="l-title">${l.title}</div>
-                <div class="l-status">${isComp ? `✅ ជាប់និទ្ទេស ${grade}` : '👩‍🏫 ចុចរៀនជាមួយអ្នកគ្រូពិសិដ្ឋ'}</div>
+                <div class="l-status">${isComp ? `✅ ជាប់និទ្ទេស ${grade}` : '📖 ១ ថ្ងៃ ១ អក្សរ ១ ពាក្យ ១ ល្បះ'}</div>
               </div>
               <div class="l-icon">${isComp ? '🏆' : '➡️'}</div>
             </div>
