@@ -349,7 +349,12 @@ async function generateCertificateHTML(data) {
       text-align: center;
     }
     .dir-role-kh {
-      display: none; /* Hide role to match the requested layout */
+      font-family: 'Khmer OS Muol Light', 'Khmer OS Moul Light', 'Moul', cursive;
+      font-size: 14px; color: #0f172a;
+      margin-bottom: 4px;
+      text-align: center;
+      position: relative;
+      z-index: 3;
     }
     /* Signature and Stamp Container */
     .sig-stamp-container {
@@ -362,20 +367,21 @@ async function generateCertificateHTML(data) {
     .stamp-official {
       position: absolute;
       left: 50%;
-      top: -10px; 
-      width: 160px;
-      height: 160px;
-      transform: translateX(-60%) rotate(-6deg);
+      top: -30px; 
+      width: 180px;
+      height: 180px;
+      transform: translateX(-50%) rotate(-6deg);
       object-fit: contain;
       z-index: 2;
       filter: drop-shadow(0 2px 6px rgba(185,28,28,0.3));
       pointer-events: none;
     }
-    /* Director Signature: on the RIGHT */
+    /* Director Signature: CENTERED below the role text */
     .sig-director {
       position: absolute;
-      right: 15px;
-      bottom: 25px;
+      left: 50%;
+      top: 10px;
+      transform: translateX(-50%);
       width: 170px;
       height: 95px;
       object-fit: contain;
