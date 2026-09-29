@@ -140,6 +140,49 @@ const checkVIP = async (userId) => {
   return false;
 };
 
+// ========================
+// CHANNEL MEMBERSHIP GUARD
+// ========================
+const REQUIRED_CHANNEL = '@ssonlinechanel';
+const CHANNEL_URL = 'https://t.me/ssonlinechanel';
+
+const isMember = async (userId) => {
+  try {
+    if (SUPER_ADMIN_IDS.includes(userId.toString())) return true;
+    const member = await bot.telegram.getChatMember(REQUIRED_CHANNEL, userId);
+    return ['member', 'administrator', 'creator'].includes(member.status);
+  } catch (e) {
+    // If bot is not admin in channel, or user not found → treat as not member
+    return false;
+  }
+};
+
+const requireMembership = async (ctx, next) => {
+  // Skip for private non-bot messages only (commands and callbacks)
+  const userId = ctx.from?.id;
+  if (!userId) return next();
+  // Always allow admins
+  if (SUPER_ADMIN_IDS.includes(userId.toString())) return next();
+
+  const ok = await isMember(userId);
+  if (!ok) {
+    await ctx.reply(
+      `🔒 *ដើម្បីប្រើប្រាស់ Bot នេះ សូមចូលជាសមាជិកឆានែលរបស់យើងជាមុនសិន!*\n\n` +
+      `👉 [ចុចទីនេះ ដើម្បីចូលឆានែល](${CHANNEL_URL})\n\n` +
+      `✅ បន្ទាប់ពីចូលហើយ សូមវាយ /start ម្ដងទៀត`,
+      {
+        parse_mode: 'Markdown',
+        reply_markup: Markup.inlineKeyboard([
+          [Markup.button.url('📢 ចូលឆានែល @ssonlinechanel', CHANNEL_URL)],
+          [Markup.button.callback('✅ ខ្ញុំបានចូលហើយ', 'check_membership')]
+        ]).reply_markup
+      }
+    );
+    return; // Stop processing
+  }
+  return next();
+};
+
 // TTS Helper Function
 const generateAndSendTTS = async (ctx, text) => {
   if (!text) return;
@@ -175,11 +218,49 @@ const mainMenuKeyboard = Markup.keyboard([
   ['💎 គណនី VIP (Upgrade)', '❓ ជំនួយ (Help)']
 ]).resize();
 
+// Check Membership Button
+bot.action('check_membership', async (ctx) => {
+  await ctx.answerCbQuery();
+  const userId = ctx.from.id;
+  const ok = await isMember(userId);
+  if (ok) {
+    const username = ctx.from.first_name || 'Student';
+    await ctx.reply(`✅ *ត្រូវហើយ! ${username} បានចូលជាសមាជិករួចហើយ!*\n\nសូមស្វាគមន៍! 🎉`, {
+      parse_mode: 'Markdown',
+      reply_markup: mainMenuKeyboard.reply_markup
+    });
+    await ctx.reply('សូមជ្រើសរើសខែដែលអ្នកចង់រៀន៖', getMonthsKeyboard());
+  } else {
+    await ctx.reply(`❌ *ខ្ញុំមិនឃើញអ្នកនៅក្នុងឆានែលទេ!*\n\nសូម [ចូលឆានែល](${CHANNEL_URL}) ហើយចុច ✅ ម្ដងទៀត`, {
+      parse_mode: 'Markdown',
+      reply_markup: Markup.inlineKeyboard([
+        [Markup.button.url('📢 ចូលឆានែល', CHANNEL_URL)],
+        [Markup.button.callback('✅ ខ្ញុំបានចូលហើយ', 'check_membership')]
+      ]).reply_markup
+    });
+  }
+});
+
 // Start Command & Curriculum Menu
 bot.start(async (ctx) => {
   const userId = ctx.from.id;
   const username = ctx.from.first_name || 'Student';
-  
+
+  // Check channel membership first
+  const ok = await isMember(userId);
+  if (!ok) {
+    return ctx.reply(
+      `🔒 *សួស្តី ${username}!*\n\nដើម្បីប្រើប្រាស់ Bot សិក្សានេះ សូមចូលជាសមាជិកឆានែលយើងជាមុនសិន!`,
+      {
+        parse_mode: 'Markdown',
+        reply_markup: Markup.inlineKeyboard([
+          [Markup.button.url('📢 ចូលឆានែល @ssonlinechanel', CHANNEL_URL)],
+          [Markup.button.callback('✅ ខ្ញុំបានចូលហើយ', 'check_membership')]
+        ]).reply_markup
+      }
+    );
+  }
+
   await db.ref(`users/${userId}/profile`).update({
     name: username,
     registeredAt: Date.now()
@@ -325,8 +406,20 @@ function getMonthsKeyboard() {
 // Handle Month Selection
 bot.action(/month_(.+)/, async (ctx) => {
   const monthId = ctx.match[1];
+  const userId = ctx.from.id;
+
+  // Membership guard
+  if (!(await isMember(userId))) {
+    await ctx.answerCbQuery('🔒 សូមចូលឆានែលជាមុន!');
+    return ctx.reply('🔒 សូមចូលឆានែល @ssonlinechanel ជាមុនសិន!', {
+      reply_markup: Markup.inlineKeyboard([
+        [Markup.button.url('📢 ចូលឆានែល', CHANNEL_URL)],
+        [Markup.button.callback('✅ ខ្ញុំបានចូលហើយ', 'check_membership')]
+      ]).reply_markup
+    });
+  }
+
   const monthData = curriculum.months.find(m => m.id === monthId);
-  
   if (!monthData) return ctx.answerCbQuery("រកមិនឃើញទិន្នន័យខែ");
 
   const buttons = monthData.weeks.map(w => [Markup.button.callback(w.title, `week_${monthId}-${w.id}`)]);
@@ -420,6 +513,40 @@ bot.action(/quiz_start_([^-]+)-([^-]+)-(.+)/, async (ctx) => {
   const weekId = ctx.match[2];
   const lessonId = ctx.match[3];
   const userId = ctx.from.id;
+
+  // ✅ Check channel membership first
+  const member = await isMember(userId);
+  if (!member) {
+    return ctx.reply(
+      `🔒 *ដើម្បីប្រើប្រាស់ Quiz សូមចូលជាសមាជិកឆានែលរបស់យើងជាមុន!*`,
+      {
+        parse_mode: 'Markdown',
+        reply_markup: Markup.inlineKeyboard([
+          [Markup.button.url('📢 ចូលឆានែល @ssonlinechanel', CHANNEL_URL)],
+          [Markup.button.callback('✅ ខ្ញុំបានចូលហើយ', 'check_membership')]
+        ]).reply_markup
+      }
+    );
+  }
+
+  // 💎 Check VIP
+  const vip = await checkVIP(userId);
+  if (!vip) {
+    return ctx.reply(
+      `💎 *មុខងារប្រឡង (Quiz) សម្រាប់សមាជិក VIP ប៉ុណ្ណោះ!*\n\n` +
+      `✅ ចូលជា VIP ដើម្បីទទួលបានសិទ្ធិ:\n` +
+      `• ប្រឡង Quiz ជា MCQ ១០ សំណួរ\n` +
+      `• ទទួលពិន្ទុ + ថ្នាក់ (A-F)\n` +
+      `• រក្សាទុកប្រវត្តិពិន្ទុ\n\n` +
+      `💰 តម្លៃ: 3$/ខែ | 30$/ឆ្នាំ`,
+      {
+        parse_mode: 'Markdown',
+        reply_markup: Markup.inlineKeyboard([
+          [Markup.button.callback('💎 Upgrade VIP', 'vip_upgrade')]
+        ]).reply_markup
+      }
+    );
+  }
 
   const monthData = curriculum.months.find(m => m.id === monthId);
   if (!monthData) return;
