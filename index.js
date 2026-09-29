@@ -164,6 +164,103 @@ const checkVIP = async (userId) => {
   return false;
 };
 
+/**
+ * Check if user is eligible for Annual Subject Final Exams
+ * Eligible if:
+ * 1. Super Admin
+ * 2. Has an active yearly subscription (1 year / 12 months)
+ * 3. OR has accumulated payments totaling at least 1 year (>= 360 days)
+ */
+const checkYearlyVIP = async (userId) => {
+  if (SUPER_ADMIN_IDS.includes(userId.toString())) {
+    return { eligible: true, isVIP: true, isAdmin: true, reason: 'ADMIN', plan: 'Super Admin' };
+  }
+  if (!db) return { eligible: false, isVIP: false, reason: 'NO_DB' };
+
+  try {
+    const snap = await db.ref(`users/${userId}/subscription`).once('value');
+    const sub = snap.val();
+    if (!sub || !sub.expiresAt || sub.expiresAt <= Date.now() || sub.status === 'revoked') {
+      return { eligible: false, isVIP: false, reason: 'NOT_VIP', daysRemaining: 0, plan: 'Free' };
+    }
+
+    const remainingMs = sub.expiresAt - Date.now();
+    const daysRemaining = Math.max(0, Math.floor(remainingMs / (24 * 60 * 60 * 1000)));
+
+    // 1. Check direct plan name
+    const planStr = (sub.plan || '').toLowerCase();
+    const isExplicitYearly = (
+      planStr.includes('ឆ្នាំ') ||
+      planStr.includes('year') ||
+      planStr.includes('12 ខែ') ||
+      planStr.includes('1y') ||
+      planStr.includes('12m') ||
+      sub.isYearly === true
+    );
+
+    if (isExplicitYearly) {
+      return {
+        eligible: true,
+        isVIP: true,
+        reason: 'YEARLY_PLAN',
+        plan: sub.plan,
+        daysRemaining
+      };
+    }
+
+    // 2. Check if remaining days >= 300 days (purchased yearly or multiple extensions)
+    if (daysRemaining >= 300) {
+      return {
+        eligible: true,
+        isVIP: true,
+        reason: 'REMAINING_YEAR',
+        plan: sub.plan,
+        daysRemaining
+      };
+    }
+
+    // 3. Check cumulative payment history in payments_log (e.g. paying month by month reaching >= 360 days)
+    let totalAccumulatedDays = 0;
+    try {
+      const logSnap = await db.ref('payments_log').orderByChild('userId').equalTo(userId.toString()).once('value');
+      const logs = logSnap.val();
+      if (logs) {
+        Object.values(logs).forEach(log => {
+          if (log.daysAdded && typeof log.daysAdded === 'number') {
+            totalAccumulatedDays += log.daysAdded;
+          }
+        });
+      }
+    } catch (e) {
+      console.error('payments_log lookup error:', e);
+    }
+
+    if (totalAccumulatedDays >= 360) {
+      return {
+        eligible: true,
+        isVIP: true,
+        reason: 'CUMULATIVE_YEAR',
+        plan: sub.plan,
+        daysRemaining,
+        totalAccumulatedDays
+      };
+    }
+
+    // Not eligible for Annual Exam (e.g. 1 month or 3 months user)
+    return {
+      eligible: false,
+      isVIP: true,
+      reason: 'NOT_YEARLY',
+      plan: sub.plan || '1 ខែ',
+      daysRemaining,
+      totalAccumulatedDays
+    };
+  } catch (err) {
+    console.error('checkYearlyVIP error:', err);
+    return { eligible: false, isVIP: false, reason: 'ERROR' };
+  }
+};
+
 // ========================
 // CHANNEL MEMBERSHIP GUARD
 // ========================
@@ -369,10 +466,11 @@ const sendVipUpgradeInfo = async (ctx) => {
 ✅ អានមេរៀនជាសំឡេង (TTS)
 ✅ អាចផ្ញើជាសំឡេងឲ្យគ្រូ AI ស្តាប់ និងកែតម្រូវ
 ✅ ធ្វើតេស្តប្រឡងយកពិន្ទុ MCQ គ្រប់មេរៀន
+✅ **សិទ្ធិប្រឡងបញ្ចប់មុខវិជ្ជាប្រចាំឆ្នាំ & វិញ្ញាបនបត្រ A4 ផ្តេកផ្លូវការ (សម្រាប់កញ្ចប់ប្រចាំឆ្នាំ ឬបង់គ្រប់ ១ ឆ្នាំ)**
 
 **តម្លៃពិសេស៖**
-👉 1 ខែ = 3$
-👉 1 ឆ្នាំ = 30$
+👉 1 ខែ = 3$ (សិទ្ធិ VIP ទូទៅ + Quiz មេរៀន)
+👉 1 ឆ្នាំ = 30$ (សិទ្ធិ VIP ពេញលេញ + ប្រឡងបញ្ចប់មុខវិជ្ជាប្រចាំឆ្នាំ & វិញ្ញាបនបត្រ A4 ផ្តេក)
 
 🏦 **ព័ត៌មានបង់ប្រាក់ (ACLEDA Bank / KHQR):**
 ឈ្មោះគណនី៖ **LIM SORN**
@@ -403,6 +501,41 @@ bot.hears('💎 គណនី VIP (Upgrade)', sendVipUpgradeInfo);
 bot.action('vip_upgrade', async (ctx) => {
   try { await ctx.answerCbQuery(); } catch(e){}
   await sendVipUpgradeInfo(ctx);
+});
+
+// Action: Click Yearly VIP Upgrade (Dedicated for Annual Subject Exams)
+bot.action('vip_upgrade_yearly', async (ctx) => {
+  try { await ctx.answerCbQuery(); } catch(e){}
+  const userId = ctx.from.id;
+  const msg = (
+    `💎 *កញ្ចប់ VIP ប្រចាំឆ្នាំ (Yearly VIP - 30$/ឆ្នាំ)* 💎\n\n` +
+    `ទទួលបានសិទ្ធិពិសេសពេញលេញរយៈពេល ១ ឆ្នាំពេញ (៣៦៥ ថ្ងៃ)៖\n` +
+    `✅ *សិទ្ធិប្រឡងបញ្ចប់មុខវិជ្ជាប្រចាំឆ្នាំទាំង ៧ មុខវិជ្ជា*\n` +
+    `✅ *ទទួលបានវិញ្ញាបនបត្រផ្លូវការទម្រង់ A4 ផ្តេក (A4 Landscape)*\n` +
+    `✅ *មានភ្ជាប់ QR Code Verified អាចស្កេនផ្ទៀងផ្ទាត់ផ្លូវការ*\n` +
+    `✅ ចុះហត្ថលេខាដោយ *នាយកសាលារៀន លីម សន* & *TeacherSornAiBot*\n` +
+    `✅ សួរគ្រូ AI បានដោយសេរី គ្មានដែនកំណត់\n` +
+    `✅ អានមេរៀនជាសំឡេង (TTS) និងប្រឡង MCQ គ្រប់មេរៀន\n\n` +
+    `💰 *តម្លៃពិសេស៖ 30$/ឆ្នាំ (សន្សំបាន ៦$ ធៀបនឹងបង់ប្រចាំខែ)*\n\n` +
+    `🏦 *ព័ត៌មានបង់ប្រាក់ (ACLEDA Bank / KHQR)៖*\n` +
+    `ឈ្មោះគណនី៖ *LIM SORN*\n\n` +
+    `📲 បន្ទាប់ពីបង់ប្រាក់រួច សូមផ្ញើវិក្កយបត្រមកកាន់ Admin៖ @limsorn9\n` +
+    `ឬប្រាប់លេខ ID របស់អ្នកគឺ៖ \`${userId}\``
+  );
+
+  const keyboard = Markup.inlineKeyboard([
+    [Markup.button.callback('🔑 បញ្ចូល License Key ប្រចាំឆ្នាំ', 'enter_license_key')],
+    [Markup.button.callback('📋 ពិនិត្យ License របស់ខ្ញុំ', 'my_license_status')],
+    [Markup.button.callback('🔙 ត្រឡប់ក្រោយ', 'annual_exams_menu')]
+  ]);
+
+  if (fs.existsSync('./khqr.jpg')) {
+    await ctx.replyWithPhoto({ source: './khqr.jpg' }, { caption: msg, parse_mode: 'Markdown', reply_markup: keyboard.reply_markup });
+  } else if (fs.existsSync('./khqr.png')) {
+    await ctx.replyWithPhoto({ source: './khqr.png' }, { caption: msg, parse_mode: 'Markdown', reply_markup: keyboard.reply_markup });
+  } else {
+    await ctx.reply(msg, { parse_mode: 'Markdown', reply_markup: keyboard.reply_markup });
+  }
 });
 
 // Action: Enter License Key
@@ -1860,26 +1993,51 @@ async function sendAnnualExamsMenu(ctx) {
     });
   }
 
-  // 2. VIP Guard
-  const vip = await checkVIP(userId);
-  if (!vip) {
-    return ctx.reply(
-      `💎 *ការប្រឡងបញ្ចប់មុខវិជ្ជាប្រចាំឆ្នាំ សម្រាប់សមាជិក VIP ប៉ុណ្ណោះ!*\n\n` +
-      `✅ ចូលជា VIP ដើម្បីទទួលបានសិទ្ធិ:\n` +
-      `• ប្រឡងបញ្ចប់មុខវិជ្ជាទាំង ៧ ប្រភេទ (២០ សំណួរក្នុងមួយវិញ្ញាសា)\n` +
-      `• អាចកែប្រែ និងផ្ទៀងផ្ទាត់ចម្លើយមុន Submit\n` +
-      `• ទទួលបានវិញ្ញាបនបត្រផ្លូវការទម្រង់ A4 ផ្តេក (A4 Landscape)\n` +
-      `• ចុះហត្ថលេខាដោយ នាយកសាលារៀន លីម សន & គ្រូបន្ទុកថ្នាក់ TeacherSornAiBot\n` +
-      `• មាន QR Code Verified អាចស្កេនផ្ទៀងផ្ទាត់បាន!\n\n` +
-      `💰 តម្លៃ: 3$/ខែ | 30$/ឆ្នាំ`,
-      {
-        parse_mode: 'Markdown',
-        reply_markup: Markup.inlineKeyboard([
-          [Markup.button.callback('💎 Upgrade VIP', 'vip_upgrade')],
-          [Markup.button.callback('🔑 បញ្ចូល License Key', 'enter_license_key')]
-        ]).reply_markup
-      }
+  // 2. Yearly VIP Guard (បង់ប្រាក់ប្រចាំឆ្នាំ ឬបង់គ្រប់ ១ ឆ្នាំ)
+  const yearlyStatus = await checkYearlyVIP(userId);
+  if (!yearlyStatus.eligible) {
+    const statusText = yearlyStatus.isVIP
+      ? `💎 VIP (${yearlyStatus.plan || 'កញ្ចប់ប្រចាំខែ'}) - នៅសល់ ${yearlyStatus.daysRemaining} ថ្ងៃ`
+      : `⚪ គណនី Free (មិនទាន់ជា VIP)`;
+
+    const accumulatedInfo = (yearlyStatus.totalAccumulatedDays && yearlyStatus.totalAccumulatedDays > 0)
+      ? `• ចំនួនថ្ងៃសន្សំបានពីមុនមក៖ *${yearlyStatus.totalAccumulatedDays} ថ្ងៃ / ៣៦០ ថ្ងៃ*\n`
+      : '';
+
+    const lockedMsg = (
+      `╔════════════════════════════════════════════╗\n` +
+      `   🔒 *សិទ្ធិប្រឡងបញ្ចប់មុខវិជ្ជាប្រចាំឆ្នាំ* 🔒\n` +
+      `        *ANNUAL EXAMS PRIVILEGE*\n` +
+      `╚════════════════════════════════════════════╝\n\n` +
+      `⚠️ *ការប្រឡងបញ្ចប់មុខវិជ្ជាប្រចាំឆ្នាំ* និងការទទួលបាន *វិញ្ញាបនបត្រផ្លូវការទម្រង់ A4 ផ្តេក* គឺផ្ដល់ជូនសម្រាប់តែសិស្សានុសិស្សដែល៖\n\n` +
+      `✅ *បង់ប្រាក់គណនី VIP ប្រចាំឆ្នាំ (30$/ឆ្នាំ)* ឬ\n` +
+      `✅ *បានបង់ប្រាក់សន្សំគ្រប់ ១ ឆ្នាំ (១២ ខែ / ៣៦០ ថ្ងៃ)* ប៉ុណ្ណោះ!\n\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `📌 *ស្ថានភាពគណនីរបស់អ្នកបច្ចុប្បន្ន៖*\n` +
+      `• ប្រភេទគណនី៖ *${statusText}*\n` +
+      accumulatedInfo +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+      `💡 _ប្រសិនបើអ្នកចង់ប្រឡងបញ្ចប់មុខវិជ្ជាប្រចាំឆ្នាំទាំង ៧ ប្រភេទ និងទទួលបានវិញ្ញាបនបត្រ A4 ផ្តេក មាន QR Code Verified សូម Upgrade ទៅកាន់កញ្ចប់ប្រចាំឆ្នាំ (30$/ឆ្នាំ)!_`
     );
+
+    const lockedKeyboard = Markup.inlineKeyboard([
+      [Markup.button.callback('💎 Upgrade VIP ប្រចាំឆ្នាំ (30$/ឆ្នាំ)', 'vip_upgrade_yearly')],
+      [Markup.button.callback('🔑 បញ្ចូល License Key', 'enter_license_key')],
+      [Markup.button.callback('🔙 ត្រឡប់ទៅកម្មវិធីសិក្សា', 'back_to_months')]
+    ]);
+
+    if (ctx.callbackQuery) {
+      try {
+        return await ctx.editMessageText(lockedMsg, {
+          parse_mode: 'Markdown',
+          reply_markup: lockedKeyboard.reply_markup
+        });
+      } catch (e) {}
+    }
+    return ctx.reply(lockedMsg, {
+      parse_mode: 'Markdown',
+      reply_markup: lockedKeyboard.reply_markup
+    });
   }
 
   const buttons = [
@@ -1952,11 +2110,11 @@ bot.action(/start_annual_([a-z]+)/, async (ctx) => {
     return ctx.reply('🔒 សូមចូលឆានែល @ssonlinechanel ជាមុនសិន!');
   }
 
-  // 2. VIP Guard
-  const vip = await checkVIP(ctx.from.id);
-  if (!vip) {
-    await ctx.answerCbQuery('💎 សម្រាប់ VIP ប៉ុណ្ណោះ!');
-    return sendVipUpgradeInfo(ctx);
+  // 2. Yearly VIP Guard (បង់ប្រាក់ប្រចាំឆ្នាំ ឬបង់គ្រប់ ១ ឆ្នាំ)
+  const yearlyStatus = await checkYearlyVIP(ctx.from.id);
+  if (!yearlyStatus.eligible) {
+    await ctx.answerCbQuery('🔒 សម្រាប់អ្នកបង់ប្រចាំឆ្នាំ ឬបង់គ្រប់ ១ ឆ្នាំប៉ុណ្ណោះ!', { show_alert: true });
+    return sendAnnualExamsMenu(ctx);
   }
 
   const subj = SUBJECT_EXAMS[subjectKey];
