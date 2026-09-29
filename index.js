@@ -20,6 +20,12 @@ const {
   listUnusedKeys,
   formatCambodiaTime
 } = require('./license_manager.js');
+const {
+  fetchDashboardStats,
+  renderDashboardText,
+  getDashboardMarkup,
+  getGenKeyMarkup
+} = require('./admin_dashboard.js');
 
 
 // In-memory quiz state: { userId: { questions, currentQ, score, lessonId, answers } }
@@ -644,27 +650,71 @@ bot.command('listkeys', async (ctx) => {
   return ctx.reply(msg, { parse_mode: 'Markdown' });
 });
 
-// Admin Command: Admin Help
-bot.command(['adminhelp', 'admin'], async (ctx) => {
+// ==========================================
+// INTERACTIVE ADMIN DASHBOARD
+// ==========================================
+
+const broadcastCache = {};
+
+async function sendAdminDashboard(ctx, isEdit = false) {
+  const adminId = ctx.from.id.toString();
+  if (!SUPER_ADMIN_IDS.includes(adminId)) {
+    if (isEdit) return ctx.answerCbQuery("⛔ អ្នកគ្មានសិទ្ធិទេ។", { show_alert: true });
+    return ctx.reply("⛔ អ្នកគ្មានសិទ្ធិប្រើប្រាស់ផ្ទាំងបញ្ជានេះទេ។");
+  }
+
+  const stats = await fetchDashboardStats(db);
+  const text = renderDashboardText(stats, adminId);
+  const markup = getDashboardMarkup();
+
+  if (isEdit) {
+    try {
+      await ctx.editMessageText(text, {
+        parse_mode: 'Markdown',
+        reply_markup: markup.reply_markup
+      });
+      await ctx.answerCbQuery('🔄 Dashboard ត្រូវបាន Update!');
+    } catch (e) {
+      try { await ctx.answerCbQuery(); } catch(err){}
+    }
+  } else {
+    await ctx.reply(text, {
+      parse_mode: 'Markdown',
+      reply_markup: markup.reply_markup
+    });
+  }
+}
+
+// Admin Commands: Launch Dashboard
+bot.command(['admin', 'dashboard'], async (ctx) => {
+  await sendAdminDashboard(ctx, false);
+});
+
+// Admin Command: Text Help
+bot.command('adminhelp', async (ctx) => {
   const adminId = ctx.from.id.toString();
   if (!SUPER_ADMIN_IDS.includes(adminId)) return ctx.reply("⛔ អ្នកគ្មានសិទ្ធិប្រើប្រាស់ Command នេះទេ។");
 
   return ctx.reply(
     `🛠️ **ផ្ទាំងបញ្ជា ADMIN (StudyAI License & VIP System)**\n\n` +
-    `🔑 **គ្រប់គ្រង License Keys:**\n` +
+    `💡 *អ្នកអាចប្រើប្រាស់ Dashboard ដោយគ្រាន់តែចុច /admin*\n\n` +
+    `🔑 **ពាក្យបញ្ជាផ្ទាល់ (Text Commands):**\n` +
+    `• \`/admin\` ឬ \`/dashboard\` - បើកផ្ទាំង Dashboard ប៊ូតុង\n` +
     `• \`/genkey 1m [note]\` - បង្កើត Key 1 ខែ\n` +
     `• \`/genkey 3m\` - បង្កើត Key 3 ខែ\n` +
     `• \`/genkey 1y\` - បង្កើត Key 1 ឆ្នាំ\n` +
     `• \`/genkey 30d\` - បង្កើត Key 30 ថ្ងៃ\n` +
-    `• \`/listkeys\` - មើល Key ដែលមិនទាន់ប្រើ\n\n` +
-    `👤 **កំណត់ License ផ្ទាល់លើគណនីសិស្ស:**\n` +
+    `• \`/listkeys\` - មើល Key ដែលមិនទាន់ប្រើ\n` +
     `• \`/setlicense [ID] 1m\` - កំណត់ License ឱ្យសិស្សផ្ទាល់\n` +
     `• \`/checklicense [ID]\` - ពិនិត្យមើល License សិស្ស\n` +
     `• \`/revokelicense [ID]\` - ដកហូត/លុប License សិស្ស\n` +
-    `• \`/addvip [ID] [ខែ]\` - បន្ថែម VIP (ទម្រង់ដើម)\n\n` +
-    `📊 **ប្រព័ន្ធ:**\n` +
-    `• ស្ទាក់ចាប់ Screenshot វិក្កយបត្រស្វ័យប្រវត្តិក៏នៅតែដំណើរការធម្មតា`,
-    { parse_mode: 'Markdown' }
+    `• \`/addvip [ID] [ខែ]\` - បន្ថែម VIP (ទម្រង់ដើម)`,
+    {
+      parse_mode: 'Markdown',
+      reply_markup: Markup.inlineKeyboard([
+        [Markup.button.callback('👑 បើក Admin Dashboard', 'adm_back_dash')]
+      ]).reply_markup
+    }
   );
 });
 
@@ -691,6 +741,234 @@ bot.command('addvip', async (ctx) => {
   } catch (e) {
     console.log("Could not notify user:", e.message);
   }
+});
+
+// Dashboard Action: Refresh / Back to Dashboard
+bot.action(['adm_refresh', 'adm_back_dash'], async (ctx) => {
+  await sendAdminDashboard(ctx, true);
+});
+
+// Dashboard Action: Open GenKey Menu
+bot.action('adm_menu_genkey', async (ctx) => {
+  const adminId = ctx.from.id.toString();
+  if (!SUPER_ADMIN_IDS.includes(adminId)) return ctx.answerCbQuery("⛔ អ្នកគ្មានសិទ្ធិទេ។", { show_alert: true });
+
+  await ctx.answerCbQuery();
+  await ctx.editMessageText(
+    `🎟️ **ជ្រើសរើសរយៈពេល License Key ដែលចង់បង្កើត ៖**\n\n` +
+    `ចុចលើប៊ូតុងខាងក្រោមដើម្បីបង្កើត Key ភ្លាមៗ (1-Click)៖`,
+    {
+      parse_mode: 'Markdown',
+      reply_markup: getGenKeyMarkup().reply_markup
+    }
+  );
+});
+
+// Dashboard Action: 1-Click Generate Keys
+const handleQuickGenKey = async (ctx, durationStr) => {
+  const adminId = ctx.from.id.toString();
+  if (!SUPER_ADMIN_IDS.includes(adminId)) return ctx.answerCbQuery("⛔ អ្នកគ្មានសិទ្ធិទេ។", { show_alert: true });
+
+  await ctx.answerCbQuery("⚡ កំពុងបង្កើត Key...");
+  const res = await createLicenseKey(db, adminId, durationStr, 'Dashboard 1-Click');
+  if (!res.success) return ctx.reply(res.message);
+
+  const text = (
+    `🎟️ **បង្កើត LICENSE KEY ជោគជ័យ!**\n\n` +
+    `🔑 Key: \`${res.key}\` *(ចុចដើម្បី Copy)*\n` +
+    `⏱️ រយៈពេល: **${res.label}** (${res.days} ថ្ងៃ)\n\n` +
+    `📋 **សារសម្រាប់ Forward ទៅសិស្ស (Copy ផ្ញើបាន):**\n` +
+    `--------------------------\n` +
+    `🎉 នេះជា License Key គណនី VIP របស់អ្នក:\n` +
+    `\`${res.key}\`\n\n` +
+    `សូមចូលទៅកាន់ Bot រួចវាយ:\n` +
+    `\`/redeem ${res.key}\`\n` +
+    `ឬចុចលើប៊ូតុង "🔑 បញ្ចូល License Key" ដើម្បីដំណើរការ VIP!\n` +
+    `--------------------------`
+  );
+
+  const markup = Markup.inlineKeyboard([
+    [Markup.button.callback(`➕ បង្កើត ${res.label} មួយទៀត`, `adm_gen_${durationStr}`)],
+    [Markup.button.callback('🎟️ បង្កើតរយៈពេលផ្សេង', 'adm_menu_genkey')],
+    [Markup.button.callback('🔙 ត្រឡប់ទៅ Dashboard', 'adm_back_dash')]
+  ]);
+
+  try {
+    await ctx.editMessageText(text, { parse_mode: 'Markdown', reply_markup: markup.reply_markup });
+  } catch (e) {
+    await ctx.reply(text, { parse_mode: 'Markdown', reply_markup: markup.reply_markup });
+  }
+};
+
+bot.action('adm_gen_1m', (ctx) => handleQuickGenKey(ctx, '1m'));
+bot.action('adm_gen_3m', (ctx) => handleQuickGenKey(ctx, '3m'));
+bot.action('adm_gen_6m', (ctx) => handleQuickGenKey(ctx, '6m'));
+bot.action('adm_gen_1y', (ctx) => handleQuickGenKey(ctx, '1y'));
+bot.action('adm_gen_30d', (ctx) => handleQuickGenKey(ctx, '30d'));
+
+// Dashboard Action: List Keys
+bot.action('adm_list_keys', async (ctx) => {
+  const adminId = ctx.from.id.toString();
+  if (!SUPER_ADMIN_IDS.includes(adminId)) return ctx.answerCbQuery("⛔ អ្នកគ្មានសិទ្ធិទេ។", { show_alert: true });
+
+  await ctx.answerCbQuery();
+  const keys = await listUnusedKeys(db, 15);
+  let msg = '';
+  if (keys.length === 0) {
+    msg = "📭 មិនមាន License Key ដែលទំនេរ (មិនទាន់ប្រើ) ទេ។";
+  } else {
+    msg = `🔑 **បញ្ជី License Keys ដែលនៅទំនេរ (${keys.length}):**\n\n`;
+    keys.forEach((k, i) => {
+      const created = formatCambodiaTime(k.createdAt);
+      msg += `${i + 1}. \`${k.key}\`\n   ⏱️ ${k.label} | ${created}${k.note ? ` | (${k.note})` : ''}\n\n`;
+    });
+  }
+
+  const markup = Markup.inlineKeyboard([
+    [Markup.button.callback('🎟️ បង្កើត Key ថ្មី', 'adm_menu_genkey')],
+    [Markup.button.callback('🔙 ត្រឡប់ទៅ Dashboard', 'adm_back_dash')]
+  ]);
+
+  await ctx.editMessageText(msg, { parse_mode: 'Markdown', reply_markup: markup.reply_markup });
+});
+
+// Dashboard Action: Check User
+bot.action('adm_check_user', async (ctx) => {
+  const adminId = ctx.from.id.toString();
+  if (!SUPER_ADMIN_IDS.includes(adminId)) return ctx.answerCbQuery("⛔ អ្នកគ្មានសិទ្ធិទេ។", { show_alert: true });
+
+  await setUserState(adminId, 'adm_awaiting_check_id');
+  await ctx.answerCbQuery();
+  await ctx.reply(
+    `🔍 **សូមផ្ញើ Telegram User ID របស់សិស្សដែលចង់ពិនិត្យមើល៖**\n\n` +
+    `*(ឬវាយ \`/cancel\` ដើម្បីបោះបង់)*`,
+    { parse_mode: 'Markdown' }
+  );
+});
+
+// Dashboard Action: Set VIP
+bot.action('adm_set_vip', async (ctx) => {
+  const adminId = ctx.from.id.toString();
+  if (!SUPER_ADMIN_IDS.includes(adminId)) return ctx.answerCbQuery("⛔ អ្នកគ្មានសិទ្ធិទេ។", { show_alert: true });
+
+  await setUserState(adminId, 'adm_awaiting_set_vip');
+  await ctx.answerCbQuery();
+  await ctx.reply(
+    `➕ **កំណត់ VIP ផ្ទាល់ឱ្យសិស្ស**\n\n` +
+    `សូមផ្ញើសារទម្រង់៖ \`[UserID] [រយៈពេល]\`\n` +
+    `ឧទាហរណ៍៖ \`123456789 1m\` ឬ \`123456789 3m\`\n\n` +
+    `*(ឬវាយ \`/cancel\` ដើម្បីបោះបង់)*`,
+    { parse_mode: 'Markdown' }
+  );
+});
+
+// Dashboard Action: Revoke VIP
+bot.action('adm_revoke_vip', async (ctx) => {
+  const adminId = ctx.from.id.toString();
+  if (!SUPER_ADMIN_IDS.includes(adminId)) return ctx.answerCbQuery("⛔ អ្នកគ្មានសិទ្ធិទេ។", { show_alert: true });
+
+  await setUserState(adminId, 'adm_awaiting_revoke_id');
+  await ctx.answerCbQuery();
+  await ctx.reply(
+    `⛔ **ដកហូត VIP របស់សិស្ស**\n\n` +
+    `សូមផ្ញើ Telegram User ID របស់សិស្សដែលត្រូវដកហូត ៖\n\n` +
+    `*(ឬវាយ \`/cancel\` ដើម្បីបោះបង់)*`,
+    { parse_mode: 'Markdown' }
+  );
+});
+
+// Dashboard Action: Broadcast Announcement
+bot.action('adm_broadcast', async (ctx) => {
+  const adminId = ctx.from.id.toString();
+  if (!SUPER_ADMIN_IDS.includes(adminId)) return ctx.answerCbQuery("⛔ អ្នកគ្មានសិទ្ធិទេ។", { show_alert: true });
+
+  await setUserState(adminId, 'adm_awaiting_broadcast_msg');
+  await ctx.answerCbQuery();
+  await ctx.reply(
+    `📢 **ផ្ញើសារប្រកាស (Broadcast) ទៅកាន់សិស្សទាំងអស់**\n\n` +
+    `សូមផ្ញើសារដែលអ្នកចង់ប្រកាសមកទីនេះ (ប្រព័ន្ធនឹងបង្ហាញ Preview និងសួរការបញ្ជាក់មុននឹងផ្ញើចេញ) ៖\n\n` +
+    `*(ឬវាយ \`/cancel\` ដើម្បីបោះបង់)*`,
+    { parse_mode: 'Markdown' }
+  );
+});
+
+// Dashboard Action: Confirm Broadcast
+bot.action('adm_confirm_broadcast', async (ctx) => {
+  const adminId = ctx.from.id.toString();
+  if (!SUPER_ADMIN_IDS.includes(adminId)) return ctx.answerCbQuery("⛔ អ្នកគ្មានសិទ្ធិទេ។", { show_alert: true });
+
+  const cached = broadcastCache[adminId];
+  if (!cached || !cached.text) {
+    return ctx.reply("❌ មិនមានសារដែលត្រូវប្រកាសទេ។ សូមសាកល្បងម្ដងទៀត។");
+  }
+
+  await ctx.answerCbQuery("🚀 កំពុងចាប់ផ្តើមផ្ញើសារប្រកាស...");
+  await ctx.editMessageText("⏳ **កំពុងដំណើរការផ្ញើសារទៅកាន់សិស្សទាំងអស់ សូមរង់ចាំបន្តិច...**", { parse_mode: 'Markdown' });
+
+  const usersSnap = await db.ref('users').once('value');
+  const usersVal = usersSnap.val() || {};
+  const userIds = Object.keys(usersVal);
+
+  let successCount = 0;
+  let failCount = 0;
+
+  for (const uid of userIds) {
+    try {
+      await bot.telegram.sendMessage(uid, cached.text, { parse_mode: 'Markdown' });
+      successCount++;
+    } catch (e) {
+      failCount++;
+    }
+    await new Promise(r => setTimeout(r, 40)); // safe delay
+  }
+
+  delete broadcastCache[adminId];
+  await ctx.reply(
+    `📢 **ការប្រកាស (Broadcast) បានបញ្ចប់!**\n\n` +
+    `✅ ផ្ញើបានជោគជ័យ: **${successCount} នាក់**\n` +
+    `❌ បរាជ័យ (Block/Inactive): **${failCount} នាក់**\n` +
+    `👥 សិស្សសរុប: **${userIds.length} នាក់**`,
+    {
+      parse_mode: 'Markdown',
+      reply_markup: Markup.inlineKeyboard([
+        [Markup.button.callback('🔙 ត្រឡប់ទៅ Dashboard', 'adm_back_dash')]
+      ]).reply_markup
+    }
+  );
+});
+
+// Dashboard Action: Cancel Broadcast
+bot.action('adm_cancel_broadcast', async (ctx) => {
+  const adminId = ctx.from.id.toString();
+  delete broadcastCache[adminId];
+  await ctx.answerCbQuery("❌ បានបោះបង់");
+  await sendAdminDashboard(ctx, true);
+});
+
+// Dashboard Action: Help
+bot.action('adm_help', async (ctx) => {
+  const adminId = ctx.from.id.toString();
+  if (!SUPER_ADMIN_IDS.includes(adminId)) return ctx.answerCbQuery("⛔ អ្នកគ្មានសិទ្ធិទេ។", { show_alert: true });
+
+  await ctx.answerCbQuery();
+  const helpText = (
+    `📖 **សៀវភៅពាក្យបញ្ជា ADMIN (StudyAI Bot)**\n\n` +
+    `• \`/admin\` - បើកផ្ទាំង Dashboard ប៊ូតុងបញ្ជារហ័ស\n` +
+    `• \`/genkey [1m/3m/1y] [note]\` - បង្កើត License Key\n` +
+    `• \`/listkeys\` - មើលបញ្ជី Key ទំនេរ\n` +
+    `• \`/setlicense [ID] [1m/3m]\` - ដាក់ VIP ឱ្យសិស្សផ្ទាល់\n` +
+    `• \`/checklicense [ID]\` - មើលថ្ងៃផុតកំណត់របស់សិស្ស\n` +
+    `• \`/revokelicense [ID]\` - ដកហូត VIP សិស្ស\n` +
+    `• \`/addvip [ID] [ចំនួនខែ]\` - បន្ថែម VIP\n` +
+    `• \`/cancel\` - បោះបង់ប្រតិបត្តិការដែលកំពុងរង់ចាំ`
+  );
+
+  await ctx.editMessageText(helpText, {
+    parse_mode: 'Markdown',
+    reply_markup: Markup.inlineKeyboard([
+      [Markup.button.callback('🔙 ត្រឡប់ទៅ Dashboard', 'adm_back_dash')]
+    ]).reply_markup
+  });
 });
 
 bot.hears('🕰️ ប្រវត្តិសិក្សា', async (ctx) => {
@@ -1304,6 +1582,113 @@ bot.on('text', async (ctx) => {
       );
     } else {
       return ctx.reply(res.message);
+    }
+  }
+
+  // 👑 Intercept Admin Dashboard Interactive States
+  if (SUPER_ADMIN_IDS.includes(userId)) {
+    if (userText === '/cancel') {
+      await setUserState(userId, 'none');
+      delete broadcastCache[userId];
+      return ctx.reply("❌ បានបោះបង់ប្រតិបត្តិការ។", {
+        reply_markup: Markup.inlineKeyboard([
+          [Markup.button.callback('👑 ត្រឡប់ទៅ Dashboard', 'adm_back_dash')]
+        ]).reply_markup
+      });
+    }
+
+    if (userState === 'adm_awaiting_check_id') {
+      await setUserState(userId, 'none');
+      const targetId = userText.trim();
+      const info = await getUserLicenseInfo(db, targetId, SUPER_ADMIN_IDS);
+      let msg = `🔍 **ព័ត៌មាន License របស់សិស្ស៖**\n\n` +
+        `👤 User ID: \`${targetId}\`\n` +
+        `📊 ស្ថានភាព: **${info.statusKhmer}**\n` +
+        `⌛ ថ្ងៃផុតកំណត់: **${info.expireDateFormatted}**\n`;
+      if (info.isVIP && !info.isAdmin) {
+        msg += `⏳ នៅសល់: **${info.daysRemaining} ថ្ងៃ ${info.hoursRemaining} ម៉ោង**\n`;
+      }
+      return ctx.reply(msg, {
+        parse_mode: 'Markdown',
+        reply_markup: Markup.inlineKeyboard([
+          [Markup.button.callback('➕ ដាក់ VIP ឱ្យសិស្សនេះ', 'adm_set_vip')],
+          [Markup.button.callback('🔙 ត្រឡប់ទៅ Dashboard', 'adm_back_dash')]
+        ]).reply_markup
+      });
+    }
+
+    if (userState === 'adm_awaiting_set_vip') {
+      await setUserState(userId, 'none');
+      const parts = userText.trim().split(/\s+/);
+      if (parts.length < 2) {
+        return ctx.reply("❌ ទម្រង់មិនត្រឹមត្រូវ! សូមវាយ [UserID] [រយៈពេល] ឧទាហរណ៍៖ `123456789 1m`", { parse_mode: 'Markdown' });
+      }
+      const targetId = parts[0];
+      const duration = parts[1];
+      const res = await setDirectLicense(db, userId, targetId, duration);
+      if (!res.success) return ctx.reply(res.message);
+
+      try {
+        await bot.telegram.sendMessage(
+          targetId,
+          `🎉 **អបអរសាទរ! Admin បានកំណត់ License VIP ជូនអ្នក!**\n\n` +
+          `⏱️ រយៈពេលបន្ថែម៖ **${res.label}**\n` +
+          `⌛ សុពលភាពរហូតដល់៖ **${res.expireDateFormatted}**\n\n` +
+          `✨ ឥឡូវអ្នកអាចប្រើប្រាស់មុខងារទាំងអស់បានពេញលេញ!`,
+          { parse_mode: 'Markdown' }
+        );
+      } catch (e) {}
+
+      return ctx.reply(
+        `✅ **កំណត់ License ជោគជ័យ!**\n\n` +
+        `👤 សិស្ស ID: \`${res.targetUserId}\`\n` +
+        `⏱️ បន្ថែម: **${res.label}** (${res.days} ថ្ងៃ)\n` +
+        `⌛ ផុតកំណត់: **${res.expireDateFormatted}**`,
+        {
+          parse_mode: 'Markdown',
+          reply_markup: Markup.inlineKeyboard([
+            [Markup.button.callback('🔙 ត្រឡប់ទៅ Dashboard', 'adm_back_dash')]
+          ]).reply_markup
+        }
+      );
+    }
+
+    if (userState === 'adm_awaiting_revoke_id') {
+      await setUserState(userId, 'none');
+      const targetId = userText.trim();
+      await revokeUserLicense(db, userId, targetId);
+      try {
+        await bot.telegram.sendMessage(
+          targetId,
+          `⚠️ គណនី VIP របស់អ្នកត្រូវបានដកហូត (Revoked) ដោយ Admin។`,
+          { parse_mode: 'Markdown' }
+        );
+      } catch (e) {}
+      return ctx.reply(`✅ បានដកហូត License របស់ ID: \`${targetId}\` រួចរាល់។`, {
+        parse_mode: 'Markdown',
+        reply_markup: Markup.inlineKeyboard([
+          [Markup.button.callback('🔙 ត្រឡប់ទៅ Dashboard', 'adm_back_dash')]
+        ]).reply_markup
+      });
+    }
+
+    if (userState === 'adm_awaiting_broadcast_msg') {
+      await setUserState(userId, 'none');
+      broadcastCache[userId] = { text: userText, timestamp: Date.now() };
+      return ctx.reply(
+        `📢 **ទិដ្ឋភាពសារប្រកាស (Preview):**\n` +
+        `---------------------------\n` +
+        `${userText}\n` +
+        `---------------------------\n\n` +
+        `⚠️ *តើអ្នកពិតជាចង់ផ្ញើសារនេះទៅកាន់សិស្សទាំងអស់មែនទេ?*`,
+        {
+          parse_mode: 'Markdown',
+          reply_markup: Markup.inlineKeyboard([
+            [Markup.button.callback('✅ បញ្ជាក់ការផ្ញើ (Send Now)', 'adm_confirm_broadcast')],
+            [Markup.button.callback('❌ បោះបង់ (Cancel)', 'adm_cancel_broadcast')]
+          ]).reply_markup
+        }
+      );
     }
   }
 
