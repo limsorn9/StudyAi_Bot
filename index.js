@@ -2,6 +2,7 @@ require('dotenv').config();
 const { Telegraf, Markup } = require('telegraf');
 const { initializeApp, cert, applicationDefault } = require('firebase-admin/app');
 const { getDatabase } = require('firebase-admin/database');
+const { getAuth } = require('firebase-admin/auth');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const Groq = require('groq-sdk');
 const OpenAI = require('openai');
@@ -73,7 +74,22 @@ try {
 } catch (e) {
   console.error("❌ ERROR: Firebase Init Failed:", e.message);
 }
-const db = getDatabase(appInstance);
+let db = null;
+try {
+  if (appInstance && dbUrl) {
+    db = getDatabase(appInstance);
+  }
+} catch (e) {
+  console.warn("⚠️ Firebase Database init note:", e.message);
+}
+let auth = null;
+try {
+  if (appInstance) {
+    auth = getAuth(appInstance);
+  }
+} catch (e) {
+  console.warn("⚠️ Firebase Auth init note:", e.message);
+}
 
 // Initialize APIs
 let bot, openai;
@@ -3340,6 +3356,7 @@ app.use(express.urlencoded({ extended: true }));
 // Mount Web API Router
 const webApiRouter = createWebAPIRouter({
   db,
+  auth,
   curriculum,
   bot,
   SUPER_ADMIN_IDS,

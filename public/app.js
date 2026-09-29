@@ -1099,17 +1099,52 @@ function openSyncModal() {
 
 function openProfileModal() {
   if (!STATE.currentUser) return openLoginModal();
-  const name = STATE.currentUser.name || STATE.currentUser.username;
-  const isTg = STATE.currentUser.isTelegram ? '✅ បានភ្ជាប់ Telegram' : '❌ មិនទាន់ភ្ជាប់ Telegram';
-  const gmail = STATE.currentUser.gmail || 'មិនមាន';
+  const u = STATE.currentUser;
+  const name = u.name || u.username || 'Student';
+  const uname = u.username ? `@${u.username}` : (u.isTelegram ? `ID: ${u.id}` : '');
+  const gmail = u.gmail || 'មិនមាន';
+  const isVerified = !!u.gmailVerified;
+  const isTg = u.isTelegram ? '✅ បានភ្ជាប់ Telegram' : '❌ មិនទាន់ភ្ជាប់ Telegram';
+  const isVip = u.isVIP ? `💎 VIP (${u.vipDetails?.daysRemaining || 30} ថ្ងៃ)` : 'Free Account';
 
-  if (confirm(`👤 គណនី៖ ${name}\n📧 Gmail: ${gmail}\n📱 ស្ថានភាព Telegram: ${isTg}\n\nតើអ្នកចង់ចាកចេញពីគណនី (Logout) មែនទេ?`)) {
-    localStorage.removeItem('studyai_user_session');
-    STATE.currentUser = null;
-    updateUserInterface();
-    showToast('បានចាកចេញពីគណនីជោគជ័យ', 'info');
-    navigateTo('dashboard');
+  const avatar = document.getElementById('profAvatarText');
+  const nameTxt = document.getElementById('profNameText');
+  const unameTxt = document.getElementById('profUsernameText');
+  const gmailTxt = document.getElementById('profGmailText');
+  const tgTxt = document.getElementById('profTelegramStatus');
+  const vipTxt = document.getElementById('profVipStatus');
+  const fBadge = document.getElementById('profFirebaseStatusBadge');
+  const vBtn = document.getElementById('profVerifyEmailBtn');
+
+  if (avatar) avatar.textContent = name.charAt(0).toUpperCase();
+  if (nameTxt) nameTxt.textContent = name;
+  if (unameTxt) unameTxt.textContent = uname;
+  if (gmailTxt) gmailTxt.textContent = gmail;
+  if (tgTxt) tgTxt.textContent = isTg;
+  if (vipTxt) vipTxt.textContent = isVip;
+
+  if (fBadge) {
+    if (isVerified) {
+      fBadge.textContent = '✅ Verified (Firebase)';
+      fBadge.className = 'badge-status verified';
+      if (vBtn) vBtn.classList.add('hidden');
+    } else {
+      fBadge.textContent = '⚠️ មិនទាន់ផ្ទៀងផ្ទាត់ (Not Verified)';
+      fBadge.className = 'badge-status unverified';
+      if (vBtn && u.gmail) vBtn.classList.remove('hidden');
+    }
   }
+
+  openModal('profileModal');
+}
+
+function handleLogout() {
+  closeModal('profileModal');
+  localStorage.removeItem('studyai_user_session');
+  STATE.currentUser = null;
+  updateUserInterface();
+  showToast('បានចាកចេញពីគណនីជោគជ័យ', 'info');
+  navigateTo('dashboard');
 }
 
 function switchLoginTab(tab) {
@@ -1194,7 +1229,7 @@ async function handleRegister(e) {
   }
 
   try {
-    showToast('⏳ កំពុងចុះឈ្មោះ...', 'info');
+    showToast('⏳ កំពុងចុះឈ្មោះ និងភ្ជាប់ Firebase Auth...', 'info');
     const res = await fetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1206,8 +1241,140 @@ async function handleRegister(e) {
 
     setCurrentUser(data.user);
     closeModal('registerModal');
-    showToast(`🎉 ចុះឈ្មោះ និងភ្ជាប់គណនី Gmail ជោគជ័យ!`, 'success');
+    showToast(`🎉 ចុះឈ្មោះគណនី Gmail ជោគជ័យ! សូមផ្ទៀងផ្ទាត់លេខកូដ Firebase។`, 'success');
     refreshUserProfile();
+
+    // Trigger Firebase Email Verification Modal
+    openVerifyEmailModal(data.user.gmail, data.verificationCode, data.verificationLink);
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+function openVerifyEmailModal(gmail, verificationCode, verificationLink) {
+  STATE.pendingVerifyEmail = gmail;
+  STATE.pendingVerifyCode = verificationCode;
+  STATE.pendingVerifyLink = verificationLink;
+
+  const emailDisp = document.getElementById('verifyEmailDisplay');
+  if (emailDisp) emailDisp.textContent = gmail;
+
+  const codeInput = document.getElementById('verifyOtpCodeInput');
+  if (codeInput) {
+    codeInput.value = '';
+    setTimeout(() => codeInput.focus(), 300);
+  }
+
+  const hintBox = document.getElementById('verifyCodeDemoHint');
+  const codeVal = document.getElementById('verifyCodeDemoVal');
+  if (hintBox && codeVal) {
+    if (verificationCode) {
+      hintBox.classList.remove('hidden');
+      codeVal.textContent = verificationCode;
+    } else {
+      hintBox.classList.add('hidden');
+    }
+  }
+
+  const linkWrap = document.getElementById('verifyFirebaseLinkWrapper');
+  const linkBtn = document.getElementById('verifyFirebaseLinkBtn');
+  if (linkWrap && linkBtn) {
+    if (verificationLink) {
+      linkWrap.classList.remove('hidden');
+      linkBtn.href = verificationLink;
+    } else {
+      linkWrap.classList.add('hidden');
+    }
+  }
+
+  openModal('verifyEmailModal');
+}
+
+function openVerifyEmailModalForCurrent() {
+  if (!STATE.currentUser || !STATE.currentUser.gmail) return;
+  closeModal('profileModal');
+  fetch('/api/auth/resend-email-code', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ gmail: STATE.currentUser.gmail })
+  })
+    .then(res => res.json())
+    .then(data => {
+      openVerifyEmailModal(STATE.currentUser.gmail, data.verificationCode, data.verificationLink);
+    })
+    .catch(() => {
+      openVerifyEmailModal(STATE.currentUser.gmail, null, null);
+    });
+}
+
+function autoFillVerifyCode() {
+  if (STATE.pendingVerifyCode) {
+    const input = document.getElementById('verifyOtpCodeInput');
+    if (input) input.value = STATE.pendingVerifyCode;
+  }
+}
+
+async function handleVerifyEmailCode(e) {
+  if (e) e.preventDefault();
+  const gmail = STATE.pendingVerifyEmail || STATE.currentUser?.gmail;
+  const code = (document.getElementById('verifyOtpCodeInput')?.value || '').trim();
+
+  if (!gmail) {
+    return showToast('❌ មិនមានព័ត៌មាន Email ផ្ទៀងផ្ទាត់ទេ!', 'error');
+  }
+  if (!code || code.length !== 6) {
+    return showToast('❌ សូមបញ្ចូលលេខកូដសម្ងាត់ ៦ ខ្ទង់!', 'error');
+  }
+
+  try {
+    showToast('⏳ កំពុងផ្ទៀងផ្ទាត់ជាមួយ Firebase...', 'info');
+    const res = await fetch('/api/auth/verify-email-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ gmail, code })
+    });
+    const data = await res.json();
+
+    if (!data.success) throw new Error(data.error);
+
+    if (STATE.currentUser) {
+      STATE.currentUser.gmailVerified = true;
+      try {
+        localStorage.setItem('studyai_user_session', JSON.stringify(STATE.currentUser));
+      } catch (err) {}
+    }
+
+    closeModal('verifyEmailModal');
+    showToast('🎉 ' + data.message, 'success');
+    updateUserInterface();
+    refreshUserProfile();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+async function handleResendVerifyCode() {
+  const gmail = STATE.pendingVerifyEmail || STATE.currentUser?.gmail;
+  if (!gmail) return showToast('មិនមាន Gmail សម្រាប់ផ្ញើឡើងវិញទេ!', 'error');
+
+  try {
+    showToast('⏳ កំពុងបង្កើតលេខកូដថ្មី...', 'info');
+    const res = await fetch('/api/auth/resend-email-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ gmail })
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error);
+
+    showToast('✅ លេខកូដផ្ទៀងផ្ទាត់ថ្មីត្រូវបានបង្កើត!', 'success');
+    if (data.verificationCode) {
+      const hint = document.getElementById('verifyCodeDemoHint');
+      if (hint) hint.classList.remove('hidden');
+      const val = document.getElementById('verifyCodeDemoVal');
+      if (val) val.textContent = data.verificationCode;
+      STATE.pendingVerifyCode = data.verificationCode;
+    }
   } catch (err) {
     showToast(err.message, 'error');
   }

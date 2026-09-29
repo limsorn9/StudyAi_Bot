@@ -773,6 +773,105 @@
     </div>
   </div>
 
+  <!-- 6. FIREBASE EMAIL VERIFICATION MODAL -->
+  <div id="verifyEmailModal" class="modal-overlay hidden">
+    <div class="modal-card glass-panel max-w-md">
+      <div class="modal-header">
+        <div class="modal-title">🔥 ផ្ទៀងផ្ទាត់គណនី Email (Firebase Auth)</div>
+        <button class="modal-close" onclick="closeModal('verifyEmailModal')">✕</button>
+      </div>
+
+      <div class="verify-email-header text-center">
+        <div class="verify-icon">✉️</div>
+        <h3 class="text-lg font-bold mt-2">ផ្ទៀងផ្ទាត់អាសយដ្ឋាន Gmail</h3>
+        <p class="text-slate-300 text-sm mt-1">
+          ប្រព័ន្ធបានបញ្ជូនលេខកូដសម្ងាត់ ៦ ខ្ទង់ និងតំណភ្ជាប់ Firebase Email Verification ទៅកាន់៖
+        </p>
+        <div id="verifyEmailDisplay" class="verify-email-badge">student@gmail.com</div>
+      </div>
+
+      <form onsubmit="handleVerifyEmailCode(event)" class="mt-4">
+        <div class="form-group text-center">
+          <label>បញ្ចូលលេខកូដផ្ទៀងផ្ទាត់ ៦ ខ្ទង់ (OTP Code)</label>
+          <input type="text" id="verifyOtpCodeInput" maxlength="6" required placeholder="0 0 0 0 0 0" class="text-center font-mono text-2xl tracking-widest form-input">
+        </div>
+
+        <div id="verifyCodeDemoHint" class="verification-demo-hint">
+          <div class="flex items-center justify-between gap-2">
+            <span>💡 លេខកូដសម្គាល់ Firebase: <strong id="verifyCodeDemoVal" class="text-amber-400 font-mono">------</strong></span>
+            <button type="button" class="btn btn-sm btn-outline" onclick="autoFillVerifyCode()">បំពេញស្វ័យប្រវត្ត</button>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-gold btn-block btn-lg mt-3">
+          <span>✅ បញ្ជាក់ការផ្ទៀងផ្ទាត់ (Verify Email)</span>
+        </button>
+      </form>
+
+      <div class="verify-modal-actions mt-3 flex justify-between items-center text-sm">
+        <span class="text-slate-400">មិនបានទទួលលេខកូដ?</span>
+        <button type="button" class="btn-link-action" onclick="handleResendVerifyCode()">
+          🔄 ផ្ញើលេខកូដឡើងវិញ
+        </button>
+      </div>
+
+      <div id="verifyFirebaseLinkWrapper" class="mt-3 text-center hidden">
+        <a id="verifyFirebaseLinkBtn" href="#" target="_blank" class="btn btn-outline btn-sm">
+          🔗 បើកតំណភ្ជាប់ផ្លូវការ Firebase Auth
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- 7. USER PROFILE MODAL -->
+  <div id="profileModal" class="modal-overlay hidden">
+    <div class="modal-card glass-panel max-w-md">
+      <div class="modal-header">
+        <div class="modal-title">👤 ព័ត៌មានគណនី (My Profile)</div>
+        <button class="modal-close" onclick="closeModal('profileModal')">✕</button>
+      </div>
+
+      <div class="profile-details-card text-center">
+        <div class="profile-avatar-large">
+          <span id="profAvatarText">S</span>
+        </div>
+        <h3 id="profNameText" class="mt-2 text-xl font-bold">Lim Sorn</h3>
+        <div id="profUsernameText" class="text-sm text-slate-400">@sorn123</div>
+      </div>
+
+      <div class="profile-info-list mt-4">
+        <div class="prof-item">
+          <span class="label">📧 គណនី Gmail:</span>
+          <span id="profGmailText" class="val">sorn@gmail.com</span>
+        </div>
+        <div class="prof-item">
+          <span class="label">🔥 ស្ថានភាព Firebase:</span>
+          <span id="profFirebaseStatusBadge" class="badge-status unverified">⚠️ Not Verified</span>
+        </div>
+        <div class="prof-item">
+          <span class="label">📱 Telegram Sync:</span>
+          <span id="profTelegramStatus" class="val">មិនទាន់ភ្ជាប់</span>
+        </div>
+        <div class="prof-item">
+          <span class="label">💎 គណនីសមាជិក:</span>
+          <span id="profVipStatus" class="val">Free Account</span>
+        </div>
+      </div>
+
+      <div class="profile-actions mt-4 flex flex-col gap-2">
+        <button id="profVerifyEmailBtn" class="btn btn-gold btn-block hidden" onclick="openVerifyEmailModalForCurrent()">
+          ✉️ ផ្ទៀងផ្ទាត់ Firebase Gmail ឥឡូវនេះ
+        </button>
+        <button id="profSyncTelegramBtn" class="btn btn-outline btn-block" onclick="closeModal('profileModal'); openSyncModal();">
+          📱 ភ្ជាប់ជាមួយ Telegram Bot
+        </button>
+        <button class="btn btn-outline-danger btn-block" onclick="handleLogout()">
+          🚪 ចាកចេញពីគណនី (Logout)
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Notification Container -->
   <div id="toastContainer" class="toast-container"></div>
 

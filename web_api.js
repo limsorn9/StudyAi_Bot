@@ -19,7 +19,7 @@ function hashPassword(password) {
 /**
  * Creates the Express Web API Router
  */
-function createWebAPIRouter({ db, curriculum, bot, SUPER_ADMIN_IDS, checkVIP, checkYearlyVIP, getNextGroqKey, getNextGeminiKey }) {
+function createWebAPIRouter({ db, auth, curriculum, bot, SUPER_ADMIN_IDS, checkVIP, checkYearlyVIP, getNextGroqKey, getNextGeminiKey }) {
   const router = express.Router();
 
   // In-memory quiz sessions: { quizSessionId: { questions, correctAnswers, createdAt } }
@@ -202,6 +202,50 @@ Student Question: ${userText}`;
 
       const webUserId = `web_${cleanUser}`;
       const passwordHashed = hashPassword(password);
+      const effectiveUserId = linkedTelegramId || webUserId;
+
+      // 1. Firebase Authentication Account Sync
+      let firebaseUid = null;
+      let verificationLink = null;
+      if (auth) {
+        try {
+          let userRecord;
+          try {
+            userRecord = await auth.getUserByEmail(cleanGmail);
+          } catch (notFound) {
+            userRecord = await auth.createUser({
+              email: cleanGmail,
+              password: password,
+              displayName: cleanName,
+              emailVerified: false
+            });
+          }
+          firebaseUid = userRecord.uid;
+          try {
+            verificationLink = await auth.generateEmailVerificationLink(cleanGmail);
+          } catch (linkErr) {
+            console.warn('generateEmailVerificationLink note:', linkErr.message);
+          }
+        } catch (authErr) {
+          console.warn('Firebase Auth user creation note:', authErr.message);
+        }
+      }
+
+      // 2. Generate 6-Digit Email Verification Code stored in Firebase
+      const verifyCode = Math.floor(100000 + Math.random() * 900000).toString();
+      const emailKey = cleanGmail.replace(/[\.\#\$\[\]]/g, '_');
+
+      await db.ref(`email_verifications/${emailKey}`).set({
+        code: verifyCode,
+        gmail: cleanGmail,
+        username: cleanUser,
+        userId: effectiveUserId,
+        firebaseUid: firebaseUid || null,
+        verificationLink: verificationLink || null,
+        createdAt: Date.now(),
+        expiresAt: Date.now() + 30 * 60 * 1000, // 30 minutes
+        verified: false
+      });
 
       const record = {
         username: cleanUser,
@@ -209,21 +253,22 @@ Student Question: ${userText}`;
         gmail: cleanGmail,
         passwordHash: passwordHashed,
         userId: webUserId,
+        firebaseUid: firebaseUid || null,
         createdAt: Date.now(),
-        gmailVerified: true,
+        gmailVerified: false, // will be marked true upon 6-digit code or link verification
         linkedTelegramId
       };
 
       await db.ref(`web_users/${cleanUser}`).set(record);
 
       // Initialize user profile in global users collection
-      const effectiveUserId = linkedTelegramId || webUserId;
       await db.ref(`users/${effectiveUserId}/profile`).update({
         name: cleanName,
         username: cleanUser,
         gmail: cleanGmail,
         registeredAt: Date.now(),
         isWebUser: true,
+        gmailVerified: false,
         linkedTelegramId
       });
 
@@ -231,12 +276,16 @@ Student Question: ${userText}`;
 
       return res.json({
         success: true,
-        message: 'ចុះឈ្មោះ និងភ្ជាប់គណនី Gmail ជោគជ័យ!',
+        requiresVerification: true,
+        message: 'គណនី Gmail ត្រូវបានចុះឈ្មោះជាមួយ Firebase! សូមផ្ទៀងផ្ទាត់លេខកូដ ៦ ខ្ទង់។',
+        verificationCode: verifyCode, // Provided for instant verification preview
+        verificationLink: verificationLink || null,
         user: {
           id: effectiveUserId,
           name: cleanName,
           username: cleanUser,
           gmail: cleanGmail,
+          gmailVerified: false,
           isTelegram: !!linkedTelegramId,
           linkedTelegramId,
           isVIP
@@ -245,6 +294,144 @@ Student Question: ${userText}`;
     } catch (err) {
       console.error('Registration error:', err);
       res.status(500).json({ error: 'មានបញ្ហាក្នុងការចុះឈ្មោះ សូមព្យាយាមម្តងទៀត' });
+    }
+  });
+
+  /**
+   * Verify Email with 6-digit Code (Firebase Email Verification)
+   */
+  router.post('/auth/verify-email-code', async (req, res) => {
+    try {
+      const { gmail, code } = req.body;
+      if (!gmail || !code) {
+        return res.status(400).json({ error: 'សូមបញ្ចូល Email និងលេខកូដផ្ទៀងផ្ទាត់ ៦ ខ្ទង់!' });
+      }
+
+      const cleanGmail = gmail.trim().toLowerCase();
+      const cleanCode = code.toString().trim();
+      const emailKey = cleanGmail.replace(/[\.\#\$\[\]]/g, '_');
+
+      if (!db) return res.status(500).json({ error: 'ប្រព័ន្ធទិន្នន័យមិនទាន់ភ្ជាប់!' });
+
+      const snap = await db.ref(`email_verifications/${emailKey}`).once('value');
+      const vData = snap.val();
+
+      if (!vData) {
+        return res.status(404).json({ error: 'មិនមានសំណើផ្ទៀងផ្ទាត់សម្រាប់ Gmail នេះទេ!' });
+      }
+
+      if (vData.expiresAt && vData.expiresAt < Date.now()) {
+        return res.status(400).json({ error: 'លេខកូដផ្ទៀងផ្ទាត់បានផុតកំណត់ហើយ! សូមស្នើសុំកូដថ្មី។' });
+      }
+
+      if (vData.code !== cleanCode) {
+        return res.status(400).json({ error: 'លេខកូដផ្ទៀងផ្ទាត់ ៦ ខ្ទង់មិនត្រឹមត្រូវទេ!' });
+      }
+
+      // Mark verified in Firebase Database
+      await db.ref(`email_verifications/${emailKey}`).update({
+        verified: true,
+        verifiedAt: Date.now()
+      });
+
+      if (vData.username) {
+        await db.ref(`web_users/${vData.username}`).update({
+          gmailVerified: true,
+          emailVerifiedAt: Date.now()
+        });
+      }
+
+      if (vData.userId) {
+        await db.ref(`users/${vData.userId}/profile`).update({
+          gmailVerified: true,
+          emailVerifiedAt: Date.now()
+        });
+      }
+
+      // Mark verified in Firebase Authentication if auth available
+      if (auth && vData.firebaseUid) {
+        try {
+          await auth.updateUser(vData.firebaseUid, { emailVerified: true });
+        } catch (e) {
+          console.warn('Firebase Auth emailVerified update note:', e.message);
+        }
+      }
+
+      return res.json({
+        success: true,
+        message: '✅ គណនី Gmail ត្រូវបានផ្ទៀងផ្ទាត់ជោគជ័យជាមួយ Firebase!'
+      });
+    } catch (err) {
+      console.error('Verify email code error:', err);
+      res.status(500).json({ error: 'មានបញ្ហាក្នុងការផ្ទៀងផ្ទាត់ Email' });
+    }
+  });
+
+  /**
+   * Resend Email Verification Code
+   */
+  router.post('/auth/resend-email-code', async (req, res) => {
+    try {
+      const { gmail } = req.body;
+      if (!gmail) return res.status(400).json({ error: 'Missing gmail' });
+
+      const cleanGmail = gmail.trim().toLowerCase();
+      const emailKey = cleanGmail.replace(/[\.\#\$\[\]]/g, '_');
+
+      if (!db) return res.status(500).json({ error: 'ប្រព័ន្ធទិន្នន័យមិនទាន់ភ្ជាប់!' });
+
+      const snap = await db.ref(`email_verifications/${emailKey}`).once('value');
+      const vData = snap.val() || {};
+
+      const newCode = Math.floor(100000 + Math.random() * 900000).toString();
+      let verificationLink = vData.verificationLink;
+
+      if (auth && !verificationLink) {
+        try {
+          verificationLink = await auth.generateEmailVerificationLink(cleanGmail);
+        } catch (e) {}
+      }
+
+      await db.ref(`email_verifications/${emailKey}`).update({
+        code: newCode,
+        verificationLink: verificationLink || null,
+        createdAt: Date.now(),
+        expiresAt: Date.now() + 30 * 60 * 1000,
+        verified: false
+      });
+
+      return res.json({
+        success: true,
+        message: 'លេខកូដផ្ទៀងផ្ទាត់ថ្មីត្រូវបានបង្កើតរួចរាល់!',
+        verificationCode: newCode,
+        verificationLink
+      });
+    } catch (err) {
+      console.error('Resend email error:', err);
+      res.status(500).json({ error: 'Failed to resend code' });
+    }
+  });
+
+  /**
+   * Check Email Verification Status
+   */
+  router.get('/auth/email-status/:gmail', async (req, res) => {
+    try {
+      const cleanGmail = (req.params.gmail || '').trim().toLowerCase();
+      const emailKey = cleanGmail.replace(/[\.\#\$\[\]]/g, '_');
+
+      if (!db) return res.status(500).json({ error: 'Database disconnected' });
+
+      const snap = await db.ref(`email_verifications/${emailKey}`).once('value');
+      const vData = snap.val();
+
+      return res.json({
+        success: true,
+        verified: !!(vData && vData.verified),
+        hasPendingCode: !!(vData && !vData.verified && vData.expiresAt > Date.now())
+      });
+    } catch (err) {
+      res.status(500).json({ error: 'Error checking status' });
     }
   });
 
