@@ -178,7 +178,7 @@ async function generateCertificateHTML(data) {
     }
     .cert-frame-inner {
       border: 1px solid #8b1c1c;
-      padding: 24px 34px;
+      padding: 20px 24px;
       min-height: calc(1123px - 52px);
       box-sizing: border-box;
       position: relative;
@@ -186,11 +186,12 @@ async function generateCertificateHTML(data) {
       flex-direction: column;
       background: transparent;
     }
+    /* Logo in background: 2x size (660px), centered on A4, transparent background */
     .wm-logo {
       position: absolute; top: 50%; left: 50%;
       transform: translate(-50%, -50%);
-      width: 530px; height: 530px; object-fit: contain;
-      opacity: 0.085; mix-blend-mode: multiply;
+      width: 660px; height: 660px; object-fit: contain;
+      opacity: 0.10; mix-blend-mode: multiply;
       pointer-events: none; z-index: 0;
     }
 
@@ -199,15 +200,16 @@ async function generateCertificateHTML(data) {
       display: flex; align-items: center; justify-content: space-between;
       margin-bottom: 2px; position: relative; z-index: 1;
     }
+    /* Logo in header: 2x size (140px), transparent background */
     .hdr-logo-box {
-      width: 105px; display: flex; align-items: center; justify-content: flex-start;
+      width: 145px; display: flex; align-items: center; justify-content: flex-start;
     }
     .hdr-logo {
-      width: 100px; height: 100px;
+      width: 140px; height: 140px;
       object-fit: contain; border-radius: 50%;
-      filter: drop-shadow(0 2px 8px rgba(0,0,0,0.18));
+      filter: drop-shadow(0 3px 10px rgba(0,0,0,0.18));
     }
-    .hdr-spacer { width: 105px; } /* Empty balancer - ONLY 1 stamp on whole certificate */
+    .hdr-spacer { width: 145px; } /* Empty balancer - ONLY 1 stamp on whole certificate */
     .hdr-center { flex: 1; text-align: center; padding: 0 10px; }
     .kingdom-box { margin-bottom: 3px; }
     .kingdom-title {
@@ -323,57 +325,59 @@ async function generateCertificateHTML(data) {
 
     /* Director Block (Right) - Authentic Cambodian administrative stamp & signature */
     .dir-block {
-      width: 290px; text-align: center;
+      width: 350px; text-align: center;
       display: flex; flex-direction: column; align-items: center;
+      position: relative;
     }
     .dir-date-khmer {
-      font-size: 11.5px; color: #334155; line-height: 1.5; margin-bottom: 2px;
+      font-size: 12px; color: #334155; line-height: 1.5; margin-bottom: 2px;
       text-align: center;
     }
     .dir-role-kh {
-      font-family: 'Moul', cursive; font-size: 13px; color: #0f172a;
+      font-family: 'Khmer OS Muol Light', 'Khmer OS Moul Light', 'Moul', cursive;
+      font-size: 13.5px; color: #0f172a;
       margin-bottom: 4px;
     }
     /* Signature and Stamp Container */
     .sig-stamp-container {
       position: relative;
-      width: 280px;
-      height: 120px;
+      width: 340px;
+      height: 160px;
       margin: 0 auto;
     }
-    /* The single official stamp: BIGGER, on the LEFT, and shifted UP */
+    /* Official stamp: DOUBLE SIZE (220px), on the LEFT, shifted UP, 100% transparent background */
     .stamp-official {
       position: absolute;
-      left: 8px;
-      top: -14px; /* ខិតលើបន្តិច */
-      width: 142px; /* ធំជាងនឹង */
-      height: 142px;
+      left: -12px;
+      top: -30px; /* ខិតលើបន្តិច */
+      width: 220px; /* ធំជាងនឹងគុណនឹងពីរ! */
+      height: 220px;
       object-fit: contain;
-      mix-blend-mode: multiply;
       transform: rotate(-6deg);
       z-index: 2;
-      filter: drop-shadow(0 2px 5px rgba(185,28,28,0.3));
+      filter: drop-shadow(0 2px 6px rgba(185,28,28,0.3));
       pointer-events: none;
     }
     /* Director Signature: on the RIGHT */
     .sig-director {
       position: absolute;
       right: 12px;
-      bottom: 8px;
-      width: 165px;
-      height: 85px;
+      bottom: 15px;
+      width: 185px;
+      height: 95px;
       object-fit: contain;
       mix-blend-mode: multiply;
       z-index: 1;
     }
     .dir-name-underline {
-      width: 200px;
+      width: 210px;
       border-top: 1.5px solid #94a3b8;
-      margin-top: 2px;
+      margin-top: 4px;
       padding-top: 4px;
     }
     .dir-name-kh {
-      font-family: 'Moul', cursive; font-size: 14px; color: #0f172a;
+      font-family: 'Khmer OS Muol Light', 'Khmer OS Moul Light', 'Moul', cursive;
+      font-size: 14.5px; color: #0f172a;
     }
     .dir-name-en {
       font-size: 10.5px; color: #64748b; font-weight: 700;
