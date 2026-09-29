@@ -117,8 +117,8 @@
               <button class="btn btn-glass btn-lg" onclick="navigateTo('annual-exams')">
                 <span>🎓 ការប្រឡងបញ្ចប់មុខវិជ្ជា</span>
               </button>
-              <button id="heroLinkTelegramBtn" class="btn btn-cyan btn-lg" onclick="openSyncModal()">
-                <span>🔗 ភ្ជាប់គណនី Telegram</span>
+              <button id="heroLinkTelegramBtn" class="btn btn-cyan btn-lg" onclick="startTelegramOneClickLogin()">
+                <span>📱 ភ្ជាប់ Telegram ស្វ័យប្រវត្ត (1-Click)</span>
               </button>
             </div>
           </div>
@@ -141,11 +141,11 @@
         <div id="syncNoticeBanner" class="sync-banner glass-panel">
           <div class="sync-icon">📱</div>
           <div class="sync-text">
-            <div class="sync-title">💡 ភ្ជាប់ទិន្នន័យជាមួយ Telegram Bot</div>
-            <div class="sync-sub">តើអ្នកមានគណនី Telegram Bot រួចហើយមែនទេ? ចុចទីនេះដើម្បីបញ្ចូលកូដ ៦ ខ្ទង់ ហើយ Sync ទិន្នន័យមេរៀន ពិន្ទុ និងវិញ្ញាបនបត្រមកកាន់ Chrome!</div>
+            <div class="sync-title">💡 ភ្ជាប់គណនីជាមួយ Telegram Bot</div>
+            <div class="sync-sub">តើអ្នកមានគណនី Telegram Bot រួចហើយមែនទេ? ចុចទីនេះដើម្បីបើក Bot ហើយចុច «យល់ព្រមភ្ជាប់» នោះប្រព័ន្ធនឹង Sync ទិន្នន័យមេរៀន ពិន្ទុ និងវិញ្ញាបនបត្រស្វ័យប្រវត្ត (០-Typing)!</div>
           </div>
-          <button class="btn btn-sm btn-cyan" onclick="openSyncModal()">
-            <span>🔗 ភ្ជាប់ Telegram (Sync)</span>
+          <button class="btn btn-sm btn-cyan" onclick="startTelegramOneClickLogin()">
+            <span>🔗 ភ្ជាប់ Telegram (1-Click)</span>
           </button>
         </div>
 
@@ -645,23 +645,6 @@
         </div>
       </div>
 
-      <!-- Option 3: Optional Telegram Sync Code -->
-      <div class="text-center mt-3">
-        <button type="button" class="btn-link-action text-xs text-slate-400" onclick="toggleSyncCodeLogin()">
-          🔗 ឬចូលដោយប្រើលេខកូដ Telegram ៦ ខ្ទង់ (/link)
-        </button>
-      </div>
-
-      <form id="syncCodeLoginForm" class="hidden mt-3" onsubmit="handleSyncCodeLogin(event)">
-        <div class="form-group text-center">
-          <label>លេខកូដ Telegram ៦ ខ្ទង់</label>
-          <input type="text" id="loginSyncCode" maxlength="6" placeholder="0 0 0 0 0 0" class="text-center font-mono tracking-widest text-xl form-input">
-        </div>
-        <button type="submit" class="btn btn-outline btn-block">
-          <span>🔗 ចូលដោយកូដ Telegram</span>
-        </button>
-      </form>
-
       <div class="modal-footer-note mt-4 text-center">
         មិនទាន់មានគណនី? <a href="#" onclick="closeModal('loginModal'); openRegisterModal();">ចុះឈ្មោះទីនេះ</a>
       </div>
@@ -738,41 +721,26 @@
     </div>
   </div>
 
-  <!-- 3. TELEGRAM SYNC MODAL -->
+  <!-- 3. TELEGRAM SYNC MODAL (1-Click Auto Sync) -->
   <div id="syncModal" class="modal-overlay hidden">
-    <div class="modal-card glass-panel">
+    <div class="modal-card glass-panel max-w-md text-center p-6">
       <div class="modal-header">
-        <div class="modal-title">📱 ភ្ជាប់គណនី Telegram</div>
+        <div class="modal-title">📱 ភ្ជាប់គណនី Telegram ស្វ័យប្រវត្ត</div>
         <button class="modal-close" onclick="closeModal('syncModal')">✕</button>
       </div>
 
-      <div class="sync-instructions">
-        <div class="step-item">
-          <span class="step-num">1</span>
-          <span>បើកកម្មវិធី Telegram ហើយចូលទៅកាន់ Bot <strong>@StudyAiEngKH_bot</strong></span>
+      <div class="my-3">
+        <div class="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3 text-3xl bg-cyan-500/20 border border-cyan-500/40 text-cyan-400">
+          🤖
         </div>
-        <div class="step-item">
-          <span class="step-num">2</span>
-          <span>វាយពាក្យបញ្ជា <code>/link</code> ឬ <code>/sync</code></span>
-        </div>
-        <div class="step-item">
-          <span class="step-num">3</span>
-          <span>Bot នឹងផ្ញើលេខកូដ <strong>៦ ខ្ទង់</strong> មកកាន់អ្នក</span>
-        </div>
-        <div class="step-item">
-          <span class="step-num">4</span>
-          <span>បញ្ចូលលេខកូដនោះក្នុងប្រអប់ខាងក្រោម៖</span>
-        </div>
-      </div>
-
-      <form onsubmit="handleDirectSyncCode(event)">
-        <div class="form-group">
-          <input type="text" id="directSyncCodeInput" maxlength="6" required placeholder="1 2 3 4 5 6" class="text-center font-mono text-2xl">
-        </div>
-        <button type="submit" class="btn btn-cyan btn-block btn-lg">
-          <span>🔗 ភ្ជាប់គណនីឥឡូវនេះ (Sync Now)</span>
+        <h4 class="text-base font-bold text-white mb-2">ភ្ជាប់ទិន្នន័យដោយមិនបាច់វាយអក្សរ (0-Typing)</h4>
+        <p class="text-xs text-slate-300 leading-relaxed mb-4">
+          គ្រាន់តែចុចប៊ូតុងខាងក្រោម ប្រព័ន្ធនឹងបើក Telegram Bot <strong>@StudyAiEngKH_bot</strong>។ សូមចុចប៊ូតុង <strong>«✅ យល់ព្រមភ្ជាប់គណនី»</strong> នោះប្រព័ន្ធនឹងភ្ជាប់គណនី និង Sync ទិន្នន័យដោយស្វ័យប្រវត្ត!
+        </p>
+        <button type="button" class="btn btn-cyan btn-block btn-lg" onclick="closeModal('syncModal'); startTelegramOneClickLogin();">
+          <span>🚀 បើក Telegram Bot ដើម្បីយល់ព្រមភ្ជាប់</span>
         </button>
-      </form>
+      </div>
     </div>
   </div>
 
@@ -929,8 +897,8 @@
         <button id="profVerifyEmailBtn" class="btn btn-gold btn-block hidden" onclick="openVerifyEmailModalForCurrent()">
           ✉️ ផ្ទៀងផ្ទាត់ Gmail ឥឡូវនេះ
         </button>
-        <button id="profSyncTelegramBtn" class="btn btn-outline btn-block" onclick="closeModal('profileModal'); openSyncModal();">
-          📱 ភ្ជាប់ជាមួយ Telegram Bot
+        <button id="profSyncTelegramBtn" class="btn btn-cyan btn-block" onclick="closeModal('profileModal'); startTelegramOneClickLogin();">
+          <span>📱 ភ្ជាប់ជាមួយ Telegram Bot (ចុចយល់ព្រមភ្ជាប់)</span>
         </button>
         <button class="btn btn-outline-danger btn-block" onclick="handleLogout()">
           🚪 ចាកចេញពីឧបករណ៍នេះ (Logout This Device)

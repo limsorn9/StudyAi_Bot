@@ -205,13 +205,19 @@ function updateUserInterface() {
         : 'មិនទាន់ជា VIP';
     }
 
-    if (STATE.currentUser.isTelegram && syncBanner) {
-      syncBanner.style.display = 'none';
+    const heroTgBtn = document.getElementById('heroLinkTelegramBtn');
+    if (heroTgBtn) {
+      heroTgBtn.style.display = STATE.currentUser.isTelegram ? 'none' : 'inline-flex';
+    }
+    if (syncBanner) {
+      syncBanner.style.display = STATE.currentUser.isTelegram ? 'none' : 'flex';
     }
   } else {
     if (authActions) authActions.style.display = 'flex';
     if (userBadge) userBadge.classList.add('hidden');
     if (syncBanner) syncBanner.style.display = 'flex';
+    const heroTgBtn = document.getElementById('heroLinkTelegramBtn');
+    if (heroTgBtn) heroTgBtn.style.display = 'inline-flex';
   }
 }
 
@@ -1425,7 +1431,7 @@ function openRegisterModal() {
 }
 
 function openSyncModal() {
-  openModal('syncModal');
+  startTelegramOneClickLogin();
 }
 
 function openProfileModal() {
@@ -1486,6 +1492,15 @@ function openProfileModal() {
       fBadge.textContent = '⚠️ មិនទាន់ផ្ទៀងផ្ទាត់ (Not Verified)';
       fBadge.className = 'badge-status unverified';
       if (vBtn && u.gmail) vBtn.classList.remove('hidden');
+    }
+  }
+
+  const syncTgBtn = document.getElementById('profSyncTelegramBtn');
+  if (syncTgBtn) {
+    if (u.isTelegram) {
+      syncTgBtn.classList.add('hidden');
+    } else {
+      syncTgBtn.classList.remove('hidden');
     }
   }
 
@@ -2198,15 +2213,23 @@ function togglePasswordLogin() {
 async function startTelegramOneClickLogin() {
   try {
     showToast('⏳ កំពុងបង្កើតតំណភ្ជាប់ Telegram...', 'info');
-    const res = await fetch('/api/auth/telegram-web-token', { method: 'POST' });
+    const res = await fetch('/api/auth/telegram-web-token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        currentUserId: STATE.currentUser?.id || null
+      })
+    });
     const data = await res.json();
     if (!data.success) throw new Error(data.error || 'បង្កើតតំណមិនបាន');
 
     window.open(data.botUrl, '_blank');
-    showToast('🛡️ សូមបើក Telegram Bot ហើយចុច «✅ យល់ព្រម និងអនុញ្ញាត» ដើម្បីផ្ទៀងផ្ទាត់សុវត្ថិភាព!', 'info');
+    showToast('🛡️ សូមបើក Telegram Bot ហើយចុច «✅ យល់ព្រមភ្ជាប់គណនី»!', 'info');
 
     closeModal('loginModal');
     closeModal('registerModal');
+    closeModal('syncModal');
+    closeModal('profileModal');
 
     const icon = document.getElementById('authWaitingIcon');
     const title = document.getElementById('authWaitingTitle');
@@ -2219,18 +2242,18 @@ async function startTelegramOneClickLogin() {
     }
     if (title) title.textContent = '🛡️ រង់ចាំការបញ្ជាក់លើ Telegram Bot';
     if (desc) {
-      desc.innerHTML = `Telegram Bot <strong>@StudyAiEngKH_bot</strong> ត្រូវបានបើក។<br>សូមចុចប៊ូតុង <strong>«✅ យល់ព្រម និងអនុញ្ញាត»</strong> លើ Telegram ដើម្បីចូលរៀនលើ Browser នេះស្វ័យប្រវត្ត។`;
+      desc.innerHTML = `Telegram Bot <strong>@StudyAiEngKH_bot</strong> ត្រូវបានបើក។<br>សូមចុចប៊ូតុង <strong>«✅ យល់ព្រមភ្ជាប់គណនី»</strong> លើ Telegram ដើម្បីភ្ជាប់ និងចូលរៀនស្វ័យប្រវត្ត។`;
     }
-    if (status) status.textContent = '⏳ កំពុងរង់ចាំលោកអ្នកចុច Confirm លើ Telegram...';
+    if (status) status.textContent = '⏳ កំពុងរង់ចាំលោកអ្នកចុចយល់ព្រមភ្ជាប់លើ Telegram...';
     openModal('authWaitingModal');
 
-    // Poll for login status
+    // Poll for login/linking status
     const token = data.token;
     const startTime = Date.now();
     if (telegramConfirmPollInterval) clearInterval(telegramConfirmPollInterval);
 
     telegramConfirmPollInterval = setInterval(async () => {
-      if (Date.now() - startTime > 180000 || STATE.currentUser) {
+      if (Date.now() - startTime > 180000) {
         clearInterval(telegramConfirmPollInterval);
         telegramConfirmPollInterval = null;
         closeModal('authWaitingModal');
@@ -2253,7 +2276,7 @@ async function startTelegramOneClickLogin() {
           telegramConfirmPollInterval = null;
           closeModal('authWaitingModal');
           setCurrentUser(pollData.user, pollData.sessionToken, pollData.deviceId);
-          showToast(`🎉 ស្វាគមន៍ ${pollData.user.name}! ផ្ទៀងផ្ទាត់សុវត្ថិភាព Telegram ជោគជ័យ`, 'success');
+          showToast(pollData.linked ? '🎉 បានភ្ជាប់គណនី Telegram ដោយជោគជ័យ!' : `🎉 ស្វាគមន៍ ${pollData.user.name}! ផ្ទៀងផ្ទាត់សុវត្ថិភាព Telegram ជោគជ័យ`, 'success');
           refreshUserProfile();
 
           if (!pollData.user.photoUrl || !pollData.user.khmerName) {

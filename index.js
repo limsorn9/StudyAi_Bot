@@ -445,7 +445,7 @@ bot.action(/tg_auth_allow_(.+)/, async (ctx) => {
   const userId = ctx.from.id.toString();
   const username = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ') || ctx.from.username || `User ${userId}`;
 
-  await ctx.answerCbQuery('✅ បានអនុញ្ញាតដោយជោគជ័យ!');
+  await ctx.answerCbQuery('✅ បានយល់ព្រមភ្ជាប់គណនីជោគជ័យ!');
 
   if (db) {
     try {
@@ -469,9 +469,9 @@ bot.action(/tg_auth_allow_(.+)/, async (ctx) => {
 
   const webUrl = process.env.WEBAPP_URL || process.env.RENDER_EXTERNAL_URL || process.env.WebHook_URL || 'https://studyai-bot.onrender.com';
   return ctx.editMessageText(
-    `✅ *ការផ្ទៀងផ្ទាត់សុវត្ថិភាព TELEGRAM ជោគជ័យ!* 🎉\n\n` +
-    `សួស្តី *${username}*! អ្នកបានអនុញ្ញាតឱ្យ Browser ចូលប្រើគណនីរបស់អ្នករួចរាល់ហើយ។\n\n` +
-    `💻 វេបសាយលើ Browser របស់អ្នកកំពុង Login ស្វ័យប្រវត្ត។ សូមត្រឡប់ទៅ Browser វិញ ឬចុចប៊ូតុងខាងក្រោម៖`,
+    `✅ *ការភ្ជាប់គណនី TELEGRAM ជោគជ័យ!* 🎉\n\n` +
+    `សួស្តី *${username}*! អ្នកបានយល់ព្រមភ្ជាប់គណនី Telegram ជាមួយ Browser រួចរាល់ហើយ។\n\n` +
+    `💻 វេបសាយលើ Browser របស់អ្នកកំពុង Sync និងចូលរៀនស្វ័យប្រវត្ត។ សូមត្រឡប់ទៅ Browser វិញ ឬចុចប៊ូតុងខាងក្រោម៖`,
     {
       parse_mode: 'Markdown',
       reply_markup: Markup.inlineKeyboard([
@@ -523,17 +523,17 @@ bot.start(async (ctx) => {
     return ctx.reply(
       `🛡️ *ប្រព័ន្ធសុវត្ថិភាព TELEGRAM (SECURITY CONFIRMATION)* 🛡️\n` +
       `━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
-      `សួស្តី *${username}*! មានការស្នើសុំចុះឈ្មោះ / ចូលគណនីលើវេបសាយ *Teacher SSOnline English Academy* ពី Browser របស់អ្នក។\n\n` +
+      `សួស្តី *${username}*! មានការស្នើសុំចុះឈ្មោះ ឬភ្ជាប់គណនីលើវេបសាយ *Teacher SSOnline English Academy* ពី Browser របស់អ្នក។\n\n` +
       `👤 *ព័ត៌មានគណនី Telegram៖*\n` +
       `• Telegram ID: \`${userId}\`\n` +
       `• ឈ្មោះ៖ *${username}*\n` +
-      `• ស្ថានភាព៖ ⏳ កំពុងរង់ចាំការបញ្ជាក់សុវត្ថិភាពពីអ្នក\n\n` +
-      `👉 *តើអ្នកយល់ព្រមអនុញ្ញាតឱ្យ Browser នេះចុះឈ្មោះ ឬចូលរៀនដែរឬទេ?*`,
+      `• ស្ថានភាព៖ ⏳ កំពុងរង់ចាំការបញ្ជាក់ពីអ្នក\n\n` +
+      `👉 *សូមចុចប៊ូតុងខាងក្រោមដើម្បីយល់ព្រមភ្ជាប់គណនីភ្លាមៗ៖*`,
       {
         parse_mode: 'Markdown',
         reply_markup: Markup.inlineKeyboard([
           [
-            Markup.button.callback('✅ យល់ព្រម និងអនុញ្ញាត (Confirm)', `tg_auth_allow_${token}`),
+            Markup.button.callback('✅ យល់ព្រមភ្ជាប់គណនី (Confirm & Link)', `tg_auth_allow_${token}`),
             Markup.button.callback('❌ បដិសេធ (Deny)', `tg_auth_deny_${token}`)
           ]
         ]).reply_markup

@@ -212,12 +212,14 @@ Student Question: ${userText}`;
    */
   router.post('/auth/telegram-web-token', async (req, res) => {
     try {
+      const { currentUserId } = req.body || {};
       const token = 'tg_' + crypto.randomBytes(8).toString('hex');
       if (db) {
         await db.ref(`telegram_web_auth/${token}`).set({
           createdAt: Date.now(),
           expiresAt: Date.now() + 5 * 60 * 1000, // 5 minutes
-          verified: false
+          verified: false,
+          currentUserId: currentUserId || null
         });
       }
       const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'StudyAiEngKH_bot';
@@ -266,10 +268,33 @@ Student Question: ${userText}`;
         const userData = userSnap.val() || {};
         const profile = userData.profile || {};
 
-        const isVIP = checkVIP ? await checkVIP(userId) : false;
-        const yearly = checkYearlyVIP ? await checkYearlyVIP(userId) : { eligible: false };
+        let effectiveUserId = userId;
+        let isLinked = false;
 
-        const session = await createDeviceSession(userId, deviceId, userAgent || req.headers['user-agent'], req.ip);
+        // If this token was initiated from an existing logged in web user, link accounts
+        if (data.currentUserId && data.currentUserId !== userId) {
+          effectiveUserId = data.currentUserId;
+          isLinked = true;
+          // Link Telegram to the current web user profile
+          await db.ref(`users/${data.currentUserId}/profile`).update({
+            linkedTelegramId: userId,
+            isTelegram: true,
+            telegramUsername: profile.username || '',
+            telegramLinkedAt: Date.now()
+          });
+          // Also link back on the Telegram user profile
+          await db.ref(`users/${userId}/profile`).update({
+            linkedWebUserId: data.currentUserId
+          });
+        }
+
+        const effSnap = await db.ref(`users/${effectiveUserId}/profile`).once('value');
+        const effProf = effSnap.val() || profile;
+
+        const isVIP = checkVIP ? ((await checkVIP(effectiveUserId)) || (await checkVIP(userId))) : false;
+        const yearly = checkYearlyVIP ? await checkYearlyVIP(effectiveUserId) : { eligible: false };
+
+        const session = await createDeviceSession(effectiveUserId, deviceId, userAgent || req.headers['user-agent'], req.ip);
 
         // Cleanup token
         await db.ref(`telegram_web_auth/${token}`).remove();
@@ -277,14 +302,16 @@ Student Question: ${userText}`;
         return res.json({
           success: true,
           verified: true,
+          linked: isLinked,
           user: {
-            id: userId,
-            name: profile.name || data.name || `User ${userId}`,
-            username: profile.username || '',
-            khmerName: profile.khmerName || null,
-            photoUrl: profile.photoUrl || profile.avatar || null,
-            phone: profile.phone || null,
+            id: effectiveUserId,
+            name: effProf.name || profile.name || data.name || `User ${effectiveUserId}`,
+            username: effProf.username || profile.username || '',
+            khmerName: effProf.khmerName || profile.khmerName || null,
+            photoUrl: effProf.photoUrl || profile.photoUrl || profile.avatar || null,
+            phone: effProf.phone || profile.phone || null,
             isTelegram: true,
+            linkedTelegramId: userId,
             isVIP,
             yearlyEligible: yearly.eligible,
             vipDetails: yearly
