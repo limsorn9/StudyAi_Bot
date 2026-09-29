@@ -118,8 +118,13 @@ async function generateCertificateHTML(data) {
   // Director Signature
   let directorSigDataUrl = '';
   try {
-    const f = path.join(__dirname, 'public', 'director_signature.jpg');
-    if (fs.existsSync(f)) directorSigDataUrl = `data:image/jpeg;base64,${fs.readFileSync(f).toString('base64')}`;
+    const fPng = path.join(__dirname, 'public', 'director_signature.png');
+    const fJpg = path.join(__dirname, 'public', 'director_signature.jpg');
+    if (fs.existsSync(fPng)) {
+      directorSigDataUrl = `data:image/png;base64,${fs.readFileSync(fPng).toString('base64')}`;
+    } else if (fs.existsSync(fJpg)) {
+      directorSigDataUrl = `data:image/jpeg;base64,${fs.readFileSync(fJpg).toString('base64')}`;
+    }
   } catch (err) { console.error('Signature Error:', err); }
 
   // Khmer date & number helper
@@ -129,7 +134,7 @@ async function generateCertificateHTML(data) {
   };
   const now = new Date();
   const khMonths = ['មករា','កុម្ភៈ','មីនា','មេសា','ឧសភា','មិថុនា','កក្កដា','សីហា','កញ្ញា','តុលា','វិច្ឆិកា','ធ្នូ'];
-  const khDateStr = `ថ្ងៃទី ${toKhmerNum(now.getDate())} ខែ${khMonths[now.getMonth()]} ឆ្នាំ${toKhmerNum(now.getFullYear())}`;
+  const khDateStr = `ថ្ងៃទី${toKhmerNum(now.getDate())} ខែ${khMonths[now.getMonth()]} ឆ្នាំ${toKhmerNum(now.getFullYear())}`;
 
   // Only ONE official stamp is used in the entire certificate, placed on the left & slightly above the director's signature
   const logoTag   = schoolLogoDataUrl  ? `<img src="${schoolLogoDataUrl}"  alt="Logo"  class="hdr-logo" />`  : '';
@@ -149,7 +154,7 @@ async function generateCertificateHTML(data) {
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Battambang:wght@400;700;900&family=Moul&family=Cinzel:wght@600;800;900&family=Playfair+Display:ital,wght@0,600;1,400&display=swap" rel="stylesheet">
   <style>
-    @page { size: 210mm 297mm; margin: 0; }
+    @page { size: 297mm 210mm; margin: 0; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       background: #1a1a2e;
@@ -161,7 +166,7 @@ async function generateCertificateHTML(data) {
       padding: 20px;
       font-family: 'Battambang', sans-serif;
     }
-    .no-print { margin-bottom: 16px; display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+    .no-print { margin-bottom: 14px; display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
     .print-btn {
       background: linear-gradient(135deg, #c5a059, #9c7a36);
       color: #fff; border: none; padding: 10px 24px; border-radius: 6px;
@@ -170,43 +175,45 @@ async function generateCertificateHTML(data) {
       box-shadow: 0 4px 12px rgba(197,160,89,0.4);
     }
 
-    /* ========== A4 PORTRAIT 794x1123 ========== */
+    /* ========== A4 LANDSCAPE (1123 x 794) ========== */
     .cert-wrapper {
-      width: 794px;
-      min-height: 1123px;
+      width: 1123px;
+      height: 794px;
       background: #ffffff;
       position: relative;
       box-shadow: 0 20px 60px rgba(0,0,0,0.25);
       box-sizing: border-box;
-      padding: 18px;
+      padding: 16px;
+      overflow: hidden;
     }
 
-    /* Clean, classic, elegant double border (No striped gradient) */
+    /* Clean, classic, elegant double border */
     .cert-frame-outer {
-      border: 2px solid #b8860b;
-      padding: 6px;
-      min-height: calc(1123px - 36px);
+      border: 2.5px solid #b8860b;
+      padding: 5px;
+      height: 100%;
       box-sizing: border-box;
       background: transparent;
       position: relative;
       z-index: 1;
     }
     .cert-frame-inner {
-      border: 1px solid #8b1c1c;
-      padding: 20px 24px;
-      min-height: calc(1123px - 52px);
+      border: 1.5px solid #8b1c1c;
+      padding: 14px 24px;
+      height: 100%;
       box-sizing: border-box;
       position: relative;
       display: flex;
       flex-direction: column;
+      justify-content: space-between;
       background: transparent;
     }
-    /* Logo in background: 2x size (660px), centered on A4, transparent background */
+    /* Logo in background: centered watermark, transparent */
     .wm-logo {
       position: absolute; top: 50%; left: 50%;
       transform: translate(-50%, -50%);
-      width: 660px; height: 660px; object-fit: contain;
-      opacity: 0.10; mix-blend-mode: multiply;
+      width: 520px; height: 520px; object-fit: contain;
+      opacity: 0.08; mix-blend-mode: multiply;
       pointer-events: none; z-index: 0;
     }
 
@@ -247,82 +254,69 @@ async function generateCertificateHTML(data) {
 
     /* -------- DIVIDER -------- */
     .orn-div {
-      display: flex; align-items: center; justify-content: center; gap: 10px;
-      margin: 6px 0; position: relative; z-index: 1;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      margin: 3px 0; position: relative; z-index: 1;
     }
-    .orn-bar { flex: 1; height: 2px; max-width: 180px;
+    .orn-bar { flex: 1; height: 1.5px; max-width: 160px;
       background: linear-gradient(90deg, transparent, #c5a059, #8b1c1c, #c5a059, transparent); }
-    .orn-sym { color: #c5a059; font-size: 14px; }
+    .orn-sym { color: #c5a059; font-size: 12px; }
 
     /* -------- MAIN TITLE -------- */
-    .main-title { text-align: center; position: relative; z-index: 1; margin: 4px 0 2px 0; }
+    .main-title { text-align: center; position: relative; z-index: 1; margin: 0; }
     .title-kh {
-      font-family: 'Moul', cursive; font-size: 42px; color: #c0000b;
-      display: block; text-shadow: 1px 1px 2px rgba(0,0,0,0.12);
-      letter-spacing: 1px;
+      font-family: 'Moul', cursive; font-size: 34px; color: #c0000b;
+      display: block; text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+      letter-spacing: 1px; line-height: 1.2;
     }
     .title-en {
-      font-family: 'Cinzel', serif; font-size: 11px; font-weight: 900;
-      color: #1e3a8a; letter-spacing: 2.2px; text-transform: uppercase;
-      margin-top: 2px;
+      font-family: 'Cinzel', serif; font-size: 10px; font-weight: 900;
+      color: #1e3a8a; letter-spacing: 2px; text-transform: uppercase;
+      margin-top: 1px;
     }
 
     /* -------- BODY -------- */
-    .cert-body { text-align: center; position: relative; z-index: 1; flex: 1; margin-top: 10px; }
+    .cert-body { text-align: center; position: relative; z-index: 1; margin: 2px 0; }
     .cert-line-1 {
       font-family: 'Khmer OS Muol Light', 'Khmer OS Moul Light', 'Moul', cursive;
-      font-size: 17px;
-      font-weight: normal;
-      color: #1e3a8a;
-      line-height: 1.6;
-      margin-bottom: 6px;
-      letter-spacing: 0.3px;
+      font-size: 15px; color: #1e3a8a; line-height: 1.4; margin-bottom: 2px;
     }
     .cert-line-2 {
       font-family: 'Khmer OS Muol Light', 'Khmer OS Moul Light', 'Moul', cursive;
-      font-size: 16px;
-      font-weight: normal;
-      color: #0f172a;
-      line-height: 1.6;
-      margin-bottom: 12px;
-      letter-spacing: 0.3px;
+      font-size: 14.5px; color: #0f172a; line-height: 1.4; margin-bottom: 6px;
     }
     .stu-name {
       display: inline-block;
       font-family: 'Khmer OS Muol Light', 'Khmer OS Moul Light', 'Moul', 'Battambang', sans-serif;
-      font-size: 34px;
-      font-weight: bold;
-      color: #0f172a;
-      border-bottom: 2.5px solid #c5a059;
-      padding: 0 40px 6px 40px;
-      margin-bottom: 14px;
+      font-size: 30px; font-weight: bold; color: #0f172a;
+      border-bottom: 2px solid #c5a059;
+      padding: 0 35px 3px 35px; margin-bottom: 6px;
     }
-    .achieve { font-size: 14px; color: #334155; line-height: 1.9; }
-    .subj-red { font-size: 18px; font-weight: 900; color: #8b1c1c; }
+    .achieve { font-size: 13.5px; color: #334155; line-height: 1.7; }
+    .subj-red { font-size: 16.5px; font-weight: 900; color: #8b1c1c; }
     .official-decree-note {
-      font-size: 13px; color: #475569; margin-top: 6px; font-weight: 600;
+      font-size: 12px; color: #475569; margin-top: 3px; font-weight: 600;
     }
 
 
     /* -------- FOOTER -------- */
-    .cert-footer { position: relative; z-index: 1; margin-top: 10px; }
+    .cert-footer { position: relative; z-index: 1; }
     .footer-row {
       display: flex; justify-content: space-between; align-items: flex-end;
     }
 
     /* QR Col (Left) */
     .qr-col {
-      display: flex; flex-direction: column; gap: 3px; width: 140px;
+      display: flex; flex-direction: column; gap: 2px; width: 140px;
     }
     .qr-frame {
       background: #fff; border: 2px solid #c5a059; border-radius: 6px;
-      padding: 5px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); display: inline-block;
+      padding: 4px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); display: inline-block;
       width: fit-content;
     }
-    .qr-frame img { display: block; width: 88px; height: 88px; }
-    .qr-badge { font-size: 8.5px; color: #8b1c1c; font-weight: 900; letter-spacing: 0.8px; margin-top: 2px; }
-    .qr-id { font-size: 8.5px; color: #0f172a; font-weight: 700; }
-    .qr-sub { font-size: 8px; color: #64748b; }
+    .qr-frame img { display: block; width: 80px; height: 80px; }
+    .qr-badge { font-size: 8px; color: #8b1c1c; font-weight: 900; letter-spacing: 0.8px; margin-top: 2px; }
+    .qr-id { font-size: 8px; color: #0f172a; font-weight: 700; }
+    .qr-sub { font-size: 7.5px; color: #64748b; }
 
     /* Center Note */
     .footer-center {
@@ -333,93 +327,94 @@ async function generateCertificateHTML(data) {
       font-size: 11px; color: #475569; line-height: 1.6; font-style: italic;
     }
     .cert-code-pill {
-      margin-top: 6px; font-size: 9px; color: #8b1c1c; font-weight: 800;
+      margin-top: 5px; font-size: 8.5px; color: #8b1c1c; font-weight: 800;
       background: rgba(139,28,28,0.06); padding: 3px 10px; border-radius: 12px;
       border: 1px solid rgba(139,28,28,0.15);
     }
 
-    /* Director Block (Right) - Authentic Cambodian administrative stamp & signature */
+    /* ========================================================
+       DIRECTOR BLOCK: EXACT REPLICA OF USER'S 100% MOCKUP IMAGE
+       ======================================================== */
     .dir-block {
-      width: 400px;
-      display: flex; flex-direction: column; align-items: center;
       position: relative;
+      width: 480px;
+      height: 215px;
     }
-    .dir-date-khmer {
-      font-size: 13px; color: #0f172a; line-height: 1.8; margin-bottom: 2px;
-      text-align: center;
-    }
-    .dir-role-kh {
-      font-family: 'Khmer OS Muol Light', 'Khmer OS Moul Light', 'Moul', cursive;
-      font-size: 14px; color: #0f172a;
-      margin-bottom: 4px;
-      text-align: center;
-      position: relative;
-      z-index: 3;
-    }
-    /* Signature and Stamp Container */
-    .sig-stamp-container {
-      position: relative;
-      width: 100%;
-      height: 150px;
-      margin-top: 5px;
-    }
-    /* Official stamp: Centered below date */
+
     .stamp-official {
       position: absolute;
-      left: 50%;
-      top: -30px; 
-      width: 180px;
-      height: 180px;
-      transform: translateX(-50%) rotate(-6deg);
+      left: 0;
+      top: 0;
+      width: 195px;
+      height: 195px;
       object-fit: contain;
-      z-index: 2;
-      filter: drop-shadow(0 2px 6px rgba(185,28,28,0.3));
+      z-index: 1;
       pointer-events: none;
+      filter: drop-shadow(0 2px 6px rgba(185,28,28,0.25));
     }
-    /* Director Signature: CENTERED below the role text */
+
+    .dir-date-khmer {
+      position: absolute;
+      left: 125px;
+      top: 32px;
+      z-index: 2;
+      font-family: 'Battambang', sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      color: #0f172a;
+      white-space: nowrap;
+    }
+
+    .dir-role-kh {
+      position: absolute;
+      left: 160px;
+      top: 60px;
+      z-index: 2;
+      font-family: 'Khmer OS Muol Light', 'Khmer OS Moul Light', 'Moul', cursive;
+      font-size: 15px;
+      font-weight: bold;
+      color: #000000;
+      white-space: nowrap;
+    }
+
     .sig-director {
       position: absolute;
-      left: 50%;
-      top: 10px;
-      transform: translateX(-50%);
-      width: 170px;
-      height: 95px;
+      left: 180px;
+      top: 88px;
+      z-index: 3;
+      width: 165px;
+      height: 75px;
       object-fit: contain;
-      mix-blend-mode: multiply;
-      z-index: 1;
     }
-    .dir-name-box {
-      width: 100%;
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      padding-right: 20px;
-      margin-top: -10px;
-    }
-    .dir-name-underline {
-      width: 200px;
-      border-top: 1px solid #94a3b8;
-      margin-bottom: 6px;
-    }
+
     .dir-name-kh {
+      position: absolute;
+      left: 218px;
+      top: 165px;
+      z-index: 2;
       font-family: 'Khmer OS Muol Light', 'Khmer OS Moul Light', 'Moul', cursive;
-      font-size: 16px; color: #c0000b; font-weight: 900;
-    }
-    .dir-name-en {
-      font-size: 10.5px; color: #64748b; font-weight: 700;
+      font-size: 22px;
+      font-weight: 900;
+      color: #e51d1d;
+      white-space: nowrap;
+      letter-spacing: 0.5px;
     }
 
     @media print {
       body { background: none; padding: 0; }
       .no-print { display: none !important; }
-      .cert-wrapper { width: 210mm; min-height: 297mm; box-shadow: none; }
+      .cert-wrapper {
+        width: 297mm;
+        height: 210mm;
+        box-shadow: none;
+      }
     }
   </style>
 </head>
 <body>
 
   <div class="no-print">
-    <button class="print-btn" onclick="window.print()">🖨️ បោះពុម្ព / Save PDF (A4 ឈរ)</button>
+    <button class="print-btn" onclick="window.print()">🖨️ បោះពុម្ព / Save PDF (A4 ផ្តេក)</button>
     <a href="${verifyTgUrl}" target="_blank" style="text-decoration:none;">
       <button class="print-btn" style="background:linear-gradient(135deg,#0369a1,#0284c7);">
         📱 ផ្ទៀងផ្ទាត់ Telegram
@@ -492,25 +487,15 @@ async function generateCertificateHTML(data) {
               </div>
             </div>
 
-            <!-- Director Right: Date + Role + Container(Big Stamp Left Shifted Up + Sig Right) + Underline Name -->
+            <!-- Director Right: 100% Match with user image -->
             <div class="dir-block">
+              ${stampOvr}
               <div class="dir-date-khmer">
-                បាត់ដំបង ថ្ងៃទី ${toKhmerNum(now.getDate())} ខែ${khMonths[now.getMonth()]} ឆ្នាំ${toKhmerNum(now.getFullYear())}
+                បាត់ដំបង ថ្ងៃទី${toKhmerNum(now.getDate())} ខែ${khMonths[now.getMonth()]} ឆ្នាំ${toKhmerNum(now.getFullYear())}
               </div>
               <div class="dir-role-kh">នាយកវិទ្យាស្ថាន</div>
-
-              <div class="sig-stamp-container">
-                <!-- ONLY 1 STAMP: BIGGER (142px), on LEFT, shifted UP (top: -14px) overlapping signature -->
-                ${stampOvr}
-                <!-- Director Signature: on RIGHT -->
-                ${sigTag}
-              </div>
-
-              <div class="dir-name-box">
-                <div class="dir-name-underline"></div>
-                <div class="dir-name-kh">លីម សន</div>
-                <div class="dir-name-en">Lim Sorn</div>
-              </div>
+              ${sigTag}
+              <div class="dir-name-kh">លីម សន</div>
             </div>
           </div>
         </div>
