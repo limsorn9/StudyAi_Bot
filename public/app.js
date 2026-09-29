@@ -507,6 +507,7 @@ function renderBeginnerWeeks() {
   }
 
   const completed = STATE.currentUser?.completedLessons || {};
+  const isAdmin = !!(STATE.currentUser?.isAdmin);
   const status = STATE.beginnerStatus;
   const passedLessons = new Set(status.passedLessons || []);
   const passedCount = status.passedCount || 0;
@@ -518,15 +519,19 @@ function renderBeginnerWeeks() {
 
   // Beginner Final Exam Card at top
   const finalPct = Math.round((passedCount / 26) * 100);
+  const canTakeFinal = isAdmin || passedCount >= 26; // Admin bypasses prerequisite
+
   const finalExamHTML = `
     <div class="beginner-final-exam-card">
       <div class="final-exam-header">
-        <div class="final-exam-icon">${isGraduated ? '🎓' : '📜'}</div>
+        <div class="final-exam-icon">${isGraduated ? '🎓' : (isAdmin ? '🛡️' : '📜')}</div>
         <div class="final-exam-info">
-          <h3>${isGraduated ? '✅ ប្រឡងបញ្ចប់ --- ជោគជ័យ!' : 'ការប្រឡងបញ្ចប់ថ្នាក់ដំបូង'}</h3>
+          <h3>${isGraduated ? '✅ ប្រឡងបញ្ចប់ --- ជោគជ័យ!' : (isAdmin ? '🛡️ Admin View — ការប្រឡងបញ្ចប់ថ្នាក់ដំបូង' : 'ការប្រឡងបញ្ចប់ថ្នាក់ដំបូង')}</h3>
           <p>${isGraduated
             ? 'អ្នកបានសម្រេចថ្នាក់ដំបូង! ទទួលបានវិញ្ញាបនបត្រជោគជ័យ 🏆'
-            : `ត្រូវប្រឡងជាប់គ្រប់ ២៦ ថ្ងៃ ទើបអាចប្រឡងបញ្ចប់ & ចូលរៀនថ្នាក់បន្ទាប់`
+            : (isAdmin
+                ? `🛡️ Admin ប្រឡងបញ្ចប់បានទាញយក (Bypass prerequisites) • សិស្សជាប់ ${passedCount}/26 ថ្ងៃ`
+                : `ត្រូវប្រឡងជាប់គ្រប់ ២៦ ថ្ងៃ ទើបអាចប្រឡងបញ្ចប់ & ចូលរៀនថ្នាក់បន្ទាប់`)
           }</p>
         </div>
       </div>
@@ -536,14 +541,14 @@ function renderBeginnerWeeks() {
           <span>${finalPct}%</span>
         </div>
         <div class="final-exam-progress-bar">
-          <div class="final-exam-progress-fill" style="width: ${finalPct}%"></div>
+          <div class="final-exam-progress-fill" style="width: ${isAdmin ? 100 : finalPct}%"></div>
         </div>
       </div>
       ${isGraduated
         ? `<div class="graduated-badge">🎓 ប្រឡងបញ្ចប់ជោគជ័យ! វិញ្ញាបនបត្រ: <strong>${status.beginnerCert?.certId || ' គ្មាន'}</strong></div>
            <button class="btn-final-exam" style="margin-top:10px" onclick="openCertificatePreview('${status.beginnerCert?.certId || ''}')">📜 មើលវិញ្ញាបនបត្រ</button>`
-        : `<button class="btn-final-exam" ${passedCount < 26 ? 'disabled' : ''} onclick="startBeginnerFinalExam()">
-            ${passedCount < 26 ? `🔒 ប្រឡងបញ្ចប់ (ខ្វះ ${26 - passedCount} ថ្ងៃ)` : '🎓 ចូលប្រឡងបញ្ចប់ (20 សំណួរ)'}
+        : `<button class="btn-final-exam" ${!canTakeFinal ? 'disabled' : ''} onclick="startBeginnerFinalExam()">
+            ${!canTakeFinal ? `🔒 ប្រឡងបញ្ចប់ (ខ្វះ ${26 - passedCount} ថ្ងៃ)` : (isAdmin ? '🛡️ Admin • ចូលប្រឡងបញ្ចប់ (20 សំណួរ)' : '🎓 ចូលប្រឡងបញ្ចប់ (20 សំណួរ)')}
            </button>`
       }
     </div>
@@ -557,18 +562,19 @@ function renderBeginnerWeeks() {
 
       // Sequential lock: lesson N requires lesson N-1 passed
       // bl1 is always unlocked; bl2 requires bl1, etc.
+      // ADMIN BYPASS: Admin sees all lessons unlocked
       const lessonNum = parseInt((l.id || '').replace('bl', ''));
-      const isUnlocked = lessonNum <= 1 || passedLessons.has(`bl${lessonNum - 1}`);
+      const isUnlocked = isAdmin || lessonNum <= 1 || passedLessons.has(`bl${lessonNum - 1}`);
       const isLocked = !isUnlocked;
 
       return `
         <div class="lesson-item-card beginner-lesson-item ${isComp ? 'completed' : ''} ${isLocked ? 'lesson-locked' : ''}" 
              onclick="${isLocked ? `showToast('🔒 ត្រូវប្រឡងជាប់ថ្ងៃទី${lessonNum - 1} ជាមុន!', 'warning')` : `openLesson('beginner', '${w.id}', '${l.id}')`}">
           <div class="l-info">
-            <div class="l-title">${isLocked ? '🔒 ' : ''}${l.title}</div>
-            <div class="l-status">${isComp ? `✅ ជាប់និទ្ទេស ${grade}` : (isLocked ? '🔒 ចាំប្រឡងថ្ងៃកន្លងទៅ' : '📖 ១ ថ្ងៃ ១ អក្សរ ១ ពាក្យ ១ ល្បះ')}</div>
+            <div class="l-title">${isLocked ? '🔒 ' : (isAdmin && !isComp ? '🛡️ ' : '')}${l.title}</div>
+            <div class="l-status">${isComp ? `✅ ជាប់និទ្ទេស ${grade}` : (isLocked ? '🔒 ចាំប្រឡងថ្ងៃកន្លងទៅ' : (isAdmin ? '🛡️ Admin • ចូលបានភ្លាម' : '📖 ១ ថ្ងៃ ១ អក្សរ ១ ពាក្យ ១ ល្បះ'))}</div>
           </div>
-          <div class="l-icon">${isComp ? '🏆' : (isLocked ? '🔒' : '➡️')}</div>
+          <div class="l-icon">${isComp ? '🏆' : (isLocked ? '🔒' : (isAdmin ? '🛡️' : '➡️'))}</div>
         </div>
       `;
     }).join('');
@@ -580,7 +586,7 @@ function renderBeginnerWeeks() {
             <div class="week-title">📅 ${w.title} (${w.lessons.length} ថ្ងៃ)</div>
             ${w.description ? `<div class="week-desc text-xs text-slate-400 mt-0.5">${w.description}</div>` : ''}
           </div>
-          <span class="badge badge-emerald">👩‍🏫 អ្នកគ្រូ ពិសិដ្ឋ AI</span>
+          <span class="badge ${isAdmin ? 'badge-amber' : 'badge-emerald'}">${isAdmin ? '🛡️ Admin View' : '👩‍🏫 អ្នកគ្រូ ពិសិដ្ឋ AI'}</span>
         </div>
         <div class="lessons-grid">${lessonsHTML}</div>
       </div>
@@ -645,6 +651,7 @@ function renderCurriculumWeeks() {
   }
 
   const completed = STATE.currentUser?.completedLessons || {};
+  const isAdmin = !!(STATE.currentUser?.isAdmin);
 
   // Build global ordered lesson list for sequential lock checking
   const globalOrder = [];
@@ -660,6 +667,7 @@ function renderCurriculumWeeks() {
     <div class="week-card glass-panel">
       <div class="week-header">
         <div class="week-title">📅 ${w.title} (${w.lessons.length} មេរៀន)</div>
+        ${isAdmin ? '<span class="badge badge-amber">🛡️ Admin View</span>' : ''}
       </div>
       <div class="lessons-grid">
         ${w.lessons.map(l => {
@@ -667,12 +675,14 @@ function renderCurriculumWeeks() {
           const isComp = !!completed[key];
           const grade = isComp ? completed[key].grade || 'A' : null;
 
-          // Sequential lock: lesson is unlocked only if it's the very first OR the previous lesson is passed
-          const globalIdx = globalOrder.indexOf(key);
+          // Admin bypasses all locks
           let isLocked = false;
-          if (globalIdx > 0) {
-            const prevKey = globalOrder[globalIdx - 1];
-            isLocked = !completed[prevKey];
+          if (!isAdmin) {
+            const globalIdx = globalOrder.indexOf(key);
+            if (globalIdx > 0) {
+              const prevKey = globalOrder[globalIdx - 1];
+              isLocked = !completed[prevKey];
+            }
           }
 
           return `
@@ -681,10 +691,10 @@ function renderCurriculumWeeks() {
                    ? `showToast('🔒 ត្រូវប្រឡងជាប់មេរៀនមុនសិន ទើបអាចរៀននេះបាន!', 'warning')`
                    : `openLesson('${currentMonth.id}', '${w.id}', '${l.id}')`}">
               <div class="l-info">
-                <div class="l-title">${isLocked ? '🔒 ' : ''}${l.title}</div>
-                <div class="l-status">${isComp ? `✅ ជាប់និទ្ទេស ${grade}` : (isLocked ? '🔒 ចាំប្រឡងជាប់មេរៀនមុន' : '📖 ចុចដើម្បីរៀន')}</div>
+                <div class="l-title">${isLocked ? '🔒 ' : (isAdmin && !isComp ? '🛡️ ' : '')}${l.title}</div>
+                <div class="l-status">${isComp ? `✅ ជាប់និទ្ទេស ${grade}` : (isLocked ? '🔒 ចាំប្រឡងជាប់មេរៀនមុន' : (isAdmin ? '🛡️ Admin • ចូលបានភ្លាម' : '📖 ចុចដើម្បីរៀន'))}</div>
               </div>
-              <div class="l-icon">${isComp ? '🏆' : (isLocked ? '🔒' : '➡️')}</div>
+              <div class="l-icon">${isComp ? '🏆' : (isLocked ? '🔒' : (isAdmin ? '🛡️' : '➡️'))}</div>
             </div>
           `;
         }).join('')}
@@ -692,6 +702,7 @@ function renderCurriculumWeeks() {
     </div>
   `).join('');
 }
+
 
 // Global Audio Cache for Word & Expression clicks
 const wordAudioCache = new Map();

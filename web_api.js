@@ -2347,10 +2347,16 @@ Provide practical English pronunciation coaching:
       let rawQuestions = [];
       let quizTitle = '';
 
+      // ============================================================
+      // ADMIN BYPASS: Admins skip ALL sequential lock checks
+      // ============================================================
+      const callerIsAdmin = userId ? await isUserAdmin(userId) : false;
+
       if (type === 'beginner_final') {
         // Beginner Final Exam (20 questions covering all 26 letters A-Z)
         // Strictly verify that student has passed all 26 lessons (bl1 to bl26)
-        if (userId && db) {
+        // ADMIN BYPASS: Admin can take the final exam without prerequisites
+        if (userId && db && !callerIsAdmin) {
           const userSnap = await db.ref(`users/${userId}`).once('value');
           const userData = userSnap.val() || {};
           const completed = userData.completed_lessons || {};
@@ -2382,7 +2388,8 @@ Provide practical English pronunciation coaching:
         }
 
         // Yearly VIP check if userId provided
-        if (userId && checkYearlyVIP) {
+        // ADMIN BYPASS: Admin can take annual exams freely
+        if (userId && checkYearlyVIP && !callerIsAdmin) {
           const yearly = await checkYearlyVIP(userId);
           if (!yearly.eligible) {
             return res.status(403).json({
@@ -2400,8 +2407,9 @@ Provide practical English pronunciation coaching:
         let l = null;
         if (monthId === 'beginner' || monthId === 'm0') {
           // Sequential unlock check for Beginner Lesson: Day N requires Day N-1 passed!
+          // ADMIN BYPASS: Admin can access any beginner lesson directly
           const lessonNum = parseInt((lessonId || '').replace('bl', ''));
-          if (lessonNum > 1 && userId && db) {
+          if (lessonNum > 1 && userId && db && !callerIsAdmin) {
             const prevLessonId = `bl${lessonNum - 1}`;
             const userSnap = await db.ref(`users/${userId}`).once('value');
             const userData = userSnap.val() || {};
@@ -2425,8 +2433,9 @@ Provide practical English pronunciation coaching:
           // SEQUENTIAL LOCK FOR STANDARD 12-MONTH COURSE
           // A lesson is locked unless the previous lesson in the global
           // curriculum order has been passed by this user.
+          // ADMIN BYPASS: Admin can access any lesson directly
           // ============================================================
-          if (userId && db && monthId && weekId && lessonId) {
+          if (userId && db && monthId && weekId && lessonId && !callerIsAdmin) {
             // Build global ordered list: [{key: 'm1-w1-l1'}, ...]
             const globalOrder = [];
             if (curriculum && curriculum.months) {
