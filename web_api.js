@@ -2421,6 +2421,45 @@ Provide practical English pronunciation coaching:
           l = w?.lessons.find(l => l.id === lessonId);
           qList = l ? generateQuiz(l) : [];
         } else {
+          // ============================================================
+          // SEQUENTIAL LOCK FOR STANDARD 12-MONTH COURSE
+          // A lesson is locked unless the previous lesson in the global
+          // curriculum order has been passed by this user.
+          // ============================================================
+          if (userId && db && monthId && weekId && lessonId) {
+            // Build global ordered list: [{key: 'm1-w1-l1'}, ...]
+            const globalOrder = [];
+            if (curriculum && curriculum.months) {
+              for (const m of curriculum.months) {
+                for (const w of m.weeks || []) {
+                  for (const lsn of w.lessons || []) {
+                    globalOrder.push({ key: `${m.id}-${w.id}-${lsn.id}`, mId: m.id, wId: w.id, lId: lsn.id, title: lsn.title });
+                  }
+                }
+              }
+            }
+
+            const currentKey = `${monthId}-${weekId}-${lessonId}`;
+            const currentIdx = globalOrder.findIndex(x => x.key === currentKey);
+
+            // Only lock if it's not the very first lesson
+            if (currentIdx > 0) {
+              const prevLesson = globalOrder[currentIdx - 1];
+              const userSnap = await db.ref(`users/${userId}/completed_lessons/${prevLesson.key}`).once('value');
+              const prevData = userSnap.val();
+              const prevPassed = prevData && (prevData.isPassed || ['A', 'B', 'C'].includes(prevData.grade) || (prevData.percent && prevData.percent >= 70));
+
+              if (!prevPassed) {
+                return res.status(403).json({
+                  error: `🔒 ត្រូវប្រឡងជាប់មេរៀន "${prevLesson.title}" ជាមុនសិន ទើបអាចចូលប្រឡងមេរៀននេះបាន!`,
+                  isLocked: true,
+                  prevLessonKey: prevLesson.key,
+                  prevLessonTitle: prevLesson.title
+                });
+              }
+            }
+          }
+
           qList = generateQuiz(curriculum, monthId, weekId, lessonId);
           const m = curriculum.months.find(m => m.id === monthId);
           const w = m?.weeks.find(w => w.id === weekId);

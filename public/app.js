@@ -646,6 +646,16 @@ function renderCurriculumWeeks() {
 
   const completed = STATE.currentUser?.completedLessons || {};
 
+  // Build global ordered lesson list for sequential lock checking
+  const globalOrder = [];
+  STATE.curriculum.forEach(m => {
+    (m.weeks || []).forEach(w => {
+      (w.lessons || []).forEach(l => {
+        globalOrder.push(`${m.id}-${w.id}-${l.id}`);
+      });
+    });
+  });
+
   container.innerHTML = currentMonth.weeks.map(w => `
     <div class="week-card glass-panel">
       <div class="week-header">
@@ -656,13 +666,25 @@ function renderCurriculumWeeks() {
           const key = `${currentMonth.id}-${w.id}-${l.id}`;
           const isComp = !!completed[key];
           const grade = isComp ? completed[key].grade || 'A' : null;
+
+          // Sequential lock: lesson is unlocked only if it's the very first OR the previous lesson is passed
+          const globalIdx = globalOrder.indexOf(key);
+          let isLocked = false;
+          if (globalIdx > 0) {
+            const prevKey = globalOrder[globalIdx - 1];
+            isLocked = !completed[prevKey];
+          }
+
           return `
-            <div class="lesson-item-card ${isComp ? 'completed' : ''}" onclick="openLesson('${currentMonth.id}', '${w.id}', '${l.id}')">
+            <div class="lesson-item-card ${isComp ? 'completed' : ''} ${isLocked ? 'lesson-locked' : ''}"
+                 onclick="${isLocked
+                   ? `showToast('🔒 ត្រូវប្រឡងជាប់មេរៀនមុនសិន ទើបអាចរៀននេះបាន!', 'warning')`
+                   : `openLesson('${currentMonth.id}', '${w.id}', '${l.id}')`}">
               <div class="l-info">
-                <div class="l-title">${l.title}</div>
-                <div class="l-status">${isComp ? `✅ ជាប់និទ្ទេស ${grade}` : '📖 ចុចដើម្បីរៀន'}</div>
+                <div class="l-title">${isLocked ? '🔒 ' : ''}${l.title}</div>
+                <div class="l-status">${isComp ? `✅ ជាប់និទ្ទេស ${grade}` : (isLocked ? '🔒 ចាំប្រឡងជាប់មេរៀនមុន' : '📖 ចុចដើម្បីរៀន')}</div>
               </div>
-              <div class="l-icon">${isComp ? '🏆' : '➡️'}</div>
+              <div class="l-icon">${isComp ? '🏆' : (isLocked ? '🔒' : '➡️')}</div>
             </div>
           `;
         }).join('')}
