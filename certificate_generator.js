@@ -219,19 +219,23 @@ async function generateCertificateHTML(data) {
 
     /* -------- HEADER -------- */
     .hdr {
-      display: flex; align-items: center; justify-content: space-between;
-      margin-bottom: 2px; position: relative; z-index: 1;
+      display: flex; align-items: flex-start; justify-content: space-between;
+      position: relative; z-index: 1;
     }
-    /* Logo in header: 2x size (140px), transparent background */
+    /* Logo in header: enlarged x3 (~175px), centered in remaining left space, shifted down */
     .hdr-logo-box {
-      width: 90px; display: flex; align-items: center; justify-content: flex-start;
+      width: 260px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding-top: 15px;
     }
     .hdr-logo {
-      width: 80px; height: 80px;
+      width: 175px; height: 175px;
       object-fit: contain; border-radius: 50%;
-      filter: drop-shadow(0 3px 10px rgba(0,0,0,0.18));
+      filter: drop-shadow(0 4px 12px rgba(0,0,0,0.18));
     }
-    .hdr-spacer { width: 90px; } /* Balanced spacer matching logo side */
+    .hdr-spacer { width: 260px; } /* Balanced spacer matching logo side */
     .hdr-center { flex: 1; text-align: center; padding: 0 10px; }
     .kingdom-box { margin-bottom: 3px; }
     .kingdom-title {
