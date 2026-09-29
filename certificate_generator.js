@@ -361,11 +361,11 @@ async function generateCertificateHTML(data) {
       height: 145px;
       margin: 0 auto;
     }
-    /* Official stamp: positioned BELOW the director title so it does NOT block the text */
+    /* Official stamp: positioned HIGHER so it aligns with the date (បាត់ដំបង) */
     .stamp-official {
       position: absolute;
       left: -12px;
-      top: 10px; /* ចុះក្រោម → មិនបាំងអក្សរ "នាយកវិទ្យាស្ថាន" */
+      top: -40px; /* ខិតលើ កម្ពស់ស្មើអក្សរបាត់ដំបង */
       width: 200px;
       height: 200px;
       object-fit: contain;
@@ -488,7 +488,7 @@ async function generateCertificateHTML(data) {
             <!-- Director Right: Date + Role + Container(Big Stamp Left Shifted Up + Sig Right) + Underline Name -->
             <div class="dir-block">
               <div class="dir-date-khmer">
-                រាជធានីភ្នំពេញ ថ្ងៃទី ${toKhmerNum(now.getDate())} ខែ${khMonths[now.getMonth()]} ឆ្នាំ${toKhmerNum(now.getFullYear())}
+                បាត់ដំបង ថ្ងៃទី ${toKhmerNum(now.getDate())} ខែ${khMonths[now.getMonth()]} ឆ្នាំ${toKhmerNum(now.getFullYear())}
               </div>
               <div class="dir-role-kh">នាយកវិទ្យាស្ថាន</div>
 
