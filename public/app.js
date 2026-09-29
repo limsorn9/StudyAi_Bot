@@ -296,6 +296,8 @@ function navigateTo(tabName) {
   // Tab-specific hooks
   if (tabName === 'curriculum') {
     renderCurriculumWeeks();
+  } else if (tabName === 'ai-tutor') {
+    initAIStudioTab();
   } else if (tabName === 'annual-exams') {
     loadAnnualExams();
   } else if (tabName === 'certificates') {
@@ -819,41 +821,88 @@ function resetAudioPlayer() {
 }
 
 // ==========================================
-// 5. AI TUTOR CHAT DRAWER
+// 5. AI TUTOR CHAT & UNIVERSAL AI SUITE
 // ==========================================
+
+function formatMarkdownText(text) {
+  if (!text) return '';
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/```([a-zA-Z0-9]*)\n([\s\S]*?)```/g, '<pre class="ai-code-block"><code>$2</code></pre>')
+    .replace(/`([^`]+)`/g, '<code class="ai-inline-code">$1</code>')
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+    .replace(/^### (.*?)$/gm, '<h4 class="ai-heading-3">$1</h4>')
+    .replace(/^## (.*?)$/gm, '<h3 class="ai-heading-2">$1</h3>')
+    .replace(/^# (.*?)$/gm, '<h2 class="ai-heading-1">$1</h2>')
+    .replace(/^\* (.*?)$/gm, '<div class="ai-bullet">• $1</div>')
+    .replace(/^- (.*?)$/gm, '<div class="ai-bullet">• $1</div>')
+    .replace(/\n\n/g, '<br><br>')
+    .replace(/\n/g, '<br>');
+}
+
+function copyBubbleText(btn) {
+  const contentEl = btn.closest('.chat-bubble')?.querySelector('.ai-bubble-content') || btn.parentElement;
+  if (!contentEl) return;
+  const textToCopy = contentEl.innerText || contentEl.textContent || '';
+  navigator.clipboard.writeText(textToCopy).then(() => {
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '✓ បានចម្លង';
+    setTimeout(() => { btn.innerHTML = originalText; }, 2000);
+  }).catch(() => {
+    showToast('បរាជ័យក្នុងការចម្លង', 'error');
+  });
+}
 
 async function playTTS(text, btnElement) {
   if (!text) return;
   const originalHtml = btnElement.innerHTML;
-  btnElement.innerHTML = '⏳';
-  
+  btnElement.innerHTML = '⏳ កំពុងដំណើរការ...';
+  btnElement.disabled = true;
+
   try {
+    const isEnglish = /[a-zA-Z]{4,}/.test(text);
     const res = await fetch('/api/tts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, lang: 'km' })
+      body: JSON.stringify({
+        text,
+        lang: isEnglish ? 'en' : 'km'
+      })
     });
-    
+
     if (!res.ok) throw new Error('TTS Failed');
-    
+
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const audio = new Audio(url);
-    
-    btnElement.innerHTML = '🔊';
+
+    btnElement.innerHTML = '🔊 កំពុងនិយាយ...';
     btnElement.classList.add('playing');
-    
+    btnElement.disabled = false;
+
     audio.play();
     audio.onended = () => {
       btnElement.innerHTML = originalHtml;
       btnElement.classList.remove('playing');
       URL.revokeObjectURL(url);
     };
+    audio.onerror = () => {
+      btnElement.innerHTML = originalHtml;
+      btnElement.classList.remove('playing');
+    };
   } catch (err) {
-    btnElement.innerHTML = '❌';
+    btnElement.innerHTML = '❌ មិនអាចចាក់បាន';
+    btnElement.disabled = false;
     setTimeout(() => { btnElement.innerHTML = originalHtml; }, 2000);
   }
 }
+
+// ----------------------------------------------------
+// A. LESSON VIEW AI CHAT DRAWER
+// ----------------------------------------------------
 
 let mediaRecorder;
 let audioChunks = [];
@@ -861,7 +910,7 @@ let audioChunks = [];
 async function toggleVoiceRecord() {
   const btn = document.getElementById('recordVoiceBtn');
   const input = document.getElementById('chatInput');
-  
+
   if (mediaRecorder && mediaRecorder.state === 'recording') {
     mediaRecorder.stop();
     btn.innerHTML = '🎤';
@@ -881,24 +930,24 @@ async function toggleVoiceRecord() {
     mediaRecorder.onstop = async () => {
       stream.getTracks().forEach(track => track.stop());
       const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-      
+
       const oldPlaceholder = input.placeholder;
       input.placeholder = "⏳ កំពុងបំប្លែងសំឡេង...";
-      
+
       try {
         const res = await fetch('/api/stt', {
           method: 'POST',
           body: audioBlob
         });
         const data = await res.json();
-        
+
         if (data.success && data.text) {
           input.value = data.text;
           sendChatMessage();
         } else {
           showToast("បរាជ័យក្នុងការបំប្លែងសំឡេង", "error");
         }
-      } catch(err) {
+      } catch (err) {
         showToast("បរាជ័យក្នុងការបំប្លែងសំឡេង", "error");
       }
       input.placeholder = oldPlaceholder;
@@ -941,18 +990,27 @@ async function sendChatMessage() {
       body: JSON.stringify({
         userId: STATE.currentUser?.id || 'guest',
         message: msg,
-        lessonTitle: STATE.currentLesson?.title || 'General English'
+        lessonTitle: STATE.currentLesson?.title || 'General English',
+        preferredAI: STATE.preferredAI || 'auto'
       })
     });
 
     const data = await res.json();
     const cleanReply = data.reply || 'សូមអភ័យទោស ខ្ញុំមិនអាចឆ្លើយបានទេ។';
-    
-    // Create text container and TTS button
-    const safeText = cleanReply.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-    thinkBubble.innerHTML = cleanReply.replace(/\n/g, '<br>') + 
-      `<button class="tts-btn" onclick="playTTS('${safeText}', this)" title="ស្តាប់សំឡេង (Listen)">🔊</button>`;
-      
+    const provider = data.provider || 'AI';
+
+    thinkBubble.innerHTML = `
+      <div class="ai-bubble-header">
+        <span class="ai-bubble-author">👨‍🏫 គ្រូសន (Teacher Sorn)</span>
+        <span class="ai-bubble-badge">${provider}</span>
+      </div>
+      <div class="ai-bubble-content">${formatMarkdownText(cleanReply)}</div>
+      <div class="ai-bubble-actions">
+        <button class="tts-btn" onclick="playTTS(this.parentElement.previousElementSibling.innerText, this)" title="ស្តាប់សំឡេង (Listen)">🔊 ស្តាប់</button>
+        <button class="copy-btn" onclick="copyBubbleText(this)" title="ចម្លងអត្ថបទ">📋 ចម្លង</button>
+      </div>
+    `;
+
     chatBox.scrollTop = chatBox.scrollHeight;
   } catch (e) {
     thinkBubble.textContent = '⚠️ មានបញ្ហាក្នុងការតភ្ជាប់ជាមួយ AI';
@@ -968,6 +1026,421 @@ function sendQuickPrompt(promptText) {
   if (input) {
     input.value = promptText;
     sendChatMessage();
+  }
+}
+
+// ----------------------------------------------------
+// B. FULL-PAGE AI TUTOR STUDIO (#tab-ai-tutor)
+// ----------------------------------------------------
+
+let studioMediaRecorder;
+let studioAudioChunks = [];
+
+function initAIStudioTab() {
+  const select = document.getElementById('aiEngineSelect');
+  if (select && STATE.preferredAI) {
+    select.value = STATE.preferredAI;
+  }
+
+  // Load past history if user logged in
+  if (STATE.currentUser && !STATE.chatHistoryLoaded) {
+    loadStudioChatHistory();
+  }
+}
+
+function handleEngineChange() {
+  const select = document.getElementById('aiEngineSelect');
+  if (select) {
+    STATE.preferredAI = select.value;
+    localStorage.setItem('preferredAI', select.value);
+    showToast(`ម៉ាស៊ីន AI ត្រូវបានប្តូរទៅ៖ ${select.options[select.selectedIndex].text}`, 'info');
+  }
+}
+
+function triggerStudioTool(toolType) {
+  const input = document.getElementById('studioChatInput');
+  if (!input) return;
+
+  if (toolType === 'explain') {
+    input.value = 'សូមជួយពន្យល់ពី ';
+    input.focus();
+  } else if (toolType === 'grammar') {
+    input.value = 'សូមជួយពិនិត្យ និងកែកំហុសវេយ្យាករណ៍ប្រយោគនេះ៖ "';
+    input.focus();
+  } else if (toolType === 'translate') {
+    input.value = 'សូមជួយបកប្រែពាក្យ/ប្រយោគនេះ៖ "';
+    input.focus();
+  } else if (toolType === 'verb') {
+    input.value = 'សូមបង្ហាញទម្រង់ V1, V2, V3 និងអត្ថន័យនៃកិរិយាសព្ទ៖ ';
+    input.focus();
+  } else if (toolType === 'pronounce') {
+    input.value = 'សូមប្រាប់ពីរបៀបបញ្ចេញសំឡេងពាក្យ៖ ';
+    input.focus();
+  }
+}
+
+async function sendStudioChatMessage() {
+  const input = document.getElementById('studioChatInput');
+  const msg = input ? input.value.trim() : '';
+  if (!msg) return;
+
+  const chatBox = document.getElementById('aiStudioMessagesBox');
+  input.value = '';
+
+  // Append user message
+  const userBubble = document.createElement('div');
+  userBubble.className = 'chat-bubble user';
+  userBubble.textContent = msg;
+  chatBox.appendChild(userBubble);
+  chatBox.scrollTop = chatBox.scrollHeight;
+
+  // Append thinking bubble
+  const thinkBubble = document.createElement('div');
+  thinkBubble.className = 'chat-bubble ai';
+  thinkBubble.innerHTML = `
+    <div class="ai-bubble-header">
+      <span class="ai-bubble-author">👨‍🏫 គ្រូសន (Teacher Sorn)</span>
+      <span class="ai-bubble-badge">កំពុងដំណើរការ...</span>
+    </div>
+    <div class="ai-bubble-content">⏳ <em>គ្រូសនកំពុងគិត និងរៀបចំការឆ្លើយតប...</em></div>
+  `;
+  chatBox.appendChild(thinkBubble);
+  chatBox.scrollTop = chatBox.scrollHeight;
+
+  // Determine mode
+  let mode = 'chat';
+  if (msg.includes('កែកំហុស') || msg.includes('វេយ្យាករណ៍')) mode = 'grammar';
+  else if (msg.includes('បកប្រែ') || msg.includes('translate')) mode = 'translate';
+  else if (msg.includes('កិរិយាសព្ទ') || msg.includes('V1') || msg.includes('V2')) mode = 'verb';
+  else if (msg.includes('បញ្ចេញសំឡេង') || msg.includes('pronounce')) mode = 'pronounce';
+
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: STATE.currentUser?.id || 'guest',
+        message: msg,
+        preferredAI: STATE.preferredAI || 'auto',
+        mode: mode,
+        lessonTitle: STATE.currentLesson?.title || 'General English Study'
+      })
+    });
+
+    const data = await res.json();
+    const cleanReply = data.reply || 'សូមអភ័យទោស ខ្ញុំមិនអាចឆ្លើយបានទេ។';
+    const provider = data.provider || 'AI';
+    const model = data.model ? ` • ${data.model}` : '';
+
+    thinkBubble.innerHTML = `
+      <div class="ai-bubble-header">
+        <span class="ai-bubble-author">👨‍🏫 គ្រូសន (Teacher Sorn)</span>
+        <span class="ai-bubble-badge">${provider}${model}</span>
+      </div>
+      <div class="ai-bubble-content">${formatMarkdownText(cleanReply)}</div>
+      <div class="ai-bubble-actions">
+        <button class="tts-btn" onclick="playTTS(this.parentElement.previousElementSibling.innerText, this)" title="ស្តាប់សំឡេង (Listen)">🔊 ស្តាប់</button>
+        <button class="copy-btn" onclick="copyBubbleText(this)" title="ចម្លងអត្ថបទ">📋 ចម្លង</button>
+      </div>
+    `;
+
+    chatBox.scrollTop = chatBox.scrollHeight;
+  } catch (err) {
+    thinkBubble.innerHTML = `
+      <div class="ai-bubble-header">
+        <span class="ai-bubble-author">👨‍🏫 គ្រូសន (Teacher Sorn)</span>
+        <span class="ai-bubble-badge text-rose-400">កំហុស</span>
+      </div>
+      <div class="ai-bubble-content">⚠️ មានបញ្ហាក្នុងការតភ្ជាប់ជាមួយម៉ាស៊ីន AI។ សូមពិនិត្យការភ្ជាប់អ៊ីនធឺណិត ឬប្តូរម៉ាស៊ីន AI ខាងលើ។</div>
+    `;
+  }
+}
+
+function handleStudioChatKeyPress(e) {
+  if (e.key === 'Enter') sendStudioChatMessage();
+}
+
+function sendStudioPrompt(promptText) {
+  const input = document.getElementById('studioChatInput');
+  if (input) {
+    input.value = promptText;
+    sendStudioChatMessage();
+  }
+}
+
+async function clearStudioChatHistory() {
+  if (!confirm('តើអ្នកពិតជាចង់សម្អាតប្រវត្តិសារទាំងអស់មែនទេ?')) return;
+
+  if (STATE.currentUser) {
+    try {
+      await fetch('/api/chat/history', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: STATE.currentUser.id })
+      });
+    } catch (e) {}
+  }
+
+  const chatBox = document.getElementById('aiStudioMessagesBox');
+  if (chatBox) {
+    chatBox.innerHTML = `
+      <div class="chat-bubble ai">
+        <div class="ai-bubble-header">
+          <span class="ai-bubble-author">👨‍🏫 គ្រូសន (Teacher Sorn)</span>
+          <span class="ai-bubble-badge">Official AI</span>
+        </div>
+        <div class="ai-bubble-content">
+          សារទាំងអស់ត្រូវបានសម្អាតរួចរាល់! 🎉<br>
+          តើប្អូនមានសំណួរអ្វីថ្មីទៀតទេ? គ្រូសនត្រៀមជួយប្អូនជានិច្ច!
+        </div>
+      </div>
+    `;
+  }
+  showToast('បានសម្អាតប្រវត្តិសារជោគជ័យ!', 'success');
+}
+
+async function loadStudioChatHistory() {
+  if (!STATE.currentUser) return;
+  try {
+    const res = await fetch(`/api/chat/history?userId=${STATE.currentUser.id}&limit=25`);
+    const data = await res.json();
+
+    if (data.success && Array.isArray(data.history) && data.history.length > 0) {
+      STATE.chatHistoryLoaded = true;
+      const chatBox = document.getElementById('aiStudioMessagesBox');
+      if (!chatBox) return;
+
+      chatBox.innerHTML = '';
+      data.history.forEach(item => {
+        const bubble = document.createElement('div');
+        if (item.role === 'user') {
+          bubble.className = 'chat-bubble user';
+          bubble.textContent = item.text;
+        } else {
+          bubble.className = 'chat-bubble ai';
+          bubble.innerHTML = `
+            <div class="ai-bubble-header">
+              <span class="ai-bubble-author">👨‍🏫 គ្រូសន (Teacher Sorn)</span>
+              <span class="ai-bubble-badge">${item.provider || 'AI'}</span>
+            </div>
+            <div class="ai-bubble-content">${formatMarkdownText(item.text)}</div>
+            <div class="ai-bubble-actions">
+              <button class="tts-btn" onclick="playTTS(this.parentElement.previousElementSibling.innerText, this)" title="ស្តាប់សំឡេង">🔊 ស្តាប់</button>
+              <button class="copy-btn" onclick="copyBubbleText(this)" title="ចម្លង">📋 ចម្លង</button>
+            </div>
+          `;
+        }
+        chatBox.appendChild(bubble);
+      });
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+  } catch (err) {
+    console.warn('Could not load chat history:', err);
+  }
+}
+
+async function toggleStudioVoiceRecord() {
+  const btn = document.getElementById('studioRecordVoiceBtn');
+  const input = document.getElementById('studioChatInput');
+
+  if (studioMediaRecorder && studioMediaRecorder.state === 'recording') {
+    studioMediaRecorder.stop();
+    btn.innerHTML = '<span class="mic-icon">🎤</span>';
+    btn.classList.remove('recording');
+    return;
+  }
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    studioMediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+    studioAudioChunks = [];
+
+    studioMediaRecorder.ondataavailable = e => {
+      if (e.data.size > 0) studioAudioChunks.push(e.data);
+    };
+
+    studioMediaRecorder.onstop = async () => {
+      stream.getTracks().forEach(track => track.stop());
+      const audioBlob = new Blob(studioAudioChunks, { type: 'audio/webm' });
+
+      const oldPlaceholder = input.placeholder;
+      input.placeholder = "⏳ កំពុងបំប្លែងសំឡេងនិយាយទៅជាអក្សរ (STT)...";
+
+      try {
+        const res = await fetch('/api/stt', {
+          method: 'POST',
+          body: audioBlob
+        });
+        const data = await res.json();
+
+        if (data.success && data.text) {
+          input.value = data.text;
+          sendStudioChatMessage();
+        } else {
+          showToast("បរាជ័យក្នុងការបំប្លែងសំឡេង សូមសាកល្បងម្តងទៀត", "error");
+        }
+      } catch (err) {
+        showToast("បរាជ័យក្នុងការបំប្លែងសំឡេង", "error");
+      }
+      input.placeholder = oldPlaceholder;
+    };
+
+    studioMediaRecorder.start();
+    btn.innerHTML = '<span class="mic-icon">⏹️</span>';
+    btn.classList.add('recording');
+    showToast('🎙️ កំពុងថតសំឡេង... និយាយភាសាខ្មែរ ឬអង់គ្លេស រួចចុចម្តងទៀតដើម្បីផ្ញើ!', 'info');
+  } catch (err) {
+    alert("សូមអនុញ្ញាតឱ្យប្រើប្រាស់មីក្រូហ្វូនក្នុង Browser របស់អ្នក!");
+  }
+}
+
+// ----------------------------------------------------
+// C. UNIVERSAL FLOATING AI ASSISTANT WIDGET
+// ----------------------------------------------------
+
+let floatingMediaRecorder;
+let floatingAudioChunks = [];
+
+function toggleFloatingChat() {
+  const drawer = document.getElementById('floatingChatDrawer');
+  if (drawer) {
+    drawer.classList.toggle('hidden');
+    if (!drawer.classList.contains('hidden')) {
+      const input = document.getElementById('floatingChatInput');
+      if (input) input.focus();
+
+      // Update context label
+      const label = document.getElementById('floatingContextLabel');
+      if (label) {
+        if (STATE.activeTab === 'lesson' && STATE.currentLesson) {
+          label.textContent = `🟢 មេរៀន៖ ${STATE.currentLesson.title.substring(0, 16)}...`;
+        } else {
+          label.textContent = '🟢 អនឡាញ • ជួយឆ្លើយគ្រប់ទំព័រ';
+        }
+      }
+    }
+  }
+}
+
+async function sendFloatingChatMessage() {
+  const input = document.getElementById('floatingChatInput');
+  const msg = input ? input.value.trim() : '';
+  if (!msg) return;
+
+  const chatBox = document.getElementById('floatingChatMessagesBox');
+  input.value = '';
+
+  // Append user bubble
+  const userBubble = document.createElement('div');
+  userBubble.className = 'chat-bubble user';
+  userBubble.textContent = msg;
+  chatBox.appendChild(userBubble);
+  chatBox.scrollTop = chatBox.scrollHeight;
+
+  // Append thinking bubble
+  const thinkBubble = document.createElement('div');
+  thinkBubble.className = 'chat-bubble ai';
+  thinkBubble.innerHTML = '⏳ <em>គ្រូសនកំពុងគិត...</em>';
+  chatBox.appendChild(thinkBubble);
+  chatBox.scrollTop = chatBox.scrollHeight;
+
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: STATE.currentUser?.id || 'guest',
+        message: msg,
+        preferredAI: STATE.preferredAI || 'auto',
+        lessonTitle: STATE.currentLesson?.title || 'General English',
+        extraContext: `Page: ${STATE.activeTab}`
+      })
+    });
+
+    const data = await res.json();
+    const cleanReply = data.reply || 'សូមអភ័យទោស ខ្ញុំមិនអាចឆ្លើយបានទេ។';
+    const provider = data.provider || 'AI';
+
+    thinkBubble.innerHTML = `
+      <div class="ai-bubble-header">
+        <span class="ai-bubble-author">👨‍🏫 គ្រូសន</span>
+        <span class="ai-bubble-badge">${provider}</span>
+      </div>
+      <div class="ai-bubble-content">${formatMarkdownText(cleanReply)}</div>
+      <div class="ai-bubble-actions">
+        <button class="tts-btn" onclick="playTTS(this.parentElement.previousElementSibling.innerText, this)" title="ស្តាប់សំឡេង">🔊 ស្តាប់</button>
+      </div>
+    `;
+
+    chatBox.scrollTop = chatBox.scrollHeight;
+  } catch (err) {
+    thinkBubble.textContent = '⚠️ មានបញ្ហាក្នុងការតភ្ជាប់ជាមួយ AI';
+  }
+}
+
+function handleFloatingChatKey(e) {
+  if (e.key === 'Enter') sendFloatingChatMessage();
+}
+
+function sendFloatingPrompt(promptText) {
+  const input = document.getElementById('floatingChatInput');
+  if (input) {
+    input.value = promptText;
+    sendFloatingChatMessage();
+  }
+}
+
+async function toggleFloatingVoiceRecord() {
+  const btn = document.getElementById('floatingMicBtn');
+  const input = document.getElementById('floatingChatInput');
+
+  if (floatingMediaRecorder && floatingMediaRecorder.state === 'recording') {
+    floatingMediaRecorder.stop();
+    btn.innerHTML = '🎤';
+    btn.classList.remove('recording');
+    return;
+  }
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    floatingMediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+    floatingAudioChunks = [];
+
+    floatingMediaRecorder.ondataavailable = e => {
+      if (e.data.size > 0) floatingAudioChunks.push(e.data);
+    };
+
+    floatingMediaRecorder.onstop = async () => {
+      stream.getTracks().forEach(track => track.stop());
+      const audioBlob = new Blob(floatingAudioChunks, { type: 'audio/webm' });
+
+      const oldPlaceholder = input.placeholder;
+      input.placeholder = "⏳ កំពុងបំប្លែងសំឡេង...";
+
+      try {
+        const res = await fetch('/api/stt', {
+          method: 'POST',
+          body: audioBlob
+        });
+        const data = await res.json();
+
+        if (data.success && data.text) {
+          input.value = data.text;
+          sendFloatingChatMessage();
+        } else {
+          showToast("បរាជ័យក្នុងការបំប្លែងសំឡេង", "error");
+        }
+      } catch (err) {
+        showToast("បរាជ័យក្នុងការបំប្លែងសំឡេង", "error");
+      }
+      input.placeholder = oldPlaceholder;
+    };
+
+    floatingMediaRecorder.start();
+    btn.innerHTML = '⏹️';
+    btn.classList.add('recording');
+  } catch (err) {
+    alert("សូមអនុញ្ញាតឱ្យប្រើប្រាស់មីក្រូហ្វូនក្នុង Browser របស់អ្នក!");
   }
 }
 

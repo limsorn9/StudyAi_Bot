@@ -97,58 +97,318 @@ function createWebAPIRouter({ db, auth, curriculum, bot, SUPER_ADMIN_IDS, checkV
 
 
 
-  // Helper: AI Text Generator for Web Chat
-  async function generateAIAnswer(userText, context = {}) {
-    // 1. Try Groq (Fastest)
+  // ==========================================
+  // MULTI-ENGINE AI & KEY ROTATION SYSTEM
+  // ==========================================
+
+  const allGroqKeys = (process.env.GROQ_API_KEYS || process.env.GROQ_API_KEY || "").split(',').map(k => k.trim()).filter(Boolean);
+  let localGroqIdx = 0;
+  function getGroqApiKey() {
     if (typeof getNextGroqKey === 'function') {
-      const groqKey = getNextGroqKey();
-      if (groqKey) {
-        try {
-          const groq = new Groq({ apiKey: groqKey });
-          const completion = await groq.chat.completions.create({
-            model: 'llama-3.3-70b-versatile',
-            messages: [
-              {
-                role: 'system',
-                content: `You are Teacher Sorn (គ្រូសន), an expert English teacher at Teacher SSOnline English Institute (វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline).
-You speak Khmer and English fluently.
-Explain concepts clearly in Khmer and provide practical English examples.
-Current lesson context: ${context.lessonTitle || 'General English'}.
-Keep responses helpful, concise, well-formatted, and encouraging. Always refer to yourself as គ្រូសន (Teacher Sorn).`
-              },
-              { role: 'user', content: userText }
-            ],
-            temperature: 0.6,
-            max_tokens: 800
-          });
-          if (completion.choices?.[0]?.message?.content) {
-            return completion.choices[0].message.content;
-          }
-        } catch (err) {
-          console.warn('Web API Groq error:', err.message);
-        }
-      }
+      const k = getNextGroqKey();
+      if (k) return k;
     }
+    if (allGroqKeys.length > 0) {
+      const k = allGroqKeys[localGroqIdx % allGroqKeys.length];
+      localGroqIdx++;
+      return k;
+    }
+    return null;
+  }
 
-    // 2. Try Gemini
+  const allGeminiKeys = (process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || "").split(',').map(k => k.trim()).filter(Boolean);
+  let localGeminiIdx = 0;
+  function getGeminiApiKey() {
     if (typeof getNextGeminiKey === 'function') {
-      const geminiKey = getNextGeminiKey();
-      if (geminiKey) {
-        try {
-          const genAI = new GoogleGenerativeAI(geminiKey);
-          const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-          const prompt = `You are Teacher Sorn (គ្រូសន), English teacher at Teacher SSOnline Institute.
-Explain clearly in Khmer with English examples. Current lesson: ${context.lessonTitle || 'English Study'}.
-Student Question: ${userText}`;
-          const result = await model.generateContent(prompt);
-          return result.response.text();
-        } catch (err) {
-          console.warn('Web API Gemini error:', err.message);
+      const k = getNextGeminiKey();
+      if (k) return k;
+    }
+    if (allGeminiKeys.length > 0) {
+      const k = allGeminiKeys[localGeminiIdx % allGeminiKeys.length];
+      localGeminiIdx++;
+      return k;
+    }
+    return null;
+  }
+
+  const GEMINI_MODELS_POOL = [
+    'gemini-flash-lite-latest',
+    'gemini-3.8-flash',
+    'gemini-flash-latest',
+    'gemini-2.5-flash-lite',
+    'gemini-2.5-pro'
+  ];
+
+  const GROQ_MODELS_POOL = [
+    'llama-3.3-70b-versatile',
+    'llama-3.1-8b-instant',
+    'mixtral-8x7b-32768'
+  ];
+
+  /**
+   * Universal AI Text Generator for Web App & Teacher Sorn Tutor
+   * Features:
+   * - Automatic engine fallback: Groq -> Gemini -> OpenAI
+   * - Key rotation across all configured keys
+   * - Context-aware (current lesson, student progress, mode)
+   * - Persistent memory sync with Firebase database
+   */
+  async function generateAIAnswer(userText, options = {}) {
+    const {
+      lessonTitle = '',
+      userId = null,
+      preferredAI = 'auto',
+      mode = 'chat',
+      extraContext = '',
+      clientHistory = []
+    } = options;
+
+    // 1. Build Persona System Prompt based on Mode
+    let systemPrompt = `You are Teacher Sorn (គ្រូសន), a renowned and encouraging English teacher at Teacher SSOnline English Institute (វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline).
+You speak fluent Khmer (ភាសាខ្មែរ) and natural American/British English.
+Always refer to yourself as គ្រូសន (Teacher Sorn) when replying in Khmer.
+Structure your answers clearly using clean Markdown, bold headers, bullet points, and practical examples.
+Keep your tone warm, friendly, professional, and educational.`;
+
+    if (mode === 'grammar') {
+      systemPrompt += `\n\n[SPECIAL MODE: GRAMMAR ANALYZER & WRITING COACH]
+Analyze the student's English input: "${userText}"
+Format your response with:
+1. 📊 ស្ថានភាពវេយ្យាករណ៍ (Grammar Status): [✅ ត្រឹមត្រូវល្អ / ⚠️ មានចំណុចត្រូវកែ / ❌ មានកំហុសវេយ្យាករណ៍]
+2. ✍️ ប្រយោគកែតម្រូវត្រឹមត្រូវ (Corrected English): [Write corrected sentence in bold]
+3. 💡 ការពន្យល់ក្បោះក្បាយជាភាសាខ្មែរ (Khmer Explanation): [Explain clearly why each correction was made]
+4. 📝 ឧទាហរណ៍ប្រើប្រាស់បន្ថែម (Natural Examples): [Provide 2 natural sentences in English + Khmer translation]`;
+    } else if (mode === 'translate') {
+      systemPrompt += `\n\n[SPECIAL MODE: BILINGUAL TRANSLATOR & VOCABULARY COACH]
+Accurately translate the text between Khmer and English:
+1. 🔄 ការបកប្រែត្រឹមត្រូវ (Accurate Translation): [Clear natural translation]
+2. 🗣️ ការបញ្ចេញសំឡេង (Pronunciation / Phonetics): [IPA and Khmer sound phonetic approximation]
+3. 📖 ការពន្យល់ពាក្យគន្លឹះ (Key Vocabulary & Nuance): [Explain words used]
+4. 📝 ឧទាហរណ៍ជាក់ស្តែង (2 Example Sentences): [Provide 2 natural bilingual sentences]`;
+    } else if (mode === 'verb') {
+      systemPrompt += `\n\n[SPECIAL MODE: IRREGULAR VERBS ASSISTANT]
+Provide a complete guide for the requested verb:
+1. 📋 ទម្រង់កិរិយាសព្ទទាំង ៣ (3 Forms):
+   • V1 (Base Form): ...
+   • V2 (Past Simple): ...
+   • V3 (Past Participle): ...
+   • V-ing (Present Participle): ...
+2. 🇰🇭 អត្ថន័យជាភាសាខ្មែរ (Khmer Meaning): ...
+3. 📝 ឧទាហរណ៍ក្នុងកាលនីមួយៗ (Examples in Tenses):
+   • Present Simple: ...
+   • Past Simple: ...
+   • Present Perfect: ...
+4. ⚠️ កំហុសដែលសិស្សឧស្សាហ៍ច្រឡំ (Common Pitfalls & Tips): ...`;
+    } else if (mode === 'pronounce') {
+      systemPrompt += `\n\n[SPECIAL MODE: PRONUNCIATION & SPEAKING COACH]
+Provide practical English pronunciation coaching:
+1. 🗣️ ការអានតាមសូរសព្ទ (IPA & Khmer Phonetics): [Clear phonetic spelling readable by Khmer learners]
+2. 🎯 ការសង្កត់សំឡេង (Stress & Syllables): [Show syllables with stressed syllable capitalized]
+3. 💡 គន្លឹះបញ្ចេញសំឡេង (Pronunciation Tips): [Mouth shape, tongue position, silent letters]
+4. 🔊 ប្រយោគសម្រាប់ហាត់និយាយ (Practice Sentence): [A practical sentence to practice out loud]`;
+    } else {
+      if (lessonTitle) {
+        systemPrompt += `\n\nCurrent Lesson Context: The student is studying "${lessonTitle}". Relate your answer to this lesson when relevant.`;
+      }
+      if (extraContext) {
+        systemPrompt += `\nAdditional Context: ${extraContext}`;
+      }
+    }
+
+    // 2. Fetch past conversation memory from Firebase (if userId available)
+    let pastContextText = '';
+    const conversationMessages = [];
+
+    if (userId && db) {
+      try {
+        const snap = await db.ref(`users/${userId}/history`).limitToLast(8).once('value');
+        const historyItems = snap.val();
+        if (historyItems) {
+          const sorted = Object.values(historyItems)
+            .filter(i => i.role && i.text)
+            .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+
+          for (const item of sorted) {
+            const role = item.role === 'ai' ? 'assistant' : 'user';
+            conversationMessages.push({ role, content: item.text });
+            pastContextText += `${item.role === 'user' ? 'Student' : 'Teacher Sorn'}: ${item.text}\n`;
+          }
+        }
+      } catch (err) {
+        console.warn('Web API history fetch note:', err.message);
+      }
+    }
+
+    // Fall back to client-provided history if Firebase history was empty
+    if (conversationMessages.length === 0 && Array.isArray(clientHistory) && clientHistory.length > 0) {
+      for (const item of clientHistory.slice(-6)) {
+        if (item.content) {
+          const role = item.role === 'ai' || item.role === 'assistant' ? 'assistant' : 'user';
+          conversationMessages.push({ role, content: item.content });
+          pastContextText += `${role === 'user' ? 'Student' : 'Teacher Sorn'}: ${item.content}\n`;
         }
       }
     }
 
-    return "សួស្តី! ខ្ញុំគឺគ្រូសន (Teacher Sorn) នៃវិទ្យាស្ថាន Teacher SSOnline។ សូមសាកល្បងសួរម្តងទៀតណា៎!";
+    // 3. Execution Engine with Fallback
+    const enginesToTry = [];
+    if (preferredAI === 'groq') {
+      enginesToTry.push('groq', 'gemini', 'openai');
+    } else if (preferredAI === 'gemini') {
+      enginesToTry.push('gemini', 'groq', 'openai');
+    } else if (preferredAI === 'openai') {
+      enginesToTry.push('openai', 'groq', 'gemini');
+    } else {
+      // Auto: Try Groq first for lightning speed, then Gemini, then OpenAI
+      enginesToTry.push('groq', 'gemini', 'openai');
+    }
+
+    let finalAnswer = null;
+    let successfulProvider = 'AI';
+    let successfulModel = '';
+
+    for (const engine of enginesToTry) {
+      if (finalAnswer) break;
+
+      // --- A. GROQ ENGINE ---
+      if (engine === 'groq') {
+        const maxGroqTries = Math.max(allGroqKeys.length || 1, 2);
+        for (let kTry = 0; kTry < maxGroqTries; kTry++) {
+          const groqKey = getGroqApiKey();
+          if (!groqKey) break;
+
+          for (const modelName of GROQ_MODELS_POOL) {
+            try {
+              const groq = new Groq({ apiKey: groqKey });
+              const groqMsgs = [
+                { role: 'system', content: systemPrompt },
+                ...conversationMessages,
+                { role: 'user', content: userText }
+              ];
+
+              const completion = await groq.chat.completions.create({
+                model: modelName,
+                messages: groqMsgs,
+                temperature: 0.65,
+                max_tokens: 1200
+              });
+
+              const reply = completion.choices?.[0]?.message?.content;
+              if (reply && reply.trim().length > 0) {
+                finalAnswer = reply.trim();
+                successfulProvider = 'Groq';
+                successfulModel = modelName;
+                break;
+              }
+            } catch (err) {
+              console.warn(`Groq (${modelName}) attempt failed:`, err.message);
+            }
+          }
+          if (finalAnswer) break;
+        }
+      }
+
+      // --- B. GEMINI ENGINE ---
+      if (engine === 'gemini') {
+        const maxGeminiTries = Math.max(allGeminiKeys.length || 1, 2);
+        for (let kTry = 0; kTry < maxGeminiTries; kTry++) {
+          const geminiKey = getGeminiApiKey();
+          if (!geminiKey) break;
+
+          for (const modelName of GEMINI_MODELS_POOL) {
+            try {
+              const genAI = new GoogleGenerativeAI(geminiKey);
+              const model = genAI.getGenerativeModel({ model: modelName });
+
+              let promptWithContext = `${systemPrompt}\n\n`;
+              if (pastContextText) {
+                promptWithContext += `[Past Conversation Context]\n${pastContextText}\n`;
+              }
+              promptWithContext += `Student: ${userText}\nTeacher Sorn:`;
+
+              const result = await model.generateContent(promptWithContext);
+              const reply = result?.response?.text();
+              if (reply && reply.trim().length > 0) {
+                finalAnswer = reply.trim();
+                successfulProvider = 'Gemini';
+                successfulModel = modelName;
+                break;
+              }
+            } catch (err) {
+              console.warn(`Gemini (${modelName}) attempt failed:`, err.message);
+            }
+          }
+          if (finalAnswer) break;
+        }
+      }
+
+      // --- C. OPENAI ENGINE ---
+      if (engine === 'openai') {
+        const openaiKey = process.env.OPENAI_API_KEY;
+        if (openaiKey && openaiKey !== 'YOUR_OPENAI_KEY') {
+          for (const modelName of ['gpt-4o-mini', 'gpt-3.5-turbo']) {
+            try {
+              const openai = new OpenAI({ apiKey: openaiKey });
+              const openaiMsgs = [
+                { role: 'system', content: systemPrompt },
+                ...conversationMessages,
+                { role: 'user', content: userText }
+              ];
+
+              const completion = await openai.chat.completions.create({
+                model: modelName,
+                messages: openaiMsgs,
+                temperature: 0.7,
+                max_tokens: 1200
+              });
+
+              const reply = completion.choices?.[0]?.message?.content;
+              if (reply && reply.trim().length > 0) {
+                finalAnswer = reply.trim();
+                successfulProvider = 'OpenAI';
+                successfulModel = modelName;
+                break;
+              }
+            } catch (err) {
+              console.warn(`OpenAI (${modelName}) attempt failed:`, err.message);
+            }
+          }
+        }
+      }
+    }
+
+    if (!finalAnswer) {
+      finalAnswer = `សួស្តីប្អូន! ខ្ញុំគឺគ្រូសន (Teacher Sorn) នៃវិទ្យាស្ថាន Teacher SSOnline។\n\nប្រព័ន្ធកំពុងមមាញឹកបន្តិច សូមសាកល្បងចុចផ្ញើសំណួរម្តងទៀតណា៎ ឬសាកល្បងប្តូរម៉ាស៊ីន AI (AI Engine) ខាងលើ! 🌟`;
+      successfulProvider = 'System';
+      successfulModel = 'fallback';
+    }
+
+    // 4. Save to Firebase History for cross-device & telegram sync
+    if (userId && db) {
+      try {
+        await db.ref(`users/${userId}/history`).push({
+          role: 'user',
+          text: userText,
+          timestamp: Date.now()
+        });
+        await db.ref(`users/${userId}/history`).push({
+          role: 'ai',
+          text: finalAnswer,
+          provider: successfulProvider,
+          model: successfulModel,
+          timestamp: Date.now()
+        });
+      } catch (err) {
+        console.warn('Failed to save chat to history:', err.message);
+      }
+    }
+
+    return {
+      reply: finalAnswer,
+      provider: successfulProvider,
+      model: successfulModel,
+      timestamp: Date.now()
+    };
   }
 
   // ==========================================
@@ -2274,17 +2534,17 @@ Student Question: ${userText}`;
       cleanText = cleanText.replace(/[*_#`]/g, '').trim();
 
       const isEnglish = (lang === 'en') || /[a-zA-Z]{4,}/.test(cleanText);
-      const voice = isEnglish ? 'en-US-AriaNeural' : 'km-KH-SreymomNeural';
+      const voice = isEnglish ? 'en-US-AriaNeural' : 'km-KH-PisethNeural';
 
       const edgeTts = new MsEdgeTTS();
       await edgeTts.setMetadata(voice, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
-      const stream = edgeTts.toStream(cleanText);
+      const { audioStream } = edgeTts.toStream(cleanText.substring(0, 4000));
 
       const chunks = [];
       await new Promise((resolve, reject) => {
-        stream.on('data', chunk => chunks.push(chunk));
-        stream.on('end', resolve);
-        stream.on('error', reject);
+        audioStream.on('data', chunk => chunks.push(chunk));
+        audioStream.on('end', resolve);
+        audioStream.on('error', reject);
       });
 
       const buffer = Buffer.concat(chunks);
@@ -2297,69 +2557,259 @@ Student Question: ${userText}`;
     }
   });
 
+  // 1. General & Lesson AI Chatbot Endpoint
   router.post('/chat', async (req, res) => {
     try {
-      const { userId, message, lessonTitle } = req.body;
-      if (!message) return res.status(400).json({ error: 'Missing message' });
+      const { userId, message, lessonTitle, preferredAI, mode, extraContext, clientHistory } = req.body;
+      if (!message || !message.trim()) {
+        return res.status(400).json({ error: 'Missing message parameter' });
+      }
 
-      const reply = await generateAIAnswer(message, { lessonTitle });
-      res.json({ success: true, reply });
+      const result = await generateAIAnswer(message.trim(), {
+        lessonTitle,
+        userId,
+        preferredAI: preferredAI || 'auto',
+        mode: mode || 'chat',
+        extraContext,
+        clientHistory
+      });
+
+      res.json({
+        success: true,
+        reply: result.reply,
+        provider: result.provider,
+        model: result.model,
+        timestamp: result.timestamp
+      });
     } catch (err) {
-      res.status(500).json({ error: 'Chat AI error' });
+      console.error('Web API /chat error:', err);
+      res.status(500).json({ error: 'Chat AI error', details: err.message });
     }
   });
 
+  // 2. Fetch User Chat History
+  router.get('/chat/history', async (req, res) => {
+    try {
+      const { userId, limit = 20 } = req.query;
+      if (!userId) return res.status(400).json({ error: 'Missing userId parameter' });
+      if (!db) return res.json({ success: true, history: [] });
+
+      const snap = await db.ref(`users/${userId}/history`).limitToLast(parseInt(limit, 10) || 20).once('value');
+      const data = snap.val();
+      const history = [];
+      if (data) {
+        Object.keys(data).forEach(k => {
+          const item = data[k];
+          if (item && item.text) {
+            history.push({
+              id: k,
+              role: item.role === 'ai' ? 'ai' : 'user',
+              text: item.text,
+              provider: item.provider || 'AI',
+              timestamp: item.timestamp || Date.now()
+            });
+          }
+        });
+        history.sort((a, b) => a.timestamp - b.timestamp);
+      }
+
+      res.json({ success: true, history });
+    } catch (err) {
+      console.error('/chat/history error:', err);
+      res.status(500).json({ error: 'Failed to fetch history' });
+    }
+  });
+
+  // 3. Clear User Chat History
+  router.delete('/chat/history', async (req, res) => {
+    try {
+      const { userId } = req.body;
+      if (!userId) return res.status(400).json({ error: 'Missing userId parameter' });
+      if (db) {
+        await db.ref(`users/${userId}/history`).remove();
+      }
+      res.json({ success: true, message: 'Chat history cleared' });
+    } catch (err) {
+      console.error('/chat/history delete error:', err);
+      res.status(500).json({ error: 'Failed to clear history' });
+    }
+  });
+
+  // 4. Grammar Checker & Writing Coach Tool
+  router.post('/ai/grammar', async (req, res) => {
+    try {
+      const { text, userId } = req.body;
+      if (!text || !text.trim()) return res.status(400).json({ error: 'Missing text parameter' });
+
+      const result = await generateAIAnswer(text.trim(), {
+        userId,
+        mode: 'grammar',
+        preferredAI: 'auto'
+      });
+
+      res.json({
+        success: true,
+        originalText: text,
+        analysis: result.reply,
+        provider: result.provider
+      });
+    } catch (err) {
+      res.status(500).json({ error: 'Grammar analysis failed' });
+    }
+  });
+
+  // 5. Smart Bilingual Translation Tool
+  router.post('/ai/translate', async (req, res) => {
+    try {
+      const { text, userId } = req.body;
+      if (!text || !text.trim()) return res.status(400).json({ error: 'Missing text parameter' });
+
+      const result = await generateAIAnswer(text.trim(), {
+        userId,
+        mode: 'translate',
+        preferredAI: 'auto'
+      });
+
+      res.json({
+        success: true,
+        originalText: text,
+        translation: result.reply,
+        provider: result.provider
+      });
+    } catch (err) {
+      res.status(500).json({ error: 'Translation failed' });
+    }
+  });
+
+  // 6. Irregular Verb Assistant Tool
+  router.post('/ai/verb-helper', async (req, res) => {
+    try {
+      const { verb, userId } = req.body;
+      if (!verb || !verb.trim()) return res.status(400).json({ error: 'Missing verb parameter' });
+
+      const result = await generateAIAnswer(verb.trim(), {
+        userId,
+        mode: 'verb',
+        preferredAI: 'auto'
+      });
+
+      res.json({
+        success: true,
+        verb: verb.trim(),
+        details: result.reply,
+        provider: result.provider
+      });
+    } catch (err) {
+      res.status(500).json({ error: 'Verb helper failed' });
+    }
+  });
+
+  // 7. Pronunciation & Speaking Coach Tool
+  router.post('/ai/pronounce', async (req, res) => {
+    try {
+      const { phrase, userId } = req.body;
+      if (!phrase || !phrase.trim()) return res.status(400).json({ error: 'Missing phrase parameter' });
+
+      const result = await generateAIAnswer(phrase.trim(), {
+        userId,
+        mode: 'pronounce',
+        preferredAI: 'auto'
+      });
+
+      res.json({
+        success: true,
+        phrase: phrase.trim(),
+        coaching: result.reply,
+        provider: result.provider
+      });
+    } catch (err) {
+      res.status(500).json({ error: 'Pronunciation coaching failed' });
+    }
+  });
+
+  // 8. AI Engines Status
+  router.get('/ai/status', (req, res) => {
+    const hasGroq = allGroqKeys.length > 0;
+    const hasGemini = allGeminiKeys.length > 0;
+    const hasOpenAI = !!(process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'YOUR_OPENAI_KEY');
+
+    res.json({
+      success: true,
+      engines: {
+        groq: { available: hasGroq, count: allGroqKeys.length, primaryModel: GROQ_MODELS_POOL[0] },
+        gemini: { available: hasGemini, count: allGeminiKeys.length, primaryModel: GEMINI_MODELS_POOL[0] },
+        openai: { available: hasOpenAI, primaryModel: 'gpt-4o-mini' }
+      },
+      recommended: hasGroq ? 'groq' : (hasGemini ? 'gemini' : (hasOpenAI ? 'openai' : 'system'))
+    });
+  });
+
+  // 9. Speech to Text (STT) Voice-to-Text with multi-model fallback
   router.post('/stt', async (req, res) => {
     try {
       const chunks = [];
       req.on('data', chunk => chunks.push(chunk));
       req.on('end', async () => {
         const buffer = Buffer.concat(chunks);
-        if (buffer.length === 0) return res.status(400).json({ error: 'No audio data' });
+        if (buffer.length === 0) return res.status(400).json({ error: 'No audio data received' });
 
-        const tmpPath = path.join(__dirname, `temp_web_audio_${Date.now()}.webm`);
+        const tmpPath = path.join(__dirname, `temp_web_audio_${Date.now()}_${Math.random().toString(36).substring(7)}.webm`);
         fs.writeFileSync(tmpPath, buffer);
 
         try {
           const { GoogleAIFileManager } = require("@google/generative-ai/server");
-          
-          let apiKey = null;
-          if (typeof getNextGeminiKey === 'function') apiKey = getNextGeminiKey();
-          if (!apiKey) {
-             const keys = (process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || "").split(',').map(k=>k.trim()).filter(Boolean);
-             apiKey = keys[0];
-          }
-          if (!apiKey) throw new Error("No Gemini API key");
+
+          const apiKey = getGeminiApiKey();
+          if (!apiKey) throw new Error("No Gemini API key available for speech recognition");
 
           const genAI = new GoogleGenerativeAI(apiKey);
           const fileManager = new GoogleAIFileManager(apiKey);
-          const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
+          // Upload temporary audio file
           const uploadResult = await fileManager.uploadFile(tmpPath, {
             mimeType: "audio/webm",
-            displayName: `WebVoice`,
+            displayName: `WebVoice_${Date.now()}`,
           });
 
-          const promptText = "Please transcribe this audio exactly as it is spoken. If it is in Khmer, transcribe it in Khmer. Do not translate. Output ONLY the transcribed text.";
-          const result = await model.generateContent([
-            promptText,
-            { fileData: { fileUri: uploadResult.file.uri, mimeType: uploadResult.file.mimeType } }
-          ]);
-          
-          const text = result.response.text().trim();
-          
-          fs.unlinkSync(tmpPath);
+          let transcribedText = '';
+          const sttModels = ['gemini-flash-lite-latest', 'gemini-3.8-flash', 'gemini-flash-latest'];
+
+          for (const mName of sttModels) {
+            try {
+              const model = genAI.getGenerativeModel({ model: mName });
+              const promptText = "Please transcribe this audio exactly as it is spoken. If it is in Khmer, transcribe it in Khmer. If English, transcribe in English. Output ONLY the transcribed text without quotes or explanation.";
+
+              const result = await model.generateContent([
+                promptText,
+                { fileData: { fileUri: uploadResult.file.uri, mimeType: uploadResult.file.mimeType } }
+              ]);
+
+              const t = result?.response?.text()?.trim();
+              if (t) {
+                transcribedText = t;
+                break;
+              }
+            } catch (mErr) {
+              console.warn(`STT model ${mName} note:`, mErr.message);
+            }
+          }
+
+          if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
           fileManager.deleteFile(uploadResult.file.name).catch(() => {});
 
-          res.json({ success: true, text });
+          if (!transcribedText) {
+            return res.status(500).json({ error: 'Could not transcribe audio' });
+          }
+
+          res.json({ success: true, text: transcribedText });
         } catch (err) {
           if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
           console.error('STT Error:', err);
-          res.status(500).json({ error: 'Transcription failed' });
+          res.status(500).json({ error: 'Audio transcription failed', details: err.message });
         }
       });
     } catch (err) {
-      res.status(500).json({ error: 'Server error' });
+      res.status(500).json({ error: 'Server error processing audio' });
     }
   });
 

@@ -3227,114 +3227,23 @@ bot.on('text', async (ctx) => {
   await handleUserMessage(ctx, userId, userText);
 });
 
-// Voice Message Handling (STT)
+// Voice Message Handling - Policy: Encourage text to maximize quota savings (85-90% saving), while offering free unlimited TTS
 bot.on('voice', async (ctx) => {
   const userId = ctx.from.id.toString();
-  const isVIP = await checkVIP(userId);
-  if (!isVIP) {
-    return ctx.reply("🔒 **គណនីរបស់អ្នកមិនទាន់បានបង់ប្រាក់ទេ (Free Account)**\nអ្នកមិនអាចផ្ញើសារជាសំឡេងបានទេ។ សូមដំឡើងទៅគណនី VIP (Upgrade) ដើម្បីប្រើប្រាស់មុខងារនេះ។", { parse_mode: 'Markdown' });
-  }
+  const username = ctx.from.first_name || 'ប្អូន';
+  const webUrl = process.env.WEBAPP_URL || process.env.RENDER_EXTERNAL_URL || 'https://studyai-bot.onrender.com';
 
-  const waitMsg = await ctx.reply("⏳ គ្រូសនកំពុងស្តាប់សំឡេង សូមរង់ចាំបន្តិចណា៎...");
-  ctx.sendChatAction('typing');
-
-  try {
-    const fileId = ctx.message.voice.file_id;
-    const fileLink = await ctx.telegram.getFileLink(fileId);
-    
-    const axios = require('axios');
-    const FormData = require('form-data');
-    
-    const response = await axios({
-      method: 'GET',
-      url: fileLink.href,
-      responseType: 'stream'
-    });
-
-
-    const fs = require('fs');
-    const tempAudioPath = `temp_audio_${userId}.ogg`;
-    const writer = fs.createWriteStream(tempAudioPath);
-    response.data.pipe(writer);
-    await new Promise((resolve, reject) => {
-      writer.on('finish', resolve);
-      writer.on('error', reject);
-    });
-    
-    const { GoogleGenerativeAI } = require("@google/generative-ai");
-    const { GoogleAIFileManager } = require("@google/generative-ai/server");
-    
-    let userText = "";
-    let lastError = null;
-    let success = false;
-    const geminiModels = ["gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-omni-1.1-flash", "gemma-4-31b-it"];
-    
-    for (const modelName of geminiModels) {
-      for (let i = 0; i < (geminiKeys.length || 1); i++) {
-        try {
-          const apiKey = getNextGeminiKey();
-          if (!apiKey) throw new Error("No GEMINI_API_KEYS configured in environment");
-          const genAI = new GoogleGenerativeAI(apiKey);
-          const fileManager = new GoogleAIFileManager(apiKey);
-          const model = genAI.getGenerativeModel({ model: modelName });
-          
-          // Upload audio file using File API
-          const uploadResult = await fileManager.uploadFile(tempAudioPath, {
-            mimeType: "audio/ogg",
-            displayName: `Voice_${userId}`,
-          });
-          
-          const promptText = "Please transcribe this audio exactly as it is spoken. If it is in Khmer, transcribe it in Khmer. Do not translate. Output ONLY the transcribed text.";
-          const result = await model.generateContent([
-            promptText,
-            {
-              fileData: {
-                fileUri: uploadResult.file.uri,
-                mimeType: uploadResult.file.mimeType
-              }
-            }
-          ]);
-          
-          userText = result.response.text().trim();
-          
-          // Clean up Gemini Server File
-          try {
-            await fileManager.deleteFile(uploadResult.file.name);
-          } catch (cleanupError) {
-            console.warn("Failed to delete Gemini file:", cleanupError);
-          }
-          
-          lastError = null;
-          success = true;
-          break; // Success
-        } catch (error) {
-          lastError = error;
-          console.warn(`Gemini STT (${modelName}) key failed: ${error.message}. Retrying...`);
-        }
-      }
-      if (success) break;
+  return ctx.reply(
+    `💡 *សួស្តី ${username}! សូមវាយជាអក្សរដើម្បីសន្សំកូតា និងទទួលបានចម្លើយលឿនបំផុត!* ✍️\n\n` +
+    `ដើម្បីឱ្យគ្រូសន (Teacher Sorn) អាចវិភាគសំណួរបានលម្អិត រហ័ស និងមិនអស់កូតាប្រព័ន្ធ សូមប្អូន **វាយសំណួរជាអក្សរ (Text)** ផ្ញើមកកាន់គ្រូសនណា៎!\n\n` +
+    `🔊 *បន្ទាប់ពីគ្រូសនឆ្លើយតបជាអក្សររួច ប្អូនអាចចុចប៊ូតុង «🔊 ស្ដាប់សម្លេង» ដើម្បីស្តាប់គ្រូសនបញ្ចេញសំឡេងពន្យល់ដោយឥតគិតថ្លៃ (Free Unlimited TTS) បានជានិច្ច!* 🌟`,
+    {
+      parse_mode: 'Markdown',
+      reply_markup: Markup.inlineKeyboard([
+        [Markup.button.webApp('🌐 បើក Web App រៀនតាមទូរស័ព្ទ', webUrl)]
+      ]).reply_markup
     }
-    
-    // Clean up local file
-    if (fs.existsSync(tempAudioPath)) fs.unlinkSync(tempAudioPath);
-    
-    if (lastError && !success) throw lastError;
-    
-    if (!userText) {
-      try { await ctx.telegram.deleteMessage(ctx.chat.id, waitMsg.message_id); } catch(e){}
-      return ctx.reply("❌ មិនអាចស្តាប់សំឡេងបានច្បាស់ទេ។ សូមនិយាយម្តងទៀត!");
-    }
-    
-    try { await ctx.telegram.deleteMessage(ctx.chat.id, waitMsg.message_id); } catch(e){}
-    await ctx.reply(`🎙 ខ្ញុំស្តាប់បានថា៖\n_"${userText}"_`, { parse_mode: 'Markdown' });
-    
-    // Process text
-    await handleUserMessage(ctx, userId, userText);
-  } catch (error) {
-    try { await ctx.telegram.deleteMessage(ctx.chat.id, waitMsg.message_id); } catch(e){}
-    console.error("STT Error:", error);
-    ctx.reply("❌ មានបញ្ហាក្នុងការស្តាប់សំឡេង! សូមព្យាយាមម្តងទៀត។");
-  }
+  );
 });
 
 // TTS Generation Action (Using Edge TTS)

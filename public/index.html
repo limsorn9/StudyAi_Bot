@@ -52,6 +52,9 @@
         <button class="nav-item" data-tab="curriculum" onclick="navigateTo('curriculum')">
           <span class="icon">📚</span> <span class="label">មេរៀន (12 ខែ)</span>
         </button>
+        <button class="nav-item" data-tab="ai-tutor" onclick="navigateTo('ai-tutor')">
+          <span class="icon">🤖</span> <span class="label">គ្រូសន AI</span>
+        </button>
         <button class="nav-item" data-tab="annual-exams" onclick="navigateTo('annual-exams')">
           <span class="icon">🎓</span> <span class="label">ប្រឡងប្រចាំឆ្នាំ</span>
         </button>
@@ -340,10 +343,127 @@
             </div>
 
             <div class="chat-input-bar">
-              <button class="btn btn-icon" id="recordVoiceBtn" onclick="toggleVoiceRecord()" title="និយាយ (Record Voice)">🎤</button>
-              <input type="text" id="chatInput" placeholder="សួរសំណួរទៅកាន់គ្រូសន..." onkeypress="handleChatKeyPress(event)">
+              <button class="btn btn-icon" onclick="sendQuickPrompt('សូមជួយពន្យល់ចំណុចនេះបន្ថែម')" title="សុំការពន្យល់ (Quick Prompt)">💡</button>
+              <input type="text" id="chatInput" placeholder="វាយសំណួរទៅកាន់គ្រូសន..." onkeypress="handleChatKeyPress(event)">
               <button class="btn btn-primary" onclick="sendChatMessage()">
                 <span>ផ្ញើ 🚀</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==============================================
+           3.5 AI TUTOR CHAT & STUDY STUDIO TAB
+      ============================================== -->
+      <section id="tab-ai-tutor" class="tab-pane">
+        <div class="ai-studio-container">
+          <!-- Top Hero Card / Teacher Info & Engine Selector -->
+          <div class="ai-studio-header glass-panel">
+            <div class="ai-studio-profile">
+              <div class="ai-studio-avatar-ring">
+                <span class="ai-studio-avatar-emoji">👨‍🏫</span>
+                <span class="ai-studio-pulse-dot" title="Online"></span>
+              </div>
+              <div class="ai-studio-info">
+                <div class="ai-studio-name-row">
+                  <h2 class="ai-studio-name">គ្រូសន (Teacher Sorn AI)</h2>
+                  <span class="ai-badge-verified">✓ គ្រូជំនាញភាសាអង់គ្លេស</span>
+                </div>
+                <p class="ai-studio-sub">
+                  វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline • ជួយឆ្លើយចម្ងល់ ពន្យល់វេយ្យាករណ៍ បកប្រែ និងហាត់និយាយ
+                </p>
+              </div>
+            </div>
+
+            <div class="ai-studio-controls">
+              <!-- Engine Selector -->
+              <div class="engine-selector-box">
+                <label for="aiEngineSelect" class="engine-label">ម៉ាស៊ីន AI (Engine):</label>
+                <select id="aiEngineSelect" class="engine-select" onchange="handleEngineChange()">
+                  <option value="auto" selected>⚡ ស្វ័យប្រវត្ត (Auto - ល្អ & លឿនបំផុត)</option>
+                  <option value="groq">🦙 Groq LLaMA 3.3 (Fastest)</option>
+                  <option value="gemini">✨ Google Gemini 2026 (Smart)</option>
+                  <option value="openai">🧠 OpenAI GPT-4o (Accurate)</option>
+                </select>
+              </div>
+
+              <!-- Clear Chat Button -->
+              <button class="btn btn-outline-danger btn-sm" onclick="clearStudioChatHistory()" title="សម្អាតសារទាំងអស់">
+                <span>🗑️ សម្អាតសារ</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Quick Action Tools Bar -->
+          <div class="ai-tools-bar glass-panel">
+            <span class="ai-tools-label">🛠️ ឧបករណ៍ជំនួយរហ័ស (Quick Tools):</span>
+            <div class="ai-tools-list">
+              <button class="ai-tool-btn" onclick="triggerStudioTool('explain')">
+                <span class="tool-icon">💡</span>
+                <span class="tool-text">ពន្យល់មេរៀន</span>
+              </button>
+              <button class="ai-tool-btn" onclick="triggerStudioTool('grammar')">
+                <span class="tool-icon">✍️</span>
+                <span class="tool-text">កែកំហុសសំណេរ</span>
+              </button>
+              <button class="ai-tool-btn" onclick="triggerStudioTool('translate')">
+                <span class="tool-icon">🔄</span>
+                <span class="tool-text">បកប្រែខ្មែរ-អង់គ្លេស</span>
+              </button>
+              <button class="ai-tool-btn" onclick="triggerStudioTool('verb')">
+                <span class="tool-icon">⚡</span>
+                <span class="tool-text">សួរកិរិយាសព្ទប្រែប្រួល</span>
+              </button>
+              <button class="ai-tool-btn" onclick="triggerStudioTool('pronounce')">
+                <span class="tool-icon">🗣️</span>
+                <span class="tool-text">របៀបបញ្ចេញសំឡេង</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Main Chat Studio Card -->
+          <div class="ai-studio-chat-card glass-panel">
+            <!-- Messages Scroll Box -->
+            <div class="ai-studio-messages" id="aiStudioMessagesBox">
+              <!-- Initial Welcome Message from Teacher Sorn -->
+              <div class="chat-bubble ai">
+                <div class="ai-bubble-header">
+                  <span class="ai-bubble-author">👨‍🏫 គ្រូសន (Teacher Sorn)</span>
+                  <span class="ai-bubble-badge">Official AI</span>
+                </div>
+                <div class="ai-bubble-content">
+                  សួស្តីប្អូនៗទាំងអស់គ្នា! ខ្ញុំគឺគ្រូសន (Teacher Sorn) នៃវិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline។<br><br>
+                  តើប្អូនមានសំណួរ ឬចម្ងល់អ្វីទាក់ទងនឹងភាសាអង់គ្លេសទេ? ប្អូនអាច៖<br>
+                  • វាយប្រយោគអង់គ្លេសឱ្យគ្រូជួយកែកំហុសវេយ្យាករណ៍ (Grammar Check)<br>
+                  • សួរឱ្យគ្រូបកប្រែជាភាសាខ្មែរ ឬអង់គ្លេស (Translation)<br>
+                  • សួរពីកិរិយាសព្ទប្រែប្រួល (Irregular Verbs V1, V2, V3)<br>
+                  • ចុចប៊ូតុង <strong>🎤 និយាយ</strong> ដើម្បីនិយាយជាសំឡេងមកកាន់គ្រូផ្ទាល់បានណា៎! 🌟
+                </div>
+                <div class="ai-bubble-actions">
+                  <button class="tts-btn" onclick="playTTS(this.parentElement.previousElementSibling.innerText, this)" title="ស្តាប់សំឡេង (Listen)">🔊 ស្តាប់</button>
+                  <button class="copy-btn" onclick="copyBubbleText(this)" title="ចម្លងអត្ថបទ">📋 ចម្លង</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Quick Suggestions Row -->
+            <div class="studio-quick-prompts">
+              <button class="pill-btn" onclick="sendStudioPrompt('សូមជួយពន្យល់ពីរបៀបប្រើ Present Simple Tense ឱ្យបានច្បាស់')">📚 Present Simple Tense</button>
+              <button class="pill-btn" onclick="sendStudioPrompt('តើ Do និង Make ខុសគ្នាយ៉ាងដូចម្តេច? សូមឧទាហរណ៍')">🔍 Do vs Make</button>
+              <button class="pill-btn" onclick="sendStudioPrompt('សូមជួយកែប្រយោគនេះ៖ I go to school yesterday with my friend.')">✍️ កែប្រយោគ</button>
+              <button class="pill-btn" onclick="sendStudioPrompt('សូមប្រាប់ពីរបៀបបញ្ចេញសំឡេងពាក្យ Comfortable និង Schedule')">🗣️ ការបញ្ចេញសំឡេង</button>
+              <button class="pill-btn" onclick="sendStudioPrompt('សូមណែនាំឃ្លាអង់គ្លេសសន្ទនាទូទៅ ៥ ឃ្លាដែលពេញនិយម')">💬 ៥ ឃ្លាសន្ទនាពេញនិយម</button>
+            </div>
+
+            <!-- Input Bar -->
+            <div class="ai-studio-input-bar">
+              <button class="btn btn-icon record-btn" onclick="triggerStudioTool('explain')" title="ជំនួយការសំណួរ (Quick Tool)">
+                <span class="mic-icon">💡</span>
+              </button>
+              <input type="text" id="studioChatInput" placeholder="វាយសំណួរ ឬប្រយោគឱ្យគ្រូសនជួយពន្យល់... (ចុច Enter ដើម្បីផ្ញើ)" onkeypress="handleStudioChatKeyPress(event)">
+              <button class="btn btn-primary btn-send" onclick="sendStudioChatMessage()">
+                <span>ផ្ញើសំណួរ 🚀</span>
               </button>
             </div>
           </div>
@@ -991,6 +1111,53 @@
         </button>
       </form>
     </div>
+  </div>
+
+  <!-- ==============================================
+       UNIVERSAL FLOATING AI ASSISTANT WIDGET
+  ============================================== -->
+  <div id="universalFloatingAi" class="universal-ai-widget">
+    <!-- Floating Collapsible Chat Drawer -->
+    <div id="floatingChatDrawer" class="floating-chat-drawer glass-panel hidden">
+      <div class="drawer-header">
+        <div class="drawer-tutor-info">
+          <div class="drawer-avatar">👨‍🏫</div>
+          <div class="drawer-title-box">
+            <div class="drawer-name">គ្រូសន (Teacher Sorn AI)</div>
+            <div class="drawer-status" id="floatingContextLabel">🟢 អនឡាញ • ជួយឆ្លើយគ្រប់ទំព័រ</div>
+          </div>
+        </div>
+        <div class="drawer-controls">
+          <button class="drawer-action-btn" onclick="navigateTo('ai-tutor'); toggleFloatingChat();" title="ពង្រីកធំ (Full Studio)">⤢</button>
+          <button class="drawer-action-btn close-btn" onclick="toggleFloatingChat()" title="បិទ (Close)">✕</button>
+        </div>
+      </div>
+
+      <div class="drawer-messages" id="floatingChatMessagesBox">
+        <div class="chat-bubble ai">
+          សួស្តីប្អូន! ខ្ញុំគឺគ្រូសន (Teacher Sorn)។ តើមានអ្វីឱ្យគ្រូជួយលើទំព័រនេះទេ?
+        </div>
+      </div>
+
+      <div class="drawer-quick-prompts">
+        <button class="drawer-pill" onclick="sendFloatingPrompt('សូមជួយពន្យល់ចំណុចនេះជាភាសាខ្មែរ')">💡 ពន្យល់</button>
+        <button class="drawer-pill" onclick="sendFloatingPrompt('សូមជួយកែសម្រួលវេយ្យាករណ៍ប្រយោគនេះ')">✍️ កែវេយ្យាករណ៍</button>
+        <button class="drawer-pill" onclick="sendFloatingPrompt('តើពាក្យនេះមានន័យដូចម្តេច?')">📖 បកប្រែពាក្យ</button>
+      </div>
+
+      <div class="drawer-input-bar">
+        <button class="btn btn-icon drawer-mic-btn" onclick="sendFloatingPrompt('សូមជួយពន្យល់ចំណុចនេះជាភាសាខ្មែរ')" title="សុំការពន្យល់">💡</button>
+        <input type="text" id="floatingChatInput" placeholder="វាយសំណួរទៅគ្រូសន..." onkeypress="handleFloatingChatKey(event)">
+        <button class="btn btn-primary btn-sm drawer-send-btn" onclick="sendFloatingChatMessage()">🚀</button>
+      </div>
+    </div>
+
+    <!-- Floating Circular Button (FAB) -->
+    <button id="floatingAiFab" class="floating-ai-fab" onclick="toggleFloatingChat()" title="សន្ទនាជាមួយគ្រូសន AI (Chat with Teacher Sorn)">
+      <span class="ai-fab-icon">🤖</span>
+      <span class="ai-fab-label">គ្រូសន AI</span>
+      <span class="ai-fab-pulse"></span>
+    </button>
   </div>
 
   <!-- Toast Notification Container -->
