@@ -10,6 +10,16 @@ const fs = require('fs');
 const irregularVerbs = require('./irregular_verbs.js');
 const { generateQuiz } = require('./quiz_generator.js');
 const { checkTTSLimit, recordTTSStart, recordTTSDone, checkAILimit, recordAIUsage, getTTSStats } = require('./rate_limiter.js');
+const {
+  parseDuration,
+  createLicenseKey,
+  redeemLicenseKey,
+  setDirectLicense,
+  revokeUserLicense,
+  getUserLicenseInfo,
+  listUnusedKeys,
+  formatCambodiaTime
+} = require('./license_manager.js');
 
 
 // In-memory quiz state: { userId: { questions, currentQ, score, lessonId, answers } }
@@ -326,14 +336,19 @@ bot.hears('📚 បញ្ជីមេរៀន (Lessons)', async (ctx) => {
 
 
 
-bot.hears('💎 គណនី VIP (Upgrade)', (ctx) => {
+// ==========================================
+// LICENSE & VIP MANAGEMENT SYSTEM
+// ==========================================
+
+const sendVipUpgradeInfo = async (ctx) => {
   const userId = ctx.from.id;
-  const msg = `💎 **គណនី VIP (Upgrade)** 💎
+  const msg = `💎 **គណនី VIP (Upgrade & License)** 💎
 
 បង់ប្រាក់ដើម្បីទទួលបានសិទ្ធិពិសេស៖
 ✅ សួរគ្រូ AI បានដោយសេរី (គ្មានដែនកំណត់)
+✅ អានមេរៀនជាសំឡេង (TTS)
 ✅ អាចផ្ញើជាសំឡេងឲ្យគ្រូ AI ស្តាប់ និងកែតម្រូវ
-✅ ធ្វើតេស្តប្រឡងយកពិន្ទុ
+✅ ធ្វើតេស្តប្រឡងយកពិន្ទុ MCQ គ្រប់មេរៀន
 
 **តម្លៃពិសេស៖**
 👉 1 ខែ = 3$
@@ -341,24 +356,324 @@ bot.hears('💎 គណនី VIP (Upgrade)', (ctx) => {
 
 🏦 **ព័ត៌មានបង់ប្រាក់ (ACLEDA Bank / KHQR):**
 ឈ្មោះគណនី៖ **LIM SORN**
-*(អ្នកអាចស្កេន KHQR ខាងលើ ឬខាងក្រោមដើម្បីបង់ប្រាក់)*
+*(អ្នកអាចស្កេន KHQR ដើម្បីបង់ប្រាក់ ឬប្រើប្រាស់ License Key)*
 
 📲 បន្ទាប់ពីបង់ប្រាក់រួច សូមផ្ញើវិក្កយបត្រ (Screenshot) មកកាន់ Admin៖ @limsorn9
-រួចប្រាប់លេខ ID របស់អ្នកគឺ៖ \`${userId}\``;
+ឬប្រាប់លេខ ID របស់អ្នកគឺ៖ \`${userId}\`
+
+💡 **ប្រសិនបើអ្នកមាន License Key រួចហើយ សូមចុចប៊ូតុងខាងក្រោម!**`;
+
+  const keyboard = Markup.inlineKeyboard([
+    [Markup.button.callback('🔑 បញ្ចូល License Key', 'enter_license_key')],
+    [Markup.button.callback('📋 ពិនិត្យ License របស់ខ្ញុំ', 'my_license_status')]
+  ]);
+
   if (fs.existsSync('./khqr.jpg')) {
-    ctx.replyWithPhoto({ source: './khqr.jpg' }, { caption: msg, parse_mode: 'Markdown' });
+    await ctx.replyWithPhoto({ source: './khqr.jpg' }, { caption: msg, parse_mode: 'Markdown', reply_markup: keyboard.reply_markup });
   } else if (fs.existsSync('./khqr.png')) {
-    ctx.replyWithPhoto({ source: './khqr.png' }, { caption: msg, parse_mode: 'Markdown' });
+    await ctx.replyWithPhoto({ source: './khqr.png' }, { caption: msg, parse_mode: 'Markdown', reply_markup: keyboard.reply_markup });
   } else {
-    ctx.reply(msg + "\n\n*(ចំណាំ៖ រូបភាព KHQR មិនទាន់ត្រូវបានដាក់បញ្ចូលក្នុងប្រព័ន្ធទេ សូមលោកគ្រូដាក់រូបភាព khqr.jpg ចូលក្នុង Folder ដើម)*", { parse_mode: 'Markdown' });
+    await ctx.reply(msg, { parse_mode: 'Markdown', reply_markup: keyboard.reply_markup });
+  }
+};
+
+bot.hears('💎 គណនី VIP (Upgrade)', sendVipUpgradeInfo);
+
+// Action: Click VIP Upgrade
+bot.action('vip_upgrade', async (ctx) => {
+  try { await ctx.answerCbQuery(); } catch(e){}
+  await sendVipUpgradeInfo(ctx);
+});
+
+// Action: Enter License Key
+bot.action('enter_license_key', async (ctx) => {
+  const userId = ctx.from.id.toString();
+  await setUserState(userId, 'awaiting_license_key');
+  try { await ctx.answerCbQuery(); } catch(e){}
+  await ctx.reply(
+    `🔑 **សូមផ្ញើ License Key របស់អ្នកមកកាន់ទីនេះ៖**\n\n` +
+    `ឧទាហរណ៍៖ \`STUDY-XXXX-XXXX-XXXX\`\n` +
+    `*(គ្រាន់តែ Copy កូដមក Paste ផ្ញើ ឬវាយ \`/redeem [កូដ]\`)*`,
+    { parse_mode: 'Markdown' }
+  );
+});
+
+// Action: Check My License Status
+bot.action('my_license_status', async (ctx) => {
+  try { await ctx.answerCbQuery(); } catch(e){}
+  const userId = ctx.from.id.toString();
+  const info = await getUserLicenseInfo(db, userId, SUPER_ADMIN_IDS);
+
+  let msg = `📋 **ព័ត៌មានស្ថានភាព License របស់អ្នក៖**\n\n` +
+    `👤 ID: \`${userId}\`\n` +
+    `📊 ស្ថានភាព: **${info.statusKhmer}**\n` +
+    `⌛ ថ្ងៃផុតកំណត់: **${info.expireDateFormatted}**\n`;
+
+  if (info.isVIP && !info.isAdmin) {
+    msg += `⏳ នៅសល់: **${info.daysRemaining} ថ្ងៃ ${info.hoursRemaining} ម៉ោង**\n`;
+  }
+
+  const buttons = [];
+  if (!info.isVIP) {
+    buttons.push([Markup.button.callback('💎 Upgrade VIP', 'vip_upgrade')]);
+  }
+  buttons.push([Markup.button.callback('🔑 បញ្ចូល License Key', 'enter_license_key')]);
+
+  await ctx.reply(msg, {
+    parse_mode: 'Markdown',
+    reply_markup: Markup.inlineKeyboard(buttons).reply_markup
+  });
+});
+
+// User Command: Check My License
+bot.command(['mylicense', 'license_status'], async (ctx) => {
+  const userId = ctx.from.id.toString();
+  const info = await getUserLicenseInfo(db, userId, SUPER_ADMIN_IDS);
+
+  let msg = `📋 **ព័ត៌មានស្ថានភាព License របស់អ្នក៖**\n\n` +
+    `👤 ID: \`${userId}\`\n` +
+    `📊 ស្ថានភាព: **${info.statusKhmer}**\n` +
+    `⌛ ថ្ងៃផុតកំណត់: **${info.expireDateFormatted}**\n`;
+
+  if (info.isVIP && !info.isAdmin) {
+    msg += `⏳ នៅសល់: **${info.daysRemaining} ថ្ងៃ ${info.hoursRemaining} ម៉ោង**\n`;
+  }
+
+  const buttons = [];
+  if (!info.isVIP) {
+    buttons.push([Markup.button.callback('💎 Upgrade VIP', 'vip_upgrade')]);
+  }
+  buttons.push([Markup.button.callback('🔑 បញ្ចូល License Key', 'enter_license_key')]);
+
+  return ctx.reply(msg, {
+    parse_mode: 'Markdown',
+    reply_markup: Markup.inlineKeyboard(buttons).reply_markup
+  });
+});
+
+// User Command: Redeem License Key
+bot.command(['redeem', 'license'], async (ctx) => {
+  const userId = ctx.from.id.toString();
+  const text = ctx.message.text.trim();
+  const parts = text.split(/\s+/);
+
+  if (parts.length < 2) {
+    await setUserState(userId, 'awaiting_license_key');
+    return ctx.reply(
+      `🔑 **សូមបញ្ជាក់ License Key ដែលត្រូវបញ្ចូល៖**\n` +
+      `ទម្រង់៖ \`/redeem STUDY-XXXX-XXXX-XXXX\` ឬគ្រាន់តែផ្ញើកូដមកទីនេះ!`,
+      { parse_mode: 'Markdown' }
+    );
+  }
+
+  const rawKey = parts[1];
+  const res = await redeemLicenseKey(db, userId, rawKey);
+
+  if (res.success) {
+    await setUserState(userId, 'none');
+    return ctx.reply(
+      `🎉 **អបអរសាទរ! បញ្ចូល License Key ជោគជ័យ!**\n\n` +
+      `💎 គណនីរបស់អ្នកឥឡូវនេះជា **VIP** ពេញលេញ!\n` +
+      `⏱️ រយៈពេលបន្ថែម៖ **${res.label}** (${res.days} ថ្ងៃ)\n` +
+      `⌛ សុពលភាពរហូតដល់៖ **${res.expireDateFormatted}**\n\n` +
+      `✨ ឥឡូវអ្នកអាចប្រើប្រាស់មុខងារទាំងអស់៖\n` +
+      `• 🧠 សួរគ្រូ AI ដោយគ្មានដែនកំណត់\n` +
+      `• 🔊 អានមេរៀនជាសំឡេង\n` +
+      `• 📝 ប្រឡង Quiz MCQ និងកត់ត្រាពិន្ទុ\n` +
+      `• 🎤 ផ្ញើសារជាសំឡេងបានយ៉ាងងាយស្រួល!`,
+      { parse_mode: 'Markdown' }
+    );
+  } else {
+    return ctx.reply(res.message);
   }
 });
 
+// Admin Command: Generate License Key
+bot.command(['genkey', 'genlicense'], async (ctx) => {
+  const adminId = ctx.from.id.toString();
+  if (!SUPER_ADMIN_IDS.includes(adminId)) return ctx.reply("⛔ អ្នកគ្មានសិទ្ធិប្រើប្រាស់ Command នេះទេ។");
+
+  const args = ctx.message.text.trim().split(/\s+/);
+  if (args.length < 2) {
+    return ctx.reply(
+      `❌ **ទម្រង់មិនត្រឹមត្រូវ!**\n\n` +
+      `សូមវាយ៖ \`/genkey [រយៈពេល] [ចំណាំ/ឈ្មោះសិស្ស]\`\n\n` +
+      `ឧទាហរណ៍៖\n` +
+      `• \`/genkey 1m\` (សម្រាប់ 1 ខែ)\n` +
+      `• \`/genkey 3m ចាន់ណា\` (សម្រាប់ 3 ខែ)\n` +
+      `• \`/genkey 1y\` (សម្រាប់ 1 ឆ្នាំ)\n` +
+      `• \`/genkey 30d\` (សម្រាប់ 30 ថ្ងៃ)`,
+      { parse_mode: 'Markdown' }
+    );
+  }
+
+  const durationInput = args[1];
+  const note = args.slice(2).join(' ');
+
+  const res = await createLicenseKey(db, adminId, durationInput, note);
+  if (!res.success) return ctx.reply(res.message);
+
+  return ctx.reply(
+    `🎟️ **បង្កើត LICENSE KEY ជោគជ័យ!**\n\n` +
+    `🔑 Key: \`${res.key}\` *(ចុចដើម្បី Copy)*\n` +
+    `⏱️ រយៈពេល: **${res.label}** (${res.days} ថ្ងៃ)\n` +
+    (note ? `📝 ចំណាំ: ${note}\n` : '') +
+    `\n📋 **សារសម្រាប់ផ្ញើទៅសិស្ស (Copy ផ្ញើបាន):**\n` +
+    `--------------------------\n` +
+    `🎉 នេះជា License Key VIP របស់អ្នក:\n` +
+    `\`${res.key}\`\n\n` +
+    `សូមចូលទៅកាន់ Bot រួចវាយ:\n` +
+    `\`/redeem ${res.key}\`\n` +
+    `ឬចុចលើប៊ូតុង "🔑 បញ្ចូល License Key" ដើម្បីដំណើរការ VIP!\n` +
+    `--------------------------`,
+    { parse_mode: 'Markdown' }
+  );
+});
+
+// Admin Command: Set License Directly to User
+bot.command(['setlicense', 'setvip'], async (ctx) => {
+  const adminId = ctx.from.id.toString();
+  if (!SUPER_ADMIN_IDS.includes(adminId)) return ctx.reply("⛔ អ្នកគ្មានសិទ្ធិប្រើប្រាស់ Command នេះទេ។");
+
+  const args = ctx.message.text.trim().split(/\s+/);
+  if (args.length < 3) {
+    return ctx.reply(
+      `❌ **ទម្រង់មិនត្រឹមត្រូវ!**\n\n` +
+      `សូមវាយ៖ \`/setlicense [UserID] [រយៈពេល]\`\n\n` +
+      `ឧទាហរណ៍៖\n` +
+      `• \`/setlicense 123456789 1m\`\n` +
+      `• \`/setlicense 123456789 3m\`\n` +
+      `• \`/setlicense 123456789 1y\``,
+      { parse_mode: 'Markdown' }
+    );
+  }
+
+  const targetId = args[1];
+  const durationInput = args[2];
+
+  const res = await setDirectLicense(db, adminId, targetId, durationInput);
+  if (!res.success) return ctx.reply(res.message);
+
+  ctx.reply(
+    `✅ **កំណត់ License ជោគជ័យ!**\n\n` +
+    `👤 សិស្ស ID: \`${res.targetUserId}\`\n` +
+    `⏱️ បន្ថែម: **${res.label}** (${res.days} ថ្ងៃ)\n` +
+    `⌛ ផុតកំណត់: **${res.expireDateFormatted}**`,
+    { parse_mode: 'Markdown' }
+  );
+
+  try {
+    await bot.telegram.sendMessage(
+      targetId,
+      `🎉 **អបអរសាទរ! Admin បានកំណត់ License VIP ជូនអ្នក!**\n\n` +
+      `⏱️ រយៈពេលបន្ថែម៖ **${res.label}**\n` +
+      `⌛ សុពលភាពរហូតដល់៖ **${res.expireDateFormatted}**\n\n` +
+      `✨ ឥឡូវអ្នកអាចប្រើប្រាស់មុខងារទាំងអស់បានពេញលេញ!`,
+      { parse_mode: 'Markdown' }
+    );
+  } catch (e) {
+    console.log("Could not notify user:", e.message);
+  }
+});
+
+// Admin Command: Revoke / Cancel User License
+bot.command(['revokelicense', 'dellicense'], async (ctx) => {
+  const adminId = ctx.from.id.toString();
+  if (!SUPER_ADMIN_IDS.includes(adminId)) return ctx.reply("⛔ អ្នកគ្មានសិទ្ធិប្រើប្រាស់ Command នេះទេ។");
+
+  const args = ctx.message.text.trim().split(/\s+/);
+  if (args.length < 2) {
+    return ctx.reply("❌ សូមវាយ៖ `/revokelicense [UserID]`", { parse_mode: 'Markdown' });
+  }
+
+  const targetId = args[1];
+  await revokeUserLicense(db, adminId, targetId);
+
+  ctx.reply(`✅ បានដកហូត License របស់ ID: \`${targetId}\` រួចរាល់។`, { parse_mode: 'Markdown' });
+
+  try {
+    await bot.telegram.sendMessage(
+      targetId,
+      `⚠️ គណនី VIP របស់អ្នកត្រូវបានដកហូត (Revoked) ដោយ Admin។ ប្រសិនបើមានចម្ងល់សូមទាក់ទង Admin។`,
+      { parse_mode: 'Markdown' }
+    );
+  } catch (e) {}
+});
+
+// Admin Command: Check User License
+bot.command(['checklicense', 'checkvip'], async (ctx) => {
+  const adminId = ctx.from.id.toString();
+  if (!SUPER_ADMIN_IDS.includes(adminId)) return ctx.reply("⛔ អ្នកគ្មានសិទ្ធិប្រើប្រាស់ Command នេះទេ។");
+
+  const args = ctx.message.text.trim().split(/\s+/);
+  if (args.length < 2) {
+    return ctx.reply("❌ សូមវាយ៖ `/checklicense [UserID]`", { parse_mode: 'Markdown' });
+  }
+
+  const targetId = args[1];
+  const info = await getUserLicenseInfo(db, targetId, SUPER_ADMIN_IDS);
+
+  let msg = `🔍 **ព័ត៌មាន License របស់សិស្ស៖**\n\n` +
+    `👤 User ID: \`${targetId}\`\n` +
+    `📊 ស្ថានភាព: **${info.statusKhmer}**\n` +
+    `⌛ ថ្ងៃផុតកំណត់: **${info.expireDateFormatted}**\n`;
+
+  if (info.isVIP && !info.isAdmin) {
+    msg += `⏳ នៅសល់: **${info.daysRemaining} ថ្ងៃ ${info.hoursRemaining} ម៉ោង**\n`;
+  }
+
+  return ctx.reply(msg, { parse_mode: 'Markdown' });
+});
+
+// Admin Command: List Unused Keys
+bot.command('listkeys', async (ctx) => {
+  const adminId = ctx.from.id.toString();
+  if (!SUPER_ADMIN_IDS.includes(adminId)) return ctx.reply("⛔ អ្នកគ្មានសិទ្ធិប្រើប្រាស់ Command នេះទេ។");
+
+  const keys = await listUnusedKeys(db, 15);
+  if (keys.length === 0) {
+    return ctx.reply("📭 មិនមាន License Key ដែលទំនេរ (មិនទាន់ប្រើ) ទេ។\nប្រើ `/genkey [duration]` ដើម្បីបង្កើតថ្មី។", { parse_mode: 'Markdown' });
+  }
+
+  let msg = `🔑 **បញ្ជី License Keys ដែលនៅទំនេរ (${keys.length}):**\n\n`;
+  keys.forEach((k, i) => {
+    const created = formatCambodiaTime(k.createdAt);
+    msg += `${i + 1}. \`${k.key}\`\n   ⏱️ ${k.label} | បង្កើត: ${created}${k.note ? ` | (${k.note})` : ''}\n\n`;
+  });
+
+  return ctx.reply(msg, { parse_mode: 'Markdown' });
+});
+
+// Admin Command: Admin Help
+bot.command(['adminhelp', 'admin'], async (ctx) => {
+  const adminId = ctx.from.id.toString();
+  if (!SUPER_ADMIN_IDS.includes(adminId)) return ctx.reply("⛔ អ្នកគ្មានសិទ្ធិប្រើប្រាស់ Command នេះទេ។");
+
+  return ctx.reply(
+    `🛠️ **ផ្ទាំងបញ្ជា ADMIN (StudyAI License & VIP System)**\n\n` +
+    `🔑 **គ្រប់គ្រង License Keys:**\n` +
+    `• \`/genkey 1m [note]\` - បង្កើត Key 1 ខែ\n` +
+    `• \`/genkey 3m\` - បង្កើត Key 3 ខែ\n` +
+    `• \`/genkey 1y\` - បង្កើត Key 1 ឆ្នាំ\n` +
+    `• \`/genkey 30d\` - បង្កើត Key 30 ថ្ងៃ\n` +
+    `• \`/listkeys\` - មើល Key ដែលមិនទាន់ប្រើ\n\n` +
+    `👤 **កំណត់ License ផ្ទាល់លើគណនីសិស្ស:**\n` +
+    `• \`/setlicense [ID] 1m\` - កំណត់ License ឱ្យសិស្សផ្ទាល់\n` +
+    `• \`/checklicense [ID]\` - ពិនិត្យមើល License សិស្ស\n` +
+    `• \`/revokelicense [ID]\` - ដកហូត/លុប License សិស្ស\n` +
+    `• \`/addvip [ID] [ខែ]\` - បន្ថែម VIP (ទម្រង់ដើម)\n\n` +
+    `📊 **ប្រព័ន្ធ:**\n` +
+    `• ស្ទាក់ចាប់ Screenshot វិក្កយបត្រស្វ័យប្រវត្តិក៏នៅតែដំណើរការធម្មតា`,
+    { parse_mode: 'Markdown' }
+  );
+});
+
+// Backward compatibility: addvip
 bot.command('addvip', async (ctx) => {
   const adminId = ctx.from.id.toString();
   if (!SUPER_ADMIN_IDS.includes(adminId)) return ctx.reply("⛔ អ្នកគ្មានសិទ្ធិប្រើប្រាស់ Command នេះទេ។");
 
-  const args = ctx.message.text.split(' ');
+  const args = ctx.message.text.trim().split(/\s+/);
   if (args.length !== 3) return ctx.reply("❌ ទម្រង់មិនត្រឹមត្រូវ! សូមវាយ៖ `/addvip [លេខIDសិស្ស] [ចំនួនខែ]`", { parse_mode: 'Markdown' });
 
   const targetId = args[1];
@@ -366,38 +681,13 @@ bot.command('addvip', async (ctx) => {
 
   if (isNaN(months) || months <= 0) return ctx.reply("❌ ចំនួនខែមិនត្រឹមត្រូវ!");
 
-  // Fetch existing subscription to not lose remaining days
-  const subSnap = await db.ref(`users/${targetId}/subscription`).once('value');
-  const currentSub = subSnap.val();
-  
-  const additionalTime = months * 30 * 24 * 60 * 60 * 1000;
-  let newExpiresAt = Date.now() + additionalTime;
+  const res = await setDirectLicense(db, adminId, targetId, `${months}m`);
+  if (!res.success) return ctx.reply(res.message);
 
-  if (currentSub && currentSub.expiresAt && currentSub.expiresAt > Date.now()) {
-    // If active, add to existing time
-    newExpiresAt = currentSub.expiresAt + additionalTime;
-  }
-
-  // Update User Subscription
-  await db.ref(`users/${targetId}/subscription`).update({
-    status: 'paid',
-    expiresAt: newExpiresAt,
-    lastUpdated: Date.now()
-  });
-
-  // Keep a secure payment log globally
-  await db.ref('payments_log').push({
-    userId: targetId,
-    adminId: adminId,
-    monthsAdded: months,
-    timestamp: Date.now()
-  });
-
-  const expireDate = new Date(newExpiresAt).toLocaleString('en-GB', { timeZone: 'Asia/Phnom_Penh' });
-  ctx.reply(`✅ ជោគជ័យ! សិស្ស ID: ${targetId} ឥឡូវជាសមាជិក VIP រហូតដល់ថ្ងៃទី ${expireDate}។\n(ប្រវត្តិបង់ប្រាក់ត្រូវបានកត់ត្រាទុកយ៉ាងមានសុវត្ថិភាព)`);
+  ctx.reply(`✅ ជោគជ័យ! សិស្ស ID: ${targetId} ឥឡូវជាសមាជិក VIP រហូតដល់ថ្ងៃទី ${res.expireDateFormatted}។\n(ប្រវត្តិបង់ប្រាក់ត្រូវបានកត់ត្រាទុកយ៉ាងមានសុវត្ថិភាព)`);
 
   try {
-    await bot.telegram.sendMessage(targetId, `🎉 អបអរសាទរ! គណនីរបស់អ្នកត្រូវបានអាប់ដេតទៅជា VIP (Upgrade) រួចរាល់។\nអ្នកបានបន្ថែមចំនួន ${months} ខែ។\nអ្នកអាចប្រើប្រាស់មុខងារទាំងអស់បានរហូតដល់៖ **${expireDate}**!`, { parse_mode: 'Markdown' });
+    await bot.telegram.sendMessage(targetId, `🎉 អបអរសាទរ! គណនីរបស់អ្នកត្រូវបានអាប់ដេតទៅជា VIP (Upgrade) រួចរាល់។\nអ្នកបានបន្ថែមចំនួន ${months} ខែ។\nអ្នកអាចប្រើប្រាស់មុខងារទាំងអស់បានរហូតដល់៖ **${res.expireDateFormatted}**!`, { parse_mode: 'Markdown' });
   } catch (e) {
     console.log("Could not notify user:", e.message);
   }
@@ -600,7 +890,8 @@ bot.action(/quiz_start_([^-]+)-([^-]+)-(.+)/, async (ctx) => {
       {
         parse_mode: 'Markdown',
         reply_markup: Markup.inlineKeyboard([
-          [Markup.button.callback('💎 Upgrade VIP', 'vip_upgrade')]
+          [Markup.button.callback('💎 Upgrade VIP', 'vip_upgrade')],
+          [Markup.button.callback('🔑 បញ្ចូល License Key', 'enter_license_key')]
         ]).reply_markup
       }
     );
@@ -979,32 +1270,61 @@ After the grade, provide helpful feedback in Khmer explaining why they got this 
 // AI Chat Handling
 bot.on('text', async (ctx) => {
   const userId = ctx.from.id.toString();
-  const userText = ctx.message.text;
+  const userText = ctx.message.text ? ctx.message.text.trim() : '';
 
   // Ignore persistent menu clicks
-  const menuOptions = ['📚 បញ្ជីមេរៀន (Lessons)', '🔄 ប្តូរគ្រូ AI', '🕰️ ប្រវត្តិសិក្សា', '❓ ជំនួយ (Help)'];
+  const menuOptions = [
+    '📚 បញ្ជីមេរៀន (Lessons)',
+    '🔄 ប្តូរគ្រូ AI',
+    '🕰️ ប្រវត្តិសិក្សា',
+    '❓ ជំនួយ (Help)',
+    '💎 គណនី VIP (Upgrade)'
+  ];
   if (menuOptions.includes(userText)) return;
+
+  // 🔑 Intercept License Key input (from "enter_license_key" button or auto-detect STUDY-XXXX-XXXX-XXXX)
+  const userState = await getUserState(userId);
+  const isKeyFormat = /^STUDY-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/i.test(userText);
+
+  if (userState === 'awaiting_license_key' || isKeyFormat) {
+    await setUserState(userId, 'none');
+    const res = await redeemLicenseKey(db, userId, userText);
+    if (res.success) {
+      return ctx.reply(
+        `🎉 **អបអរសាទរ! បញ្ចូល License Key ជោគជ័យ!**\n\n` +
+        `💎 គណនីរបស់អ្នកឥឡូវនេះជា **VIP** ពេញលេញ!\n` +
+        `⏱️ រយៈពេលបន្ថែម៖ **${res.label}** (${res.days} ថ្ងៃ)\n` +
+        `⌛ សុពលភាពរហូតដល់៖ **${res.expireDateFormatted}**\n\n` +
+        `✨ ឥឡូវអ្នកអាចប្រើប្រាស់មុខងារទាំងអស់៖\n` +
+        `• 🧠 សួរគ្រូ AI ដោយគ្មានដែនកំណត់\n` +
+        `• 🔊 អានមេរៀនជាសំឡេង\n` +
+        `• 📝 ប្រឡង Quiz MCQ និងកត់ត្រាពិន្ទុ\n` +
+        `• 🎤 ផ្ញើសារជាសំឡេងបានយ៉ាងងាយស្រួល!`,
+        { parse_mode: 'Markdown' }
+      );
+    } else {
+      return ctx.reply(res.message);
+    }
+  }
 
   // 💎 VIP Gate - Free account cannot use AI chat
   const isVIP = await checkVIP(userId);
   if (!isVIP) {
     return ctx.reply(
-      `🧠 *មុខងារសួរជា AI សម្រាប់ VIP ប៉ុណ្ណោះ!*
-
-ខ្ញុំនឹង Free Account អ្នកអាច:
-✅ មើលមេរៀនទាំងអស់ (គ្រូបភ័ភព្ជីមើល)
-✅ មើលកិរិយាសព្ទប្រែប្រវល
-
-❌ សួរជាគ្រូ AI (ត្រូវការ VIP)
-❌ អានសម្លង (ត្រូវការ VIP)
-❌ ប្រឡង Quiz (ត្រូវការ VIP)
-❌ ផ្ញើសារជាសម្លង (ត្រូវការ VIP)
-
-💰 *តម្លៃ: 3$/ខែ | 30$/ឆ្នាំ*`,
+      `🧠 *មុខងារសួរជា AI សម្រាប់ VIP ប៉ុណ្ណោះ!*\n\n` +
+      `សម្រាប់ Free Account អ្នកអាច:\n` +
+      `✅ មើលមេរៀនទាំងអស់ (Curriculum)\n` +
+      `✅ មើលកិរិយាសព្ទប្រែប្រួល\n\n` +
+      `❌ សួរជាគ្រូ AI (ត្រូវការ VIP)\n` +
+      `❌ អានសំឡេង (ត្រូវការ VIP)\n` +
+      `❌ ប្រឡង Quiz (ត្រូវការ VIP)\n` +
+      `❌ ផ្ញើសារជាសំឡេង (ត្រូវការ VIP)\n\n` +
+      `💰 *តម្លៃ: 3$/ខែ | 30$/ឆ្នាំ*`,
       {
         parse_mode: 'Markdown',
         reply_markup: Markup.inlineKeyboard([
-          [Markup.button.callback('💎 Upgrade VIP នៅសីលនេះ', 'vip_upgrade')]
+          [Markup.button.callback('💎 Upgrade VIP នៅទីនេះ', 'vip_upgrade')],
+          [Markup.button.callback('🔑 បញ្ចូល License Key', 'enter_license_key')]
         ]).reply_markup
       }
     );
@@ -1151,7 +1471,8 @@ bot.action(/tts_(.+)/, async (ctx) => {
       {
         parse_mode: 'Markdown',
         reply_markup: Markup.inlineKeyboard([
-          [Markup.button.callback('💎 Upgrade VIP នៅទីនេះ', 'vip_upgrade')]
+          [Markup.button.callback('💎 Upgrade VIP នៅទីនេះ', 'vip_upgrade')],
+          [Markup.button.callback('🔑 បញ្ចូល License Key', 'enter_license_key')]
         ]).reply_markup
       }
     );
