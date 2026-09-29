@@ -183,7 +183,48 @@ const requireMembership = async (ctx, next) => {
   return next();
 };
 
-// TTS Helper Function
+// ========================
+// GROUP ADMIN GUARD
+// ========================
+
+/**
+ * Check if user is admin/creator of the current group
+ */
+const isGroupAdmin = async (ctx) => {
+  try {
+    const userId = ctx.from?.id;
+    if (!userId) return false;
+    if (SUPER_ADMIN_IDS.includes(userId.toString())) return true;
+    const member = await ctx.telegram.getChatMember(ctx.chat.id, userId);
+    return ['administrator', 'creator'].includes(member.status);
+  } catch (e) {
+    return false;
+  }
+};
+
+/**
+ * Middleware: In group/supergroup chats, only admins can use bot.
+ * Private chats pass through (other guards apply).
+ */
+const groupAdminGuard = async (ctx, next) => {
+  const chatType = ctx.chat?.type;
+  if (chatType === 'group' || chatType === 'supergroup') {
+    const userId = ctx.from?.id;
+    if (SUPER_ADMIN_IDS.includes(userId?.toString())) return next();
+    const admin = await isGroupAdmin(ctx);
+    if (!admin) {
+      try {
+        await ctx.reply(`🔒 តែ *Admin* ក្រុមប៉ុណ្ណោះអាចប្រើ Bot Commands បាន!`, {
+          parse_mode: 'Markdown'
+        });
+      } catch (_) {}
+      return; // Block non-admins in group
+    }
+  }
+  return next();
+};
+
+
 const generateAndSendTTS = async (ctx, text) => {
   if (!text) return;
   try {
@@ -240,6 +281,9 @@ bot.action('check_membership', async (ctx) => {
     });
   }
 });
+
+// Apply Group Admin Guard as global middleware (runs before every command/message)
+bot.use(groupAdminGuard);
 
 // Start Command & Curriculum Menu
 bot.start(async (ctx) => {
