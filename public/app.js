@@ -822,6 +822,96 @@ function resetAudioPlayer() {
 // 5. AI TUTOR CHAT DRAWER
 // ==========================================
 
+async function playTTS(text, btnElement) {
+  if (!text) return;
+  const originalHtml = btnElement.innerHTML;
+  btnElement.innerHTML = '⏳';
+  
+  try {
+    const res = await fetch('/api/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, lang: 'km' })
+    });
+    
+    if (!res.ok) throw new Error('TTS Failed');
+    
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    
+    btnElement.innerHTML = '🔊';
+    btnElement.classList.add('playing');
+    
+    audio.play();
+    audio.onended = () => {
+      btnElement.innerHTML = originalHtml;
+      btnElement.classList.remove('playing');
+      URL.revokeObjectURL(url);
+    };
+  } catch (err) {
+    btnElement.innerHTML = '❌';
+    setTimeout(() => { btnElement.innerHTML = originalHtml; }, 2000);
+  }
+}
+
+let mediaRecorder;
+let audioChunks = [];
+
+async function toggleVoiceRecord() {
+  const btn = document.getElementById('recordVoiceBtn');
+  const input = document.getElementById('chatInput');
+  
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    mediaRecorder.stop();
+    btn.innerHTML = '🎤';
+    btn.classList.remove('recording');
+    return;
+  }
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+    audioChunks = [];
+
+    mediaRecorder.ondataavailable = e => {
+      if (e.data.size > 0) audioChunks.push(e.data);
+    };
+
+    mediaRecorder.onstop = async () => {
+      stream.getTracks().forEach(track => track.stop());
+      const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+      
+      const oldPlaceholder = input.placeholder;
+      input.placeholder = "⏳ កំពុងបំប្លែងសំឡេង...";
+      
+      try {
+        const res = await fetch('/api/stt', {
+          method: 'POST',
+          body: audioBlob
+        });
+        const data = await res.json();
+        
+        if (data.success && data.text) {
+          input.value = data.text;
+          sendChatMessage();
+        } else {
+          showToast("បរាជ័យក្នុងការបំប្លែងសំឡេង", "error");
+        }
+      } catch(err) {
+        showToast("បរាជ័យក្នុងការបំប្លែងសំឡេង", "error");
+      }
+      input.placeholder = oldPlaceholder;
+    };
+
+    mediaRecorder.start();
+    btn.innerHTML = '⏹️';
+    btn.classList.add('recording');
+  } catch (err) {
+    alert("សូមអនុញ្ញាតឱ្យប្រើប្រាស់មីក្រូហ្វូនក្នុង Browser របស់អ្នក!");
+  }
+}
+
 async function sendChatMessage() {
   const input = document.getElementById('chatInput');
   const msg = input.value.trim();
@@ -856,7 +946,13 @@ async function sendChatMessage() {
     });
 
     const data = await res.json();
-    thinkBubble.innerHTML = (data.reply || 'សូមអភ័យទោស ខ្ញុំមិនអាចឆ្លើយបានទេ។').replace(/\n/g, '<br>');
+    const cleanReply = data.reply || 'សូមអភ័យទោស ខ្ញុំមិនអាចឆ្លើយបានទេ។';
+    
+    // Create text container and TTS button
+    const safeText = cleanReply.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    thinkBubble.innerHTML = cleanReply.replace(/\n/g, '<br>') + 
+      `<button class="tts-btn" onclick="playTTS('${safeText}', this)" title="ស្តាប់សំឡេង (Listen)">🔊</button>`;
+      
     chatBox.scrollTop = chatBox.scrollHeight;
   } catch (e) {
     thinkBubble.textContent = '⚠️ មានបញ្ហាក្នុងការតភ្ជាប់ជាមួយ AI';
@@ -1742,33 +1838,56 @@ async function loadUserDevices() {
       return;
     }
 
-    container.innerHTML = data.devices.map(dev => {
-      const isCur = dev.isCurrent;
-      const lastActiveDate = dev.lastActive
-        ? new Date(dev.lastActive).toLocaleDateString('km-KH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-        : 'ថ្មីៗ';
+    // Device type icon detector
+    function getDeviceIcon(deviceName) {
+      const dn = (deviceName || '').toLowerCase();
+      if (dn.includes('android') || dn.includes('mobile') || dn.includes('phone')) return '📱';
+      if (dn.includes('iphone') || dn.includes('ios')) return '📱';
+      if (dn.includes('ipad') || dn.includes('tablet')) return '🖥️';
+      if (dn.includes('telegram')) return '✈️';
+      return '💻';
+    }
 
-      return `
-        <div class="device-item-card ${isCur ? 'current' : ''}">
-          <div class="device-info-left">
-            <div class="device-name-title">
-              💻 ${dev.deviceName || 'Web Browser'}
-              ${isCur ? '<span class="device-current-tag">ឧបករណ៍នេះ</span>' : ''}
+    const otherDevices = data.devices.filter(d => !d.isCurrent);
+    const hasOtherActive = otherDevices.length > 0;
+
+    container.innerHTML = `
+      ${data.devices.map(dev => {
+        const isCur = dev.isCurrent;
+        const lastActiveDate = dev.lastActive
+          ? new Date(dev.lastActive).toLocaleDateString('km-KH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+          : 'ថ្មីៗ';
+        const icon = getDeviceIcon(dev.deviceName);
+
+        return `
+          <div class="device-item-card ${isCur ? 'current' : ''}">
+            <div class="device-info-left">
+              <div class="device-name-title">
+                ${icon} ${dev.deviceName || 'Web Browser'}
+                ${isCur ? '<span class="device-current-tag">ឧបករណ៍នេះ</span>' : ''}
+              </div>
+              <div class="device-meta-sub">
+                សកម្មចុងក្រោយ៖ ${lastActiveDate} • IP: ${dev.ip || 'Local'}
+              </div>
             </div>
-            <div class="device-meta-sub">
-              សកម្មចុងក្រោយ៖ ${lastActiveDate} • IP: ${dev.ip || 'Local'}
-            </div>
+            ${!isCur ? `
+              <button type="button" class="btn btn-xs btn-outline-danger" onclick="revokeDevice('${dev.deviceId}')">
+                ផ្តាច់
+              </button>
+            ` : `
+              <span class="text-xs text-emerald-400 font-semibold">✅ សកម្ម</span>
+            `}
           </div>
-          ${!isCur ? `
-            <button type="button" class="btn btn-xs btn-outline-danger" onclick="revokeDevice('${dev.deviceId}')">
-              ផ្តាច់
-            </button>
-          ` : `
-            <span class="text-xs text-emerald-400 font-semibold">សកម្ម</span>
-          `}
+        `;
+      }).join('')}
+      ${hasOtherActive ? `
+        <div style="margin-top:10px; text-align:center;">
+          <button type="button" class="btn btn-sm btn-outline-danger" onclick="revokeAllDevices()" style="font-size:0.75rem; padding:6px 14px;">
+            🚪 Logout ឧបករណ៍ ${otherDevices.length} ផ្សេងៗទាំងអស់
+          </button>
         </div>
-      `;
-    }).join('');
+      ` : ''}
+    `;
   } catch (err) {
     container.innerHTML = '<div class="text-xs text-rose-400 text-center py-2">ផ្ទុកបញ្ជីឧបករណ៍មិនបានជោគជ័យ</div>';
   }
@@ -1780,12 +1899,17 @@ async function revokeDevice(targetDeviceId) {
 
   try {
     showToast('⏳ កំពុងផ្តាច់ឧបករណ៍...', 'info');
+    const sessionToken = localStorage.getItem('studyai_session_token');
+    const callerDeviceId = getOrCreateDeviceId();
+
     const res = await fetch('/api/auth/revoke-device', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         userId: STATE.currentUser.id,
-        targetDeviceId
+        targetDeviceId,
+        sessionToken: sessionToken || '',
+        callerDeviceId
       })
     });
     const data = await res.json();
@@ -1797,6 +1921,36 @@ async function revokeDevice(targetDeviceId) {
     showToast(err.message, 'error');
   }
 }
+
+async function revokeAllDevices() {
+  if (!STATE.currentUser) return;
+  if (!confirm('⚠️ តើអ្នកពិតជាចង់ Logout ឧបករណ៍ **ទាំងអស់** (លើកលែងតែឧបករណ៍នេះ) មែនទេ?')) return;
+
+  try {
+    showToast('⏳ កំពុង Logout ឧបករណ៍ទាំងអស់...', 'info');
+    const sessionToken = localStorage.getItem('studyai_session_token');
+    const callerDeviceId = getOrCreateDeviceId();
+
+    const res = await fetch('/api/auth/revoke-all-devices', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: STATE.currentUser.id,
+        sessionToken: sessionToken || '',
+        callerDeviceId
+      })
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'Logout មិនបានជោគជ័យ');
+
+    showToast(data.message || '✅ Logout ឧបករណ៍ទាំងអស់បានជោគជ័យ!', 'success');
+    loadUserDevices();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+
 
 // ------------------------------------------
 // MODAL TABS SWITCHING

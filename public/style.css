@@ -1409,6 +1409,62 @@ body {
   border-color: var(--primary-light);
 }
 
+.btn-icon {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-glass);
+  color: #fff;
+  padding: 0 14px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.btn-icon:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.btn-icon.recording {
+  background: #ef4444;
+  border-color: #ef4444;
+  animation: pulse-record 1.5s infinite;
+}
+
+@keyframes pulse-record {
+  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+  70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+.tts-btn {
+  background: rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.2);
+  color: #fff;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  margin-left: 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  vertical-align: middle;
+  transition: all 0.2s;
+}
+
+.tts-btn:hover { 
+  background: rgba(255,255,255,0.3); 
+  transform: scale(1.1);
+}
+
+.tts-btn.playing {
+  background: var(--primary);
+  border-color: var(--primary-light);
+}
+
 /* ==========================================================================
    QUIZ ENGINE
    ========================================================================== */
@@ -2303,7 +2359,11 @@ body {
     grid-template-columns: 1fr;
   }
   .ai-tutor-card {
-    height: 480px;
+    height: calc(100vh - 120px); /* Fill most of screen */
+    border-radius: 0;
+    margin: -24px; /* Negate container padding */
+    padding: 15px;
+    border: none;
   }
 }
 

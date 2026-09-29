@@ -1916,6 +1916,18 @@ async function handleQuizSubmission(ctx, userId) {
     let certId = Math.random().toString(36).substring(2, 8).toUpperCase();
     const dateStr = new Date().toLocaleDateString('km-KH');
 
+    // Fetch profile for khmerName & photo
+    let khmerName = null;
+    let photoUrl = null;
+    if (db) {
+      try {
+        const profSnap = await db.ref(`users/${userId}/profile`).once('value');
+        const prof = profSnap.val() || {};
+        khmerName = prof.khmerName || null;
+        photoUrl = prof.photoUrl || prof.avatar || null;
+      } catch (e) { console.error('Profile fetch for cert:', e.message); }
+    }
+
     // Check if user already had a certId for this subject/lesson to preserve QR codes
     if (db) {
       try {
@@ -1928,6 +1940,7 @@ async function handleQuizSubmission(ctx, userId) {
           certId = prevData.certId;
         }
       } catch (e) {}
+
     }
 
     // 1. Mark lesson or subject completed in Firebase
@@ -1978,7 +1991,9 @@ async function handleQuizSubmission(ctx, userId) {
       percent,
       dateStr,
       certId,
-      isAnnualExam: !!state.isAnnualExam
+      isAnnualExam: !!state.isAnnualExam,
+      khmerName: khmerName || null,
+      photoUrl: photoUrl || null
     };
 
     // Save to global certificates database for QR code verification
@@ -2031,8 +2046,30 @@ async function handleQuizSubmission(ctx, userId) {
         }
       );
     } catch (e) {
-      console.error("Certificate document send error:", e);
+      console.error("Certificate document send error:", e.message || e);
+      // Fallback: send web link instead
+      const baseUrl = process.env.RENDER_EXTERNAL_URL || process.env.BASE_URL || '';
+      const webLink = baseUrl ? `${baseUrl}/cert/${certData.certId}` : null;
+      const botUser = process.env.TELEGRAM_BOT_USERNAME || 'StudyAiEngKH_bot';
+      const tgLink = `https://t.me/${botUser}?start=verify_${certData.certId}`;
+
+      await ctx.reply(
+        `🎓 *វិញ្ញាបនបត្ររបស់អ្នកត្រូវបានចេញដោយជោគជ័យ!*\n\n` +
+        `📜 *លេខកូដ៖* \`CERT-${certData.certId}\`\n` +
+        `⚠️ ការផ្ញើឯកសារ HTML ជួបបញ្ហាបច្ចេកទេស!\n\n` +
+        (webLink ? `🌐 *មើលវិញ្ញាបនបត្រតាម Web:*\n${webLink}\n\n` : '') +
+        `📱 *ផ្ទៀងផ្ទាត់ QR ក្នុង Bot:* [ចុចនៅទីនេះ](${tgLink})\n\n` +
+        `💡 ចូល *"វិញ្ញាបនបត្ររបស់ខ្ញុំ"* ដើម្បី Refresh ម្ដងទៀត!`,
+        {
+          parse_mode: 'Markdown',
+          reply_markup: Markup.inlineKeyboard([
+            ...(webLink ? [[Markup.button.url('🌐 មើលតាម Web Browser', webLink)]] : []),
+            [Markup.button.callback('🔄 Refresh វិញ្ញាបនបត្រ', 'my_certificates_menu')]
+          ]).reply_markup
+        }
+      );
     }
+
 
     // 4. Navigation Buttons after Success
     if (state.isAnnualExam) {
@@ -2201,6 +2238,18 @@ async function refreshAndSendCertificate(ctx, userId, certInfo) {
   const dateStr = certInfo.dateStr || new Date().toLocaleDateString('km-KH');
   const titleText = certInfo.title || certInfo.subjectTitle || certInfo.lessonTitle || (certInfo.isAnnualExam ? 'ការប្រឡងបញ្ចប់មុខវិជ្ជាប្រចាំឆ្នាំ' : 'វិញ្ញាបនបត្របញ្ចប់មេរៀន');
 
+  // Fetch profile for khmerName & photo
+  let khmerName = null;
+  let photoUrl = null;
+  if (db) {
+    try {
+      const profSnap = await db.ref(`users/${userId}/profile`).once('value');
+      const prof = profSnap.val() || {};
+      khmerName = prof.khmerName || certInfo.khmerName || null;
+      photoUrl = prof.photoUrl || prof.avatar || certInfo.photoUrl || null;
+    } catch (e) { console.error('refreshCert profile fetch:', e.message); }
+  }
+
   const certData = {
     certId,
     userId: userId.toString(),
@@ -2212,8 +2261,11 @@ async function refreshAndSendCertificate(ctx, userId, certInfo) {
     total: certInfo.total ?? 10,
     percent: certInfo.percent ?? (certInfo.score && certInfo.total ? Math.round((certInfo.score / certInfo.total) * 100) : 100),
     dateStr,
-    isAnnualExam: !!certInfo.isAnnualExam
+    isAnnualExam: !!certInfo.isAnnualExam,
+    khmerName,
+    photoUrl
   };
+
 
   // 1. Update global certificates collection in Firebase
   if (db) {

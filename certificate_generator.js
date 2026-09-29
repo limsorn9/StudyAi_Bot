@@ -217,14 +217,14 @@ async function generateCertificateHTML(data) {
     }
     /* Logo in header: 2x size (140px), transparent background */
     .hdr-logo-box {
-      width: 145px; display: flex; align-items: center; justify-content: flex-start;
+      width: 90px; display: flex; align-items: center; justify-content: flex-start;
     }
     .hdr-logo {
-      width: 140px; height: 140px;
+      width: 80px; height: 80px;
       object-fit: contain; border-radius: 50%;
       filter: drop-shadow(0 3px 10px rgba(0,0,0,0.18));
     }
-    .hdr-spacer { width: 145px; } /* Empty balancer - ONLY 1 stamp on whole certificate */
+    .hdr-spacer { width: 90px; } /* Balanced spacer matching logo side */
     .hdr-center { flex: 1; text-align: center; padding: 0 10px; }
     .kingdom-box { margin-bottom: 3px; }
     .kingdom-title {
@@ -340,33 +340,34 @@ async function generateCertificateHTML(data) {
 
     /* Director Block (Right) - Authentic Cambodian administrative stamp & signature */
     .dir-block {
-      width: 350px; text-align: center;
-      display: flex; flex-direction: column; align-items: center;
+      width: 350px; text-align: right;
+      display: flex; flex-direction: column; align-items: flex-end;
       position: relative;
     }
     .dir-date-khmer {
       font-size: 12px; color: #334155; line-height: 1.5; margin-bottom: 2px;
-      text-align: center;
+      text-align: right;
     }
     .dir-role-kh {
       font-family: 'Khmer OS Muol Light', 'Khmer OS Moul Light', 'Moul', cursive;
       font-size: 13.5px; color: #0f172a;
       margin-bottom: 4px;
+      text-align: right;
     }
     /* Signature and Stamp Container */
     .sig-stamp-container {
       position: relative;
       width: 340px;
-      height: 160px;
+      height: 145px;
       margin: 0 auto;
     }
-    /* Official stamp: DOUBLE SIZE (220px), on the LEFT, shifted UP, 100% transparent background */
+    /* Official stamp: positioned BELOW the director title so it does NOT block the text */
     .stamp-official {
       position: absolute;
       left: -12px;
-      top: -30px; /* ខិតលើបន្តិច */
-      width: 220px; /* ធំជាងនឹងគុណនឹងពីរ! */
-      height: 220px;
+      top: 10px; /* ចុះក្រោម → មិនបាំងអក្សរ "នាយកវិទ្យាស្ថាន" */
+      width: 200px;
+      height: 200px;
       object-fit: contain;
       transform: rotate(-6deg);
       z-index: 2;
@@ -385,17 +386,20 @@ async function generateCertificateHTML(data) {
       z-index: 1;
     }
     .dir-name-underline {
-      width: 210px;
+      width: 230px;
       border-top: 1.5px solid #94a3b8;
       margin-top: 4px;
-      padding-top: 4px;
+      padding-top: 5px;
+      text-align: right;
     }
     .dir-name-kh {
       font-family: 'Khmer OS Muol Light', 'Khmer OS Moul Light', 'Moul', cursive;
-      font-size: 14.5px; color: #0f172a;
+      font-size: 17px; color: #c0000b; font-weight: 900;
+      text-align: right;
     }
     .dir-name-en {
-      font-size: 10.5px; color: #64748b; font-weight: 700;
+      font-size: 11px; color: #64748b; font-weight: 700;
+      text-align: right;
     }
 
     @media print {

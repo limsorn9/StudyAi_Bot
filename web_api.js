@@ -56,6 +56,47 @@ function createWebAPIRouter({ db, auth, curriculum, bot, SUPER_ADMIN_IDS, checkV
     }
   }, 30 * 60 * 1000);
 
+  /**
+   * Check VIP across linked accounts (Telegram ↔ Web).
+   * If the primary userId doesn't have VIP but has a linked account that does,
+   * the linked account's subscription is synced and VIP is returned true.
+   */
+  async function checkVIPCrossLinked(userId) {
+    if (!checkVIP || !db) return false;
+    if (!userId) return false;
+
+    const primary = await checkVIP(userId);
+    if (primary) return true;
+
+    // Check linked account
+    try {
+      const profSnap = await db.ref(`users/${userId}/profile`).once('value');
+      const prof = profSnap.val() || {};
+      const linkedId = prof.linkedTelegramId || prof.linkedWebUserId;
+      if (!linkedId) return false;
+
+      const linkedVIP = await checkVIP(linkedId);
+      if (linkedVIP) {
+        // Sync subscription to primary account
+        const subSnap = await db.ref(`users/${linkedId}/subscription`).once('value');
+        const sub = subSnap.val();
+        if (sub && sub.expiresAt && sub.expiresAt > Date.now()) {
+          await db.ref(`users/${userId}/subscription`).set({
+            ...sub,
+            syncedFromLinked: true,
+            syncedAt: Date.now()
+          });
+        }
+        return true;
+      }
+    } catch (e) {
+      console.error('[checkVIPCrossLinked] Error:', e.message);
+    }
+    return false;
+  }
+
+
+
   // Helper: AI Text Generator for Web Chat
   async function generateAIAnswer(userText, context = {}) {
     // 1. Try Groq (Fastest)
@@ -166,7 +207,7 @@ Student Question: ${userText}`;
         });
       }
 
-      const isVIP = checkVIP ? await checkVIP(userId) : false;
+      const isVIP = await checkVIPCrossLinked(userId);
       const yearly = checkYearlyVIP ? await checkYearlyVIP(userId) : { eligible: false };
 
       let completedLessons = {};
@@ -275,23 +316,139 @@ Student Question: ${userText}`;
         if (data.currentUserId && data.currentUserId !== userId) {
           effectiveUserId = data.currentUserId;
           isLinked = true;
-          // Link Telegram to the current web user profile
+
+          // ── 1. Link profile ──────────────────────────────────────────
           await db.ref(`users/${data.currentUserId}/profile`).update({
             linkedTelegramId: userId,
             isTelegram: true,
             telegramUsername: profile.username || '',
             telegramLinkedAt: Date.now()
           });
-          // Also link back on the Telegram user profile
           await db.ref(`users/${userId}/profile`).update({
             linkedWebUserId: data.currentUserId
           });
+
+          // ── 2. Sync Subscription / License (VIP) ────────────────────
+          // Merge: keep whichever subscription expires latest
+          try {
+            const [webSubSnap, tgSubSnap] = await Promise.all([
+              db.ref(`users/${data.currentUserId}/subscription`).once('value'),
+              db.ref(`users/${userId}/subscription`).once('value')
+            ]);
+            const webSub = webSubSnap.val();
+            const tgSub  = tgSubSnap.val();
+
+            if (tgSub && tgSub.expiresAt) {
+              const webExpiry = webSub?.expiresAt || 0;
+              const tgExpiry  = tgSub.expiresAt   || 0;
+              if (tgExpiry > webExpiry) {
+                // Telegram has a better/newer subscription → copy to web user
+                await db.ref(`users/${data.currentUserId}/subscription`).set({
+                  ...tgSub,
+                  syncedFromTelegram: true,
+                  syncedAt: Date.now()
+                });
+              } else if (webSub && webSub.expiresAt && webSub.expiresAt > tgExpiry) {
+                // Web has a better subscription → copy to Telegram user
+                await db.ref(`users/${userId}/subscription`).set({
+                  ...webSub,
+                  syncedFromWeb: true,
+                  syncedAt: Date.now()
+                });
+              }
+            } else if (webSub && webSub.expiresAt) {
+              // Only web has subscription → copy to Telegram
+              await db.ref(`users/${userId}/subscription`).set({
+                ...webSub,
+                syncedFromWeb: true,
+                syncedAt: Date.now()
+              });
+            }
+          } catch (subErr) {
+            console.error('[Link] Subscription sync error:', subErr.message);
+          }
+
+          // ── 3. Sync Lesson Progress (completed_lessons) ──────────────
+          try {
+            const [webProgSnap, tgProgSnap] = await Promise.all([
+              db.ref(`users/${data.currentUserId}/completed_lessons`).once('value'),
+              db.ref(`users/${userId}/completed_lessons`).once('value')
+            ]);
+            const webLessons = webProgSnap.val() || {};
+            const tgLessons  = tgProgSnap.val()  || {};
+
+            if (Object.keys(tgLessons).length > 0) {
+              // Merge: for each lesson key, keep the one with the latest timestamp
+              const merged = { ...webLessons };
+              for (const [key, tgVal] of Object.entries(tgLessons)) {
+                const webVal = webLessons[key];
+                if (!webVal || (tgVal.timestamp || 0) > (webVal.timestamp || 0)) {
+                  merged[key] = tgVal;
+                }
+              }
+              await db.ref(`users/${data.currentUserId}/completed_lessons`).set(merged);
+              // Mirror back to Telegram user
+              await db.ref(`users/${userId}/completed_lessons`).set(merged);
+            } else if (Object.keys(webLessons).length > 0) {
+              await db.ref(`users/${userId}/completed_lessons`).set(webLessons);
+            }
+          } catch (lessonErr) {
+            console.error('[Link] Lesson progress sync error:', lessonErr.message);
+          }
+
+          // ── 4. Sync Telegram-side progress node ──────────────────────
+          try {
+            const [webP, tgP] = await Promise.all([
+              db.ref(`users/${data.currentUserId}/progress`).once('value'),
+              db.ref(`users/${userId}/progress`).once('value')
+            ]);
+            const webProgress = webP.val() || {};
+            const tgProgress  = tgP.val()  || {};
+
+            if (Object.keys(tgProgress).length > 0) {
+              const mergedP = { ...webProgress };
+              for (const [key, tgVal] of Object.entries(tgProgress)) {
+                const webVal = webProgress[key];
+                if (!webVal || (tgVal.timestamp || 0) > (webVal.timestamp || 0)) {
+                  mergedP[key] = tgVal;
+                }
+              }
+              await db.ref(`users/${data.currentUserId}/progress`).set(mergedP);
+              await db.ref(`users/${userId}/progress`).set(mergedP);
+            } else if (Object.keys(webProgress).length > 0) {
+              await db.ref(`users/${userId}/progress`).set(webProgress);
+            }
+          } catch (progErr) {
+            console.error('[Link] Progress sync error:', progErr.message);
+          }
+
+          // ── 5. Sync Quiz / Exam Results ──────────────────────────────
+          try {
+            const [webQSnap, tgQSnap] = await Promise.all([
+              db.ref(`users/${data.currentUserId}/quiz_results`).once('value'),
+              db.ref(`users/${userId}/quiz_results`).once('value')
+            ]);
+            const webQuiz = webQSnap.val() || {};
+            const tgQuiz  = tgQSnap.val()  || {};
+
+            if (Object.keys(tgQuiz).length > 0) {
+              const mergedQ = { ...webQuiz, ...tgQuiz }; // quiz keys are timestamps → no collision
+              await db.ref(`users/${data.currentUserId}/quiz_results`).set(mergedQ);
+              await db.ref(`users/${userId}/quiz_results`).set(mergedQ);
+            } else if (Object.keys(webQuiz).length > 0) {
+              await db.ref(`users/${userId}/quiz_results`).set(webQuiz);
+            }
+          } catch (quizErr) {
+            console.error('[Link] Quiz results sync error:', quizErr.message);
+          }
+
+          console.log(`[Link] Telegram ${userId} ↔ Web ${data.currentUserId}: subscription + lessons + progress + quiz synced`);
         }
 
         const effSnap = await db.ref(`users/${effectiveUserId}/profile`).once('value');
         const effProf = effSnap.val() || profile;
 
-        const isVIP = checkVIP ? ((await checkVIP(effectiveUserId)) || (await checkVIP(userId))) : false;
+        const isVIP = await checkVIPCrossLinked(effectiveUserId);
         const yearly = checkYearlyVIP ? await checkYearlyVIP(effectiveUserId) : { eligible: false };
 
         const session = await createDeviceSession(effectiveUserId, deviceId, userAgent || req.headers['user-agent'], req.ip);
@@ -453,7 +610,7 @@ Student Question: ${userText}`;
         isWebUser: true
       });
 
-      const isVIP = checkVIP ? await checkVIP(userId) : false;
+      const isVIP = await checkVIPCrossLinked(userId);
       const yearly = checkYearlyVIP ? await checkYearlyVIP(userId) : { eligible: false };
 
       // Create persistent session for this device
@@ -606,7 +763,7 @@ Student Question: ${userText}`;
 
       await db.ref(`email_verifications/${emailKey}`).update({ verified: true });
 
-      const isVIP = checkVIP ? await checkVIP(userId) : false;
+      const isVIP = await checkVIPCrossLinked(userId);
       const yearly = checkYearlyVIP ? await checkYearlyVIP(userId) : { eligible: false };
 
       const session = await createDeviceSession(userId, deviceId, userAgent || req.headers['user-agent'], req.ip);
@@ -1132,11 +1289,12 @@ Student Question: ${userText}`;
   });
 
   /**
-   * Revoke (Disconnect) a specific Device
+   * Revoke (Disconnect) a specific Device — Secure Version
+   * Requires sessionToken of the CALLER to prevent unauthorized revocation
    */
   router.post('/auth/revoke-device', async (req, res) => {
     try {
-      const { userId, targetDeviceId } = req.body;
+      const { userId, targetDeviceId, sessionToken, callerDeviceId } = req.body;
 
       if (!userId || !targetDeviceId) {
         return res.status(400).json({ error: 'Missing userId or targetDeviceId' });
@@ -1144,15 +1302,29 @@ Student Question: ${userText}`;
 
       if (!db) return res.status(500).json({ error: 'Database disconnected' });
 
-      // Mark revoked in Firebase
+      // ── Security: Verify caller's session if token provided ───────
+      if (sessionToken && callerDeviceId) {
+        const callerSnap = await db.ref(`users/${userId}/sessions/${callerDeviceId}`).once('value');
+        const callerSession = callerSnap.val();
+        if (!callerSession || callerSession.revoked || callerSession.sessionToken !== sessionToken) {
+          return res.status(401).json({ error: '❌ Session Token មិនត្រឹមត្រូវ! មិនអាចផ្តាច់ឧបករណ៍ផ្សេងបាន។' });
+        }
+        // Prevent revoking own current device
+        if (targetDeviceId === callerDeviceId) {
+          return res.status(400).json({ error: 'មិនអាចផ្តាច់ឧបករណ៍ដែលអ្នកកំពុងប្រើ! សូម Logout ជំនួសវិញ។' });
+        }
+      }
+
+      // ── Mark revoked in Firebase ──────────────────────────────────
       await db.ref(`users/${userId}/sessions/${targetDeviceId}`).update({
         revoked: true,
-        revokedAt: Date.now()
+        revokedAt: Date.now(),
+        revokedByDevice: callerDeviceId || 'unknown'
       });
 
       return res.json({
         success: true,
-        message: 'ឧបករណ៍នេះត្រូវបានផ្តាច់ចេញពីគណនីជោគជ័យ!'
+        message: '✅ ឧបករណ៍នេះត្រូវបានផ្តាច់ចេញពីគណនីជោគជ័យ!'
       });
     } catch (err) {
       console.error('Revoke device error:', err);
@@ -1161,9 +1333,60 @@ Student Question: ${userText}`;
   });
 
   /**
+   * Revoke ALL Other Devices (Logout Everywhere Else)
+   */
+  router.post('/auth/revoke-all-devices', async (req, res) => {
+    try {
+      const { userId, sessionToken, callerDeviceId } = req.body;
+
+      if (!userId || !sessionToken || !callerDeviceId) {
+        return res.status(400).json({ error: 'Missing required fields' });
+      }
+
+      if (!db) return res.status(500).json({ error: 'Database disconnected' });
+
+      // Verify caller session
+      const callerSnap = await db.ref(`users/${userId}/sessions/${callerDeviceId}`).once('value');
+      const callerSession = callerSnap.val();
+      if (!callerSession || callerSession.revoked || callerSession.sessionToken !== sessionToken) {
+        return res.status(401).json({ error: '❌ Session Token មិនត្រឹមត្រូវ!' });
+      }
+
+      // Revoke all sessions EXCEPT caller
+      const allSnap = await db.ref(`users/${userId}/sessions`).once('value');
+      const allSessions = allSnap.val() || {};
+      const updates = {};
+      let revokedCount = 0;
+
+      for (const [devId, sess] of Object.entries(allSessions)) {
+        if (devId !== callerDeviceId && !sess.revoked) {
+          updates[`${devId}/revoked`] = true;
+          updates[`${devId}/revokedAt`] = Date.now();
+          updates[`${devId}/revokedByDevice`] = callerDeviceId;
+          revokedCount++;
+        }
+      }
+
+      if (revokedCount > 0) {
+        await db.ref(`users/${userId}/sessions`).update(updates);
+      }
+
+      return res.json({
+        success: true,
+        revokedCount,
+        message: `✅ បានផ្តាច់ ${revokedCount} ឧបករណ៍ផ្សេងៗទៀតចេញពីគណនី!`
+      });
+    } catch (err) {
+      console.error('Revoke all devices error:', err);
+      res.status(500).json({ error: 'Error revoking all devices' });
+    }
+  });
+
+  /**
    * Full Registration with Username, Password & Gmail (Legacy / Alternative)
    */
   router.post('/auth/register', async (req, res) => {
+
     try {
       const { username, password, fullName, gmail, syncCode, deviceId, userAgent } = req.body;
 
@@ -1256,7 +1479,7 @@ Student Question: ${userText}`;
         linkedTelegramId
       });
 
-      const isVIP = checkVIP ? await checkVIP(effectiveUserId) : false;
+      const isVIP = await checkVIPCrossLinked(effectiveUserId);
       const session = await createDeviceSession(effectiveUserId, deviceId, userAgent || req.headers['user-agent'], req.ip);
 
       return res.json({
@@ -2085,6 +2308,61 @@ Student Question: ${userText}`;
       res.status(500).json({ error: 'Chat AI error' });
     }
   });
+
+  router.post('/stt', async (req, res) => {
+    try {
+      const chunks = [];
+      req.on('data', chunk => chunks.push(chunk));
+      req.on('end', async () => {
+        const buffer = Buffer.concat(chunks);
+        if (buffer.length === 0) return res.status(400).json({ error: 'No audio data' });
+
+        const tmpPath = path.join(__dirname, `temp_web_audio_${Date.now()}.webm`);
+        fs.writeFileSync(tmpPath, buffer);
+
+        try {
+          const { GoogleAIFileManager } = require("@google/generative-ai/server");
+          
+          let apiKey = null;
+          if (typeof getNextGeminiKey === 'function') apiKey = getNextGeminiKey();
+          if (!apiKey) {
+             const keys = (process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || "").split(',').map(k=>k.trim()).filter(Boolean);
+             apiKey = keys[0];
+          }
+          if (!apiKey) throw new Error("No Gemini API key");
+
+          const genAI = new GoogleGenerativeAI(apiKey);
+          const fileManager = new GoogleAIFileManager(apiKey);
+          const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+          const uploadResult = await fileManager.uploadFile(tmpPath, {
+            mimeType: "audio/webm",
+            displayName: `WebVoice`,
+          });
+
+          const promptText = "Please transcribe this audio exactly as it is spoken. If it is in Khmer, transcribe it in Khmer. Do not translate. Output ONLY the transcribed text.";
+          const result = await model.generateContent([
+            promptText,
+            { fileData: { fileUri: uploadResult.file.uri, mimeType: uploadResult.file.mimeType } }
+          ]);
+          
+          const text = result.response.text().trim();
+          
+          fs.unlinkSync(tmpPath);
+          fileManager.deleteFile(uploadResult.file.name).catch(() => {});
+
+          res.json({ success: true, text });
+        } catch (err) {
+          if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+          console.error('STT Error:', err);
+          res.status(500).json({ error: 'Transcription failed' });
+        }
+      });
+    } catch (err) {
+      res.status(500).json({ error: 'Server error' });
+    }
+  });
+
 
   // ==========================================
   // 7. VIP LICENSE & IRREGULAR VERBS
