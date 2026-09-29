@@ -159,61 +159,34 @@ async function generateCertificateHTML(data) {
     .cert-wrapper {
       width: 794px;
       min-height: 1123px;
-      background: #fffdf5;
+      background: #ffffff;
       position: relative;
-      box-shadow: 0 30px 80px rgba(0,0,0,0.7);
-      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+      box-sizing: border-box;
+      padding: 18px;
     }
 
-    /* -------- GOLDEN BORDER -------- */
-    .b-top, .b-bottom {
-      position: absolute; left: 0; right: 0; height: 40px;
-      background: repeating-linear-gradient(
-        90deg,
-        #c8860a 0px, #f5e24a 7px, #c8860a 14px,
-        #8b1c1c 17px,
-        #c8860a 20px, #f5e24a 27px, #c8860a 34px
-      );
+    /* Clean, classic, elegant double border (No striped gradient) */
+    .cert-frame-outer {
+      border: 2px solid #b8860b;
+      padding: 6px;
+      min-height: calc(1123px - 36px);
+      box-sizing: border-box;
     }
-    .b-top { top: 0; } .b-bottom { bottom: 0; }
-    .b-left, .b-right {
-      position: absolute; top: 0; bottom: 0; width: 40px;
-      background: repeating-linear-gradient(
-        180deg,
-        #c8860a 0px, #f5e24a 7px, #c8860a 14px,
-        #8b1c1c 17px,
-        #c8860a 20px, #f5e24a 27px, #c8860a 34px
-      );
-    }
-    .b-left { left: 0; } .b-right { right: 0; }
-    .b-corner {
-      position: absolute; width: 40px; height: 40px;
-      background: linear-gradient(135deg, #d4a017, #f5e24a, #c8860a);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 16px; color: #6b0c0c; font-weight: 900; z-index: 5;
-    }
-    .b-corner.tl{top:0;left:0;} .b-corner.tr{top:0;right:0;}
-    .b-corner.bl{bottom:0;left:0;} .b-corner.br{bottom:0;right:0;}
-    /* Inner thin red line */
-    .inner-red {
-      position: absolute; top: 46px; left: 46px; right: 46px; bottom: 46px;
-      border: 2px solid #8b1c1c; pointer-events: none; z-index: 2;
-    }
-
-    /* -------- CONTENT -------- */
-    .cert-content {
-      margin: 52px 54px;
+    .cert-frame-inner {
+      border: 1px solid #8b1c1c;
+      padding: 24px 34px;
+      min-height: calc(1123px - 52px);
+      box-sizing: border-box;
+      position: relative;
       display: flex;
       flex-direction: column;
-      min-height: calc(1123px - 104px);
-      position: relative;
-      z-index: 3;
     }
     .wm-logo {
       position: absolute; top: 50%; left: 50%;
       transform: translate(-50%, -50%);
-      width: 310px; height: 310px; object-fit: contain;
-      opacity: 0.06; pointer-events: none; z-index: 0;
+      width: 330px; height: 330px; object-fit: contain;
+      opacity: 0.05; pointer-events: none; z-index: 0;
     }
 
     /* -------- HEADER -------- */
@@ -308,17 +281,6 @@ async function generateCertificateHTML(data) {
       font-size: 13px; color: #475569; margin-top: 6px; font-weight: 600;
     }
 
-    /* Grade boxes */
-    .grade-row { display: flex; justify-content: center; gap: 12px; margin: 12px 0 8px 0; }
-    .g-box {
-      background: linear-gradient(135deg, #fffdf5, #fef3d0);
-      border: 1.5px solid #c5a059; border-radius: 8px;
-      padding: 6px 16px; text-align: center; min-width: 105px;
-      box-shadow: 0 2px 6px rgba(197,160,89,0.2);
-    }
-    .g-lbl { font-size: 9px; color: #64748b; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
-    .g-val { font-size: 19px; font-weight: 900; color: #8b1c1c; font-family: 'Cinzel', serif; }
-    .g-sub { font-size: 9.5px; color: #64748b; }
 
     /* -------- FOOTER -------- */
     .cert-footer { position: relative; z-index: 1; margin-top: 10px; }
@@ -431,124 +393,94 @@ async function generateCertificateHTML(data) {
   </div>
 
   <div class="cert-wrapper">
+    <div class="cert-frame-outer">
+      <div class="cert-frame-inner">
+        ${wmTag}
 
-    <!-- ======= GOLDEN BORDER ======= -->
-    <div class="b-top"></div>
-    <div class="b-bottom"></div>
-    <div class="b-left"></div>
-    <div class="b-right"></div>
-    <div class="b-corner tl">✦</div>
-    <div class="b-corner tr">✦</div>
-    <div class="b-corner bl">✦</div>
-    <div class="b-corner br">✦</div>
-    <div class="inner-red"></div>
-
-    <!-- ======= CONTENT ======= -->
-    <div class="cert-content">
-      ${wmTag}
-
-      <!-- HEADER (Only Logo on Left, Center Kingdom & Institute, Right Balanced Spacer - NO STAMP) -->
-      <div class="hdr">
-        <div class="hdr-logo-box">${logoTag}</div>
-        <div class="hdr-center">
-          <div class="kingdom-box">
-            <div class="kingdom-title">ព្រះរាជាណាចក្រកម្ពុជា</div>
-            <div class="kingdom-motto">ជាតិ សាសនា ព្រះមហាក្សត្រ</div>
+        <!-- HEADER (Only Logo on Left, Center Kingdom & Institute, Right Balanced Spacer - NO STAMP) -->
+        <div class="hdr">
+          <div class="hdr-logo-box">${logoTag}</div>
+          <div class="hdr-center">
+            <div class="kingdom-box">
+              <div class="kingdom-title">ព្រះរាជាណាចក្រកម្ពុជា</div>
+              <div class="kingdom-motto">ជាតិ សាសនា ព្រះមហាក្សត្រ</div>
+            </div>
+            <div class="hdr-kbach">❖ · ✦ · ❖</div>
+            <div class="hdr-name-kh">វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline</div>
+            <div class="hdr-name-en">TEACHER SSONLINE ENGLISH LANGUAGE INSTITUTE</div>
           </div>
-          <div class="hdr-kbach">❖ · ✦ · ❖</div>
-          <div class="hdr-name-kh">វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline</div>
-          <div class="hdr-name-en">TEACHER SSONLINE ENGLISH LANGUAGE INSTITUTE</div>
+          <div class="hdr-spacer"></div>
         </div>
-        <div class="hdr-spacer"></div>
-      </div>
 
-      <div class="orn-div"><div class="orn-bar"></div><span class="orn-sym">✦</span><div class="orn-bar"></div></div>
+        <div class="orn-div"><div class="orn-bar"></div><span class="orn-sym">✦</span><div class="orn-bar"></div></div>
 
-      <!-- MAIN TITLE -->
-      <div class="main-title">
-        <span class="title-kh">វិញ្ញាបនបត្រ</span>
-        <div class="title-en">${certSubheading}</div>
-      </div>
-
-      <div class="orn-div"><div class="orn-bar"></div><span class="orn-sym">❖</span><div class="orn-bar"></div></div>
-
-      <!-- BODY: 2 lines with FONT KHMER OS MOULIGHT -->
-      <div class="cert-body">
-        <div class="cert-line-1">វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline</div>
-        <div class="cert-line-2">សូមប្រគល់ជូនសិស្សឈ្មោះ</div>
-        <div class="stu-name">${studentName}</div>
-        <p class="achieve">
-          បានប្រឡងបញ្ចប់ដោយជោគជ័យ${isAnnualExam ? 'នូវការប្រឡងបញ្ចប់មុខវិជ្ជាប្រចាំឆ្នាំ' : 'នូវវគ្គបណ្តុះបណ្តាល'}<br>
-          <span class="subj-red">「 ${certTitle} 」</span>
-        </p>
-        <p class="official-decree-note">
-          វិញ្ញាបនបត្រនេះប្រគល់ជូនសាមីជនប្រើប្រាស់តាមការដែលអាចប្រើបាន។
-        </p>
-
-        <!-- Grade Boxes -->
-        <div class="grade-row">
-          <div class="g-box">
-            <div class="g-lbl">Grade / និទ្ទេស</div>
-            <div class="g-val">ថ្នាក់ ${grade}</div>
-            <div class="g-sub">${gradeTitle.split('(')[0].trim()}</div>
-          </div>
-          <div class="g-box">
-            <div class="g-lbl">Score / ពិន្ទុ</div>
-            <div class="g-val">${score}/${total}</div>
-            <div class="g-sub">${percent}%</div>
-          </div>
-          <div class="g-box">
-            <div class="g-lbl">Student ID / លេខសិស្ស</div>
-            <div class="g-val" style="font-size:13px;margin-top:3px;">${userId}</div>
-            <div class="g-sub">${dateStr}</div>
-          </div>
+        <!-- MAIN TITLE -->
+        <div class="main-title">
+          <span class="title-kh">វិញ្ញាបនបត្រ</span>
+          <div class="title-en">${certSubheading}</div>
         </div>
-      </div>
 
-      <!-- FOOTER: QR Left, Note Center, Director Sig + Single Big Stamp on Left Shifted Up -->
-      <div class="cert-footer">
-        <div class="footer-row">
-          <!-- QR Left -->
-          <div class="qr-col">
-            ${qrTag}
-            <div class="qr-badge">▶ SCAN TO VERIFY</div>
-            <div class="qr-id">CERT-${certId}</div>
-            <div class="qr-sub">Student ID: ${userId}</div>
-          </div>
+        <div class="orn-div"><div class="orn-bar"></div><span class="orn-sym">❖</span><div class="orn-bar"></div></div>
 
-          <!-- Center note -->
-          <div class="footer-center">
-            <p class="cert-legal-text">
-              វិញ្ញាបនបត្រផ្លូវការចេញដោយ<br>Teacher SSOnline English Institute
-            </p>
-            <div class="cert-code-pill">
-              TMS-SSO-${now.getFullYear()}-${certId}
-            </div>
-          </div>
+        <!-- BODY: 2 lines with FONT KHMER OS MOULIGHT -->
+        <div class="cert-body">
+          <div class="cert-line-1">វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline</div>
+          <div class="cert-line-2">សូមប្រគល់ជូនសិស្សឈ្មោះ</div>
+          <div class="stu-name">${studentName}</div>
+          <p class="achieve">
+            បានប្រឡងបញ្ចប់ដោយជោគជ័យ${isAnnualExam ? 'នូវការប្រឡងបញ្ចប់មុខវិជ្ជាប្រចាំឆ្នាំ' : 'នូវវគ្គបណ្តុះបណ្តាល'}<br>
+            <span class="subj-red">「 ${certTitle} 」</span>
+          </p>
+          <p class="official-decree-note">
+            វិញ្ញាបនបត្រនេះប្រគល់ជូនសាមីជនប្រើប្រាស់តាមការដែលអាចប្រើបាន។
+          </p>
+        </div>
 
-          <!-- Director Right: Date + Role + Container(Big Stamp Left Shifted Up + Sig Right) + Underline Name -->
-          <div class="dir-block">
-            <div class="dir-date-khmer">
-              រាជធានីភ្នំពេញ ថ្ងៃទី ${toKhmerNum(now.getDate())} ខែ${khMonths[now.getMonth()]} ឆ្នាំ${toKhmerNum(now.getFullYear())}
-            </div>
-            <div class="dir-role-kh">នាយកវិទ្យាស្ថាន</div>
-
-            <div class="sig-stamp-container">
-              <!-- ONLY 1 STAMP: BIGGER (142px), on LEFT, shifted UP (top: -14px) overlapping signature -->
-              ${stampOvr}
-              <!-- Director Signature: on RIGHT -->
-              ${sigTag}
+        <!-- FOOTER: QR Left, Note Center, Director Sig + Single Big Stamp on Left Shifted Up -->
+        <div class="cert-footer">
+          <div class="footer-row">
+            <!-- QR Left -->
+            <div class="qr-col">
+              ${qrTag}
+              <div class="qr-badge">▶ SCAN TO VERIFY</div>
+              <div class="qr-id">CERT-${certId}</div>
+              <div class="qr-sub">Student ID: ${userId}</div>
             </div>
 
-            <div class="dir-name-underline">
-              <div class="dir-name-kh">លីម សន</div>
-              <div class="dir-name-en">Lim Sorn (School Director)</div>
+            <!-- Center note -->
+            <div class="footer-center">
+              <p class="cert-legal-text">
+                វិញ្ញាបនបត្រផ្លូវការចេញដោយ<br>Teacher SSOnline English Institute
+              </p>
+              <div class="cert-code-pill">
+                TMS-SSO-${now.getFullYear()}-${certId}
+              </div>
+            </div>
+
+            <!-- Director Right: Date + Role + Container(Big Stamp Left Shifted Up + Sig Right) + Underline Name -->
+            <div class="dir-block">
+              <div class="dir-date-khmer">
+                រាជធានីភ្នំពេញ ថ្ងៃទី ${toKhmerNum(now.getDate())} ខែ${khMonths[now.getMonth()]} ឆ្នាំ${toKhmerNum(now.getFullYear())}
+              </div>
+              <div class="dir-role-kh">នាយកវិទ្យាស្ថាន</div>
+
+              <div class="sig-stamp-container">
+                <!-- ONLY 1 STAMP: BIGGER (142px), on LEFT, shifted UP (top: -14px) overlapping signature -->
+                ${stampOvr}
+                <!-- Director Signature: on RIGHT -->
+                ${sigTag}
+              </div>
+
+              <div class="dir-name-underline">
+                <div class="dir-name-kh">លីម សន</div>
+                <div class="dir-name-en">Lim Sorn (School Director)</div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-    </div><!-- /cert-content -->
+      </div><!-- /cert-frame-inner -->
+    </div><!-- /cert-frame-outer -->
   </div><!-- /cert-wrapper -->
 </body>
 </html>`;
