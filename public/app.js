@@ -24,6 +24,7 @@ const STATE = {
 // ==========================================
 
 document.addEventListener('DOMContentLoaded', async () => {
+  initTheme();
   initTelegramWebApp();
   initFirebaseClient();
   loadSavedUserSession();
@@ -35,6 +36,46 @@ document.addEventListener('DOMContentLoaded', async () => {
     refreshUserProfile();
   }
 });
+
+// ==========================================
+// THEME MANAGEMENT (NIGHT MODE FULL)
+// ==========================================
+
+function initTheme() {
+  const savedTheme = localStorage.getItem('app_theme') || 'night-mode-full';
+  applyTheme(savedTheme);
+}
+
+function applyTheme(themeName) {
+  const body = document.body;
+  const icon = document.getElementById('themeIcon');
+  const label = document.getElementById('themeLabel');
+
+  if (themeName === 'day-mode') {
+    body.classList.remove('night-mode-full', 'dark-theme');
+    body.classList.add('day-mode');
+    if (icon) icon.textContent = '☀️';
+    if (label) label.textContent = 'Day Mode';
+    localStorage.setItem('app_theme', 'day-mode');
+  } else {
+    body.classList.remove('day-mode');
+    body.classList.add('night-mode-full', 'dark-theme');
+    if (icon) icon.textContent = '🌙';
+    if (label) label.textContent = 'Night Mode';
+    localStorage.setItem('app_theme', 'night-mode-full');
+  }
+}
+
+function toggleNightMode() {
+  const isNight = document.body.classList.contains('night-mode-full') || !document.body.classList.contains('day-mode');
+  if (isNight) {
+    applyTheme('day-mode');
+    showToast('☀️ បានប្តូរទៅ Day Mode (ពន្លឺ)', 'info');
+  } else {
+    applyTheme('night-mode-full');
+    showToast('🌙 បានប្តូរទៅ Night Mode Full (ស្រួលភ្នែកពេលយប់)', 'info');
+  }
+}
 
 async function initFirebaseClient() {
   try {

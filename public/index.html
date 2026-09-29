@@ -25,7 +25,7 @@
 
   <link rel="stylesheet" href="/style.css">
 </head>
-<body class="dark-theme">
+<body class="night-mode-full">
   <!-- Top Ambient Glow -->
   <div class="ambient-glow top-glow"></div>
   <div class="ambient-glow bottom-glow"></div>
@@ -70,6 +70,12 @@
       </div>
 
       <div class="nav-actions">
+        <!-- Night Mode Full Switcher -->
+        <button id="themeToggleBtn" class="theme-toggle-btn" onclick="toggleNightMode()" title="ប្តូររបៀបរាត្រី / ពន្លឺ (Night Mode Full)">
+          <span class="theme-icon" id="themeIcon">🌙</span>
+          <span class="theme-label" id="themeLabel">Night Mode</span>
+        </button>
+
         <!-- User State / Login Buttons -->
         <div id="authActions">
           <button class="btn btn-outline btn-sm" onclick="openLoginModal()">
