@@ -612,11 +612,13 @@
       <!-- Option 1: Login via Telegram -->
       <div id="loginSectionTg">
         <div class="sync-info-box">
-          🤖 <strong>ជម្រើសទី ១៖ ចូលអូតូដោយចុចលើ Telegram Bot</strong><br>
-          <span class="text-xs text-slate-300">ចុចប៊ូតុងខាងក្រោមដើម្បីបើក Bot ហើយប្រព័ន្ធនឹង Login លើ Browser នេះស្វ័យប្រវត្ត!</span>
+          🛡️ <strong>ជម្រើសទី ១៖ ចូលតាមប្រព័ន្ធសុវត្ថិភាព Telegram (Security 2FA)</strong><br>
+          <span class="text-xs text-slate-300">
+            ចុចប៊ូតុងខាងក្រោមដើម្បីបើក Telegram Bot <strong>@StudyAiEngKH_bot</strong>។ Telegram នឹងបង្ហាញសារ <strong>Security Confirmation</strong> ឱ្យអ្នកចុច <strong>«✅ យល់ព្រម និងអនុញ្ញាត»</strong> ដើម្បីការពារសុវត្ថិភាពគណនីរបស់អ្នក!
+          </span>
         </div>
         <button type="button" class="btn btn-cyan btn-block btn-lg mb-3" onclick="startTelegramOneClickLogin()">
-          <span>🤖 ចូលរៀនតាម Telegram (1-Click Login)</span>
+          <span>🛡️ ចូលតាមប្រព័ន្ធសុវត្ថិភាព Telegram (Confirm via Bot)</span>
         </button>
 
         <div class="divider-text"><span>ឬបញ្ចូលលេខកូដ ៦ ខ្ទង់</span></div>
@@ -643,7 +645,7 @@
               <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
               <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
             </svg>
-            <span>ចូលដោយប្រើ Google (Gmail 1-Click)</span>
+            <span>ចូលដោយប្រព័ន្ធសុវត្ថិភាព Google (Gmail)</span>
           </button>
         </div>
 
@@ -727,7 +729,7 @@
               <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
               <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
             </svg>
-            <span>ចុះឈ្មោះដោយប្រើ Google (Gmail 1-Click)</span>
+            <span>ចុះឈ្មោះដោយប្រព័ន្ធសុវត្ថិភាព Google (Gmail)</span>
           </button>
         </div>
 
@@ -752,20 +754,24 @@
       <!-- Option B: Register via Telegram (Auto-enrolls into Telegram bot) -->
       <div id="regSectionTg" class="hidden">
         <div class="sync-info-box">
-          🤖 <strong>ចុះឈ្មោះចូលរៀនអូតូតាម Telegram Bot</strong><br>
+          🛡️ <strong>ចុះឈ្មោះដោយប្រព័ន្ធសុវត្ថិភាព Telegram (Security Confirmation)</strong><br>
           <span class="text-xs text-slate-300">
-            គ្រាន់តែចុចប៊ូតុងខាងក្រោម ប្រព័ន្ធនឹងបើក Telegram Bot <strong>@StudyAiEngKH_bot</strong> ហើយចុះឈ្មោះអ្នកចូលរៀនភ្លាមៗដោយស្វ័យប្រវត្តតែម្តង!
+            ចុចប៊ូតុងខាងក្រោមដើម្បីបើក Telegram Bot <strong>@StudyAiEngKH_bot</strong>។ Telegram នឹងផ្ញើសារ <strong>Security Confirmation</strong> ឱ្យអ្នកចុច <strong>«✅ យល់ព្រម និងអនុញ្ញាត»</strong> ដើម្បីការពារគណនី និងចុះឈ្មោះចូលរៀនភ្លាមៗដោយស្វ័យប្រវត្ត!
           </span>
         </div>
 
         <div class="text-center my-4">
-          <a href="https://t.me/StudyAiEngKH_bot?start=web_enroll" target="_blank" class="btn btn-cyan btn-block btn-lg" onclick="handleTelegramEnrollClick()">
-            <span>🤖 បើក Telegram Bot ដើម្បីចុះឈ្មោះអូតូ 🚀</span>
-          </a>
+          <button type="button" class="btn btn-cyan btn-block btn-lg" onclick="startTelegramOneClickLogin()">
+            <span>🛡️ ចុះឈ្មោះតាមប្រព័ន្ធសុវត្ថិភាព Telegram 🚀</span>
+          </button>
         </div>
 
-        <div class="text-center text-xs text-slate-400">
-          បន្ទាប់ពីចុចចុះឈ្មោះលើ Bot រួច អ្នកអាចចូលរៀនលើ Telegram ឬយកលេខកូដ ៦ ខ្ទង់មកចូលរៀនលើ Browser នេះបានភ្លាមៗ!
+        <div class="divider-text"><span>ឬបើក BOT ដោយផ្ទាល់</span></div>
+
+        <div class="text-center my-2">
+          <a href="https://t.me/StudyAiEngKH_bot?start=web_enroll" target="_blank" class="btn btn-outline btn-block" onclick="handleTelegramEnrollClick()">
+            <span>🤖 បើក Telegram Bot @StudyAiEngKH_bot</span>
+          </a>
         </div>
       </div>
 

@@ -439,6 +439,67 @@ bot.action('check_membership', async (ctx) => {
   }
 });
 
+// Telegram 2FA Security Confirmation Handlers
+bot.action(/tg_auth_allow_(.+)/, async (ctx) => {
+  const token = ctx.match[1];
+  const userId = ctx.from.id.toString();
+  const username = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ') || ctx.from.username || `User ${userId}`;
+
+  await ctx.answerCbQuery('✅ បានអនុញ្ញាតដោយជោគជ័យ!');
+
+  if (db) {
+    try {
+      await db.ref(`telegram_web_auth/${token}`).update({
+        verified: true,
+        userId: userId,
+        name: username,
+        verifiedAt: Date.now()
+      });
+      await db.ref(`users/${userId}/profile`).update({
+        name: username,
+        username: ctx.from.username || '',
+        registeredAt: Date.now(),
+        isTelegram: true,
+        telegramSecurityVerified: true
+      });
+    } catch (e) {
+      console.error('Error updating auth token:', e);
+    }
+  }
+
+  const webUrl = process.env.WEBAPP_URL || process.env.RENDER_EXTERNAL_URL || process.env.WebHook_URL || 'https://studyai-bot.onrender.com';
+  return ctx.editMessageText(
+    `✅ *ការផ្ទៀងផ្ទាត់សុវត្ថិភាព TELEGRAM ជោគជ័យ!* 🎉\n\n` +
+    `សួស្តី *${username}*! អ្នកបានអនុញ្ញាតឱ្យ Browser ចូលប្រើគណនីរបស់អ្នករួចរាល់ហើយ។\n\n` +
+    `💻 វេបសាយលើ Browser របស់អ្នកកំពុង Login ស្វ័យប្រវត្ត។ សូមត្រឡប់ទៅ Browser វិញ ឬចុចប៊ូតុងខាងក្រោម៖`,
+    {
+      parse_mode: 'Markdown',
+      reply_markup: Markup.inlineKeyboard([
+        [Markup.button.webApp('🌐 បើក Web App (Study Online)', webUrl)]
+      ]).reply_markup
+    }
+  );
+});
+
+bot.action(/tg_auth_deny_(.+)/, async (ctx) => {
+  const token = ctx.match[1];
+  await ctx.answerCbQuery('❌ បានបដិសេធ!');
+
+  if (db) {
+    try {
+      await db.ref(`telegram_web_auth/${token}`).update({
+        denied: true,
+        deniedAt: Date.now()
+      });
+    } catch (e) {}
+  }
+
+  return ctx.editMessageText(
+    `❌ *ការស្នើសុំចូលគណនីត្រូវបានបដិសេធ!* 🛡️\n\nគ្មានឧបករណ៍ណាអាចចូលប្រើគណនីរបស់អ្នកបានឡើយ។ ប្រព័ន្ធសុវត្ថិភាព Telegram Bot បានការពារគណនីរបស់អ្នក។`,
+    { parse_mode: 'Markdown' }
+  );
+});
+
 // Apply Group Admin Guard as global middleware (runs before every command/message)
 bot.use(groupAdminGuard);
 
@@ -454,32 +515,27 @@ bot.start(async (ctx) => {
     return handleCertificateVerification(ctx, certId);
   }
 
-  // Handle 1-Click Telegram Web Login Token: e.g. /start auth_tg_12345
+  // Handle Telegram Security Confirmation for Web Login / Enroll: e.g. /start auth_tg_12345
   if (payload && payload.startsWith('auth_')) {
     const token = payload.replace('auth_', '');
-    if (db) {
-      await db.ref(`telegram_web_auth/${token}`).update({
-        verified: true,
-        userId: userId,
-        name: username,
-        verifiedAt: Date.now()
-      });
-      await db.ref(`users/${userId}/profile`).update({
-        name: username,
-        registeredAt: Date.now(),
-        isTelegram: true
-      });
-    }
-
     const webUrl = process.env.WEBAPP_URL || process.env.RENDER_EXTERNAL_URL || process.env.WebHook_URL || 'https://studyai-bot.onrender.com';
+
     return ctx.reply(
-      `🎉 *ចូលរៀនលើវេបសាយជោគជ័យ!*\n\n` +
-      `សួស្តី *${username}*! គណនីរបស់អ្នកត្រូវបានផ្ទៀងផ្ទាត់ និងអនុញ្ញាតឱ្យចូលប្រើលើ Browser រួចរាល់ហើយ។\n\n` +
-      `សូមត្រឡប់ទៅកាន់ Browser របស់អ្នកដើម្បីបន្តការសិក្សា! 🚀`,
+      `🛡️ *ប្រព័ន្ធសុវត្ថិភាព TELEGRAM (SECURITY CONFIRMATION)* 🛡️\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+      `សួស្តី *${username}*! មានការស្នើសុំចុះឈ្មោះ / ចូលគណនីលើវេបសាយ *Teacher SSOnline English Academy* ពី Browser របស់អ្នក។\n\n` +
+      `👤 *ព័ត៌មានគណនី Telegram៖*\n` +
+      `• Telegram ID: \`${userId}\`\n` +
+      `• ឈ្មោះ៖ *${username}*\n` +
+      `• ស្ថានភាព៖ ⏳ កំពុងរង់ចាំការបញ្ជាក់សុវត្ថិភាពពីអ្នក\n\n` +
+      `👉 *តើអ្នកយល់ព្រមអនុញ្ញាតឱ្យ Browser នេះចុះឈ្មោះ ឬចូលរៀនដែរឬទេ?*`,
       {
         parse_mode: 'Markdown',
         reply_markup: Markup.inlineKeyboard([
-          [Markup.button.webApp('🌐 ចូលរៀនលើ WebApp', webUrl)]
+          [
+            Markup.button.callback('✅ យល់ព្រម និងអនុញ្ញាត (Confirm)', `tg_auth_allow_${token}`),
+            Markup.button.callback('❌ បដិសេធ (Deny)', `tg_auth_deny_${token}`)
+          ]
         ]).reply_markup
       }
     );

@@ -1669,7 +1669,7 @@ async function startTelegramOneClickLogin() {
     if (!data.success) throw new Error(data.error || 'បង្កើតតំណមិនបាន');
 
     window.open(data.botUrl, '_blank');
-    showToast('🤖 សូមចុច START លើ Telegram Bot ដើម្បី Login ស្វ័យប្រវត្ត...', 'info');
+    showToast('🛡️ សូមបើក Telegram Bot ហើយចុច «✅ យល់ព្រម និងអនុញ្ញាត» ដើម្បីផ្ទៀងផ្ទាត់សុវត្ថិភាព!', 'info');
 
     // Poll for login status
     const token = data.token;
@@ -1682,15 +1682,23 @@ async function startTelegramOneClickLogin() {
       try {
         const pollRes = await fetch(`/api/auth/telegram-web-token/status?token=${encodeURIComponent(token)}&deviceId=${encodeURIComponent(getOrCreateDeviceId())}`);
         const pollData = await pollRes.json();
+
+        if (pollData.denied) {
+          clearInterval(pollInterval);
+          showToast(pollData.error || '❌ ការស្នើសុំត្រូវបានបដិសេធលើ Telegram', 'error');
+          return;
+        }
+
         if (pollData.verified && pollData.user) {
           clearInterval(pollInterval);
           setCurrentUser(pollData.user, pollData.sessionToken, pollData.deviceId);
           closeModal('loginModal');
-          showToast(`🎉 ស្វាគមន៍ ${pollData.user.name}! ចូលគណនីជោគជ័យ`, 'success');
+          closeModal('registerModal');
+          showToast(`🎉 ស្វាគមន៍ ${pollData.user.name}! ផ្ទៀងផ្ទាត់សុវត្ថិភាព Telegram ជោគជ័យ`, 'success');
           refreshUserProfile();
         }
       } catch (e) {}
-    }, 2500);
+    }, 2000);
   } catch (err) {
     showToast(err.message, 'error');
   }

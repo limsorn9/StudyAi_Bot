@@ -246,6 +246,15 @@ Student Question: ${userText}`;
         return res.status(400).json({ error: 'Token expired' });
       }
 
+      if (data.denied) {
+        await db.ref(`telegram_web_auth/${token}`).remove();
+        return res.json({
+          success: false,
+          denied: true,
+          error: '❌ អ្នកបានបដិសេធការស្នើសុំចូលគណនីនៅលើ Telegram (Authorization Denied)'
+        });
+      }
+
       if (data.verified && data.userId) {
         const userId = data.userId.toString();
         const userSnap = await db.ref(`users/${userId}`).once('value');
@@ -573,9 +582,28 @@ Student Question: ${userText}`;
    */
   router.post('/auth/google', async (req, res) => {
     try {
-      const { email, name, photoUrl, googleId, deviceId, userAgent } = req.body;
+      let { email, name, photoUrl, googleId, deviceId, userAgent, credential } = req.body;
+
+      // Decode Google Identity Services (GIS) JWT credential if provided
+      if (credential && typeof credential === 'string') {
+        try {
+          const parts = credential.split('.');
+          if (parts.length === 3) {
+            const jwtPayload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8'));
+            if (jwtPayload && jwtPayload.email) {
+              email = jwtPayload.email;
+              name = jwtPayload.name || name;
+              photoUrl = jwtPayload.picture || photoUrl;
+              googleId = jwtPayload.sub || googleId;
+            }
+          }
+        } catch (jwtErr) {
+          console.warn('Google JWT parse note:', jwtErr.message);
+        }
+      }
+
       if (!email) {
-        return res.status(400).json({ error: 'សូមបញ្ចូលព័ត៌មាន Email ពីគណនី Google!' });
+        return res.status(400).json({ error: 'សូមជ្រើសរើស ឬបញ្ចូលព័ត៌មាន Email ពីគណនី Google!' });
       }
 
       const cleanGmail = email.trim().toLowerCase();
