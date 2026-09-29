@@ -16,7 +16,11 @@ const STATE = {
   currentQuizIndex: 0,
   userAnswers: {},
   currentCertPreviewId: null,
-  allVerbsData: {}
+  allVerbsData: {},
+  courseLevel: 'beginner',
+  beginnerCourse: null,
+  activeTutor: 'piseth',
+  studioTutor: 'piseth'
 };
 
 // ==========================================
@@ -277,6 +281,8 @@ async function refreshUserProfile() {
       STATE.currentUser.vipDetails = p.vipDetails;
       STATE.currentUser.completedLessons = p.completedLessons;
       STATE.currentUser.subjectCerts = p.subjectCerts;
+      if (p.isAdmin !== undefined) STATE.currentUser.isAdmin = !!p.isAdmin;
+      if (STATE.currentUser.id === '240224709' || STATE.currentUser.telegramId === 240224709) STATE.currentUser.isAdmin = true;
 
       // Update Dashboard Counters
       const cLessons = document.getElementById('statCompletedLessons');
@@ -334,6 +340,11 @@ function navigateTo(tabName) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
+  // Pause YouTube video if navigating away from lesson
+  if (tabName !== 'lesson' && currentYTPlayer && typeof currentYTPlayer.pauseVideo === 'function') {
+    try { currentYTPlayer.pauseVideo(); } catch (e) {}
+  }
+
   // Tab-specific hooks
   if (tabName === 'curriculum') {
     renderCurriculumWeeks();
@@ -356,13 +367,124 @@ async function loadCurriculum() {
   try {
     const res = await fetch('/api/curriculum');
     const data = await res.json();
-    if (data.success && data.months) {
-      STATE.curriculum = data.months;
-      renderMonthsTabs();
+    if (data.success) {
+      STATE.curriculum = data.months || [];
+      STATE.beginnerCourse = data.beginner || null;
+      switchCourseLevel(STATE.courseLevel || 'beginner');
     }
   } catch (e) {
     console.error('Failed to load curriculum:', e);
   }
+}
+
+function switchCourseLevel(level) {
+  STATE.courseLevel = level;
+  const begBtn = document.getElementById('courseLevelBeginnerBtn');
+  const stdBtn = document.getElementById('courseLevelStandardBtn');
+  if (begBtn) begBtn.classList.toggle('active', level === 'beginner');
+  if (stdBtn) stdBtn.classList.toggle('active', level === 'standard');
+
+  const monthsBar = document.getElementById('monthsTabsBar');
+  const instructorCard = document.getElementById('curriculumInstructorCard');
+
+  if (level === 'beginner') {
+    if (monthsBar) monthsBar.style.display = 'none';
+    if (instructorCard) {
+      instructorCard.innerHTML = `
+        <div class="instructor-card-content">
+          <div class="instructor-avatar-wrap">
+            <span class="instructor-avatar-emoji">👩‍🏫</span>
+            <span class="pulse-status-dot"></span>
+          </div>
+          <div class="instructor-details">
+            <div class="instructor-name-row">
+              <h3 class="instructor-name">អ្នកគ្រូ ពិសិដ្ឋ (Teacher Piseth AI)</h3>
+              <span class="badge badge-emerald">✓ ថ្នាក់ដំបូង • មូលដ្ឋានគ្រឹះ</span>
+            </div>
+            <p class="instructor-bio">
+              ${STATE.beginnerCourse?.teacher?.description || 'បង្រៀនកូនៗ និងប្អូនៗចាប់ពីកម្រិតដំបូង គ្មានមូលដ្ឋាន ឱ្យចេះអាន ចេះសរសេរ ចេះប្រកប និងសន្ទនាសាមញ្ញៗដោយទំនុកចិត្ត'}
+            </p>
+            <div class="instructor-badges-list">
+              <span class="pill-chip">🔤 សូរសព្ទ Phonics A-Z</span>
+              <span class="pill-chip">🔢 រាប់លេខ & ពណ៌</span>
+              <span class="pill-chip">💬 ស្វាគមន៍ & ណែនាំខ្លួន</span>
+              <span class="pill-chip">📚 ២៤ មេរៀនគ្រឹះ</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+    renderBeginnerWeeks();
+  } else {
+    if (monthsBar) monthsBar.style.display = 'flex';
+    if (instructorCard) {
+      instructorCard.innerHTML = `
+        <div class="instructor-card-content">
+          <div class="instructor-avatar-wrap">
+            <span class="instructor-avatar-emoji">👨‍🏫</span>
+            <span class="pulse-status-dot"></span>
+          </div>
+          <div class="instructor-details">
+            <div class="instructor-name-row">
+              <h3 class="instructor-name">គ្រូសន (Teacher Sorn AI)</h3>
+              <span class="badge badge-cyan">✓ ថ្នាក់ទូទៅ ១២ ខែ</span>
+            </div>
+            <p class="instructor-bio">
+              នាយកវិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline • កម្មវិធីសិក្សាពេញលេញ ២៨៨ មេរៀន វេយ្យាករណ៍ សន្ទនា វាក្យសព្ទ កិរិយាសព្ទ និងកម្រិតខ្ពស់
+            </p>
+            <div class="instructor-badges-list">
+              <span class="pill-chip">📘 វេយ្យាករណ៍ពេញលេញ</span>
+              <span class="pill-chip">🗣️ សន្ទនាជាក់ស្តែង ៤៨ បរិបទ</span>
+              <span class="pill-chip">⚡ ៤៨០ កិរិយាសព្ទ</span>
+              <span class="pill-chip">🎓 វិញ្ញាបនបត្រ A4 ផ្តេក</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+    renderMonthsTabs();
+  }
+}
+
+function renderBeginnerWeeks() {
+  const container = document.getElementById('curriculumWeeksContainer');
+  if (!container) return;
+
+  const course = STATE.beginnerCourse;
+  if (!course || !course.weeks) {
+    container.innerHTML = '<p class="text-muted">មិនទាន់មានទិន្នន័យថ្នាក់ដំបូងនៅឡើយទេ</p>';
+    return;
+  }
+
+  const completed = STATE.currentUser?.completedLessons || {};
+
+  container.innerHTML = course.weeks.map(w => `
+    <div class="week-card glass-panel beginner-week-card">
+      <div class="week-header">
+        <div class="week-title-wrap">
+          <div class="week-title">🌟 ${w.title} (${w.lessons.length} មេរៀន)</div>
+          ${w.description ? `<div class="week-desc text-xs text-slate-400 mt-0.5">${w.description}</div>` : ''}
+        </div>
+        <span class="badge badge-emerald">👩‍🏫 អ្នកគ្រូ ពិសិដ្ឋ</span>
+      </div>
+      <div class="lessons-grid">
+        ${w.lessons.map(l => {
+          const key = `beginner-${w.id}-${l.id}`;
+          const isComp = !!completed[key];
+          const grade = isComp ? completed[key].grade || 'A' : null;
+          return `
+            <div class="lesson-item-card beginner-lesson-item ${isComp ? 'completed' : ''}" onclick="openLesson('beginner', '${w.id}', '${l.id}')">
+              <div class="l-info">
+                <div class="l-title">${l.title}</div>
+                <div class="l-status">${isComp ? `✅ ជាប់និទ្ទេស ${grade}` : '👩‍🏫 ចុចរៀនជាមួយអ្នកគ្រូពិសិដ្ឋ'}</div>
+              </div>
+              <div class="l-icon">${isComp ? '🏆' : '➡️'}</div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `).join('');
 }
 
 function renderMonthsTabs() {
@@ -721,12 +843,35 @@ async function openLesson(monthId, weekId, lessonId) {
     // Reset Audio player
     resetAudioPlayer();
 
-    // Reset Chat drawer with initial greeting
+    // Toggle Admin Video controls & Load YouTube Video
+    const isUserAdmin = !!(STATE.currentUser?.isAdmin || STATE.currentUser?.id === '240224709' || STATE.currentUser?.telegramId === 240224709);
+    const adminControls = document.getElementById('videoAdminControls');
+    const adminQuickAdd = document.getElementById('adminQuickAddBox');
+    if (adminControls) adminControls.classList.toggle('hidden', !isUserAdmin);
+    if (adminQuickAdd) adminQuickAdd.classList.toggle('hidden', !isUserAdmin);
+
+    loadLessonVideo(data.lesson?.video?.videoId || null);
+
+    // Setup Active Teacher info for this lesson (Teacher Piseth vs Teacher Sorn)
+    const isBeginner = !!(data.isBeginner || monthId === 'beginner');
+    STATE.activeTutor = isBeginner ? 'piseth' : 'sorn';
+
+    const drawerAvatar = document.getElementById('lessonDrawerAvatar');
+    const drawerName = document.getElementById('lessonDrawerName');
+    const drawerStatus = document.getElementById('lessonDrawerStatus');
+    if (drawerAvatar) drawerAvatar.textContent = isBeginner ? '👩‍🏫' : '👨‍🏫';
+    if (drawerName) drawerName.textContent = isBeginner ? 'អ្នកគ្រូពិសិដ្ឋ (Teacher Piseth AI)' : 'គ្រូសន (Teacher Sorn AI)';
+    if (drawerStatus) drawerStatus.textContent = isBeginner ? '🟢 កំពុងអនឡាញ • គ្រូបង្រៀនថ្នាក់ដំបូង' : '🟢 កំពុងអនឡាញ • ជួយឆ្លើយសំណួរមេរៀន';
+
+    // Reset Chat drawer with initial greeting from the assigned teacher
     const chatBox = document.getElementById('chatMessagesBox');
     if (chatBox) {
       chatBox.innerHTML = `
         <div class="chat-bubble ai">
-          សួស្តីប្អូន! ខ្ញុំគឺគ្រូសន (Teacher Sorn)។ ប្អូនកំពុងរៀនមេរៀន <strong>"${data.lesson.title}"</strong>។ តើប្អូនមានចម្ងល់ ឬចង់ឱ្យគ្រូជួយពន្យល់អ្វីបន្ថែមទេ?
+          ${isBeginner 
+            ? `សួស្តីកូនសិស្សជាទីស្រឡាញ់! អ្នកគ្រូគឺ <strong>អ្នកគ្រូពិសិដ្ឋ (Teacher Piseth)</strong>។ កូនកំពុងរៀនមេរៀន <strong>"${data.lesson.title}"</strong> នៃថ្នាក់ដំបូង។ តើកូនមានចម្ងល់ ឬចង់ឱ្យអ្នកគ្រូជួយពន្យល់អ្វីបន្ថែមទេ? អ្នកគ្រូរីករាយនឹងជួយកូនជានិច្ច! 🌟`
+            : `សួស្តីប្អូន! ខ្ញុំគឺគ្រូសន (Teacher Sorn)។ ប្អូនកំពុងរៀនមេរៀន <strong>"${data.lesson.title}"</strong>។ តើប្អូនមានចម្ងល់ ឬចង់ឱ្យគ្រូជួយពន្យល់អ្វីបន្ថែមទេ?`
+          }
         </div>
       `;
     }
@@ -740,6 +885,29 @@ async function openLesson(monthId, weekId, lessonId) {
 function goToNextLesson() {
   if (!STATE.currentLesson) return;
   const { monthId, weekId, lessonId } = STATE.currentLesson;
+
+  // Handle Beginner Class navigation
+  if (monthId === 'beginner') {
+    const course = STATE.beginnerCourse;
+    if (!course || !course.weeks) return;
+    const wIdx = course.weeks.findIndex(w => w.id === weekId);
+    if (wIdx === -1) return;
+    const week = course.weeks[wIdx];
+    const lIdx = week.lessons.findIndex(l => l.id === lessonId);
+    if (lIdx === -1) return;
+
+    if (lIdx + 1 < week.lessons.length) {
+      openLesson('beginner', weekId, week.lessons[lIdx + 1].id);
+      return;
+    }
+    if (wIdx + 1 < course.weeks.length) {
+      const nextW = course.weeks[wIdx + 1];
+      openLesson('beginner', nextW.id, nextW.lessons[0].id);
+      return;
+    }
+    showToast('🎉 អបអរសាទរកូន! កូនបានរៀនចប់កម្មវិធីថ្នាក់ដំបូងហើយ!', 'success');
+    return;
+  }
 
   const mIdx = STATE.curriculum.findIndex(m => m.id === monthId);
   if (mIdx === -1) return;
@@ -771,6 +939,260 @@ function goToNextLesson() {
   }
 
   showToast('🎉 អបអរសាទរ! អ្នកបានរៀនដល់មេរៀនចុងក្រោយនៃកម្មវិធីសិក្សាហើយ!', 'success');
+}
+
+// ==========================================
+// 3.8 LESSON YOUTUBE VIDEO PLAYER & ADMIN MANAGEMENT
+// ==========================================
+
+let currentYTPlayer = null;
+let isYTPlayerReady = false;
+let currentLessonVideoId = null;
+
+// YouTube IFrame API Ready Callback
+window.onYouTubeIframeAPIReady = function() {
+  isYTPlayerReady = true;
+  console.log('🎬 [YouTube API] IFrame API Loaded & Ready');
+  if (currentLessonVideoId) {
+    initYouTubePlayer(currentLessonVideoId);
+  }
+};
+
+function loadLessonVideo(videoId) {
+  currentLessonVideoId = videoId || null;
+  const wrapper = document.getElementById('ytPlayerWrapper');
+  const placeholder = document.getElementById('noVideoPlaceholder');
+  const overlay = document.getElementById('videoEndedOverlay');
+
+  if (overlay) overlay.classList.add('hidden');
+
+  if (!videoId) {
+    if (wrapper) wrapper.classList.add('hidden');
+    if (placeholder) placeholder.classList.remove('hidden');
+    if (currentYTPlayer && typeof currentYTPlayer.destroy === 'function') {
+      try { currentYTPlayer.destroy(); } catch (e) {}
+      currentYTPlayer = null;
+    }
+    return;
+  }
+
+  if (placeholder) placeholder.classList.add('hidden');
+  if (wrapper) wrapper.classList.remove('hidden');
+
+  if (window.YT && window.YT.Player) {
+    initYouTubePlayer(videoId);
+  } else {
+    console.log('🎬 [YouTube API] Waiting for script to initialize...');
+  }
+}
+
+function initYouTubePlayer(videoId) {
+  const container = document.getElementById('ytPlayerIframe');
+  if (!container) return;
+
+  if (currentYTPlayer && typeof currentYTPlayer.loadVideoById === 'function') {
+    try {
+      currentYTPlayer.loadVideoById({ videoId: videoId });
+      return;
+    } catch (e) {
+      console.warn('Re-instantiating YT Player:', e);
+    }
+  }
+
+  container.innerHTML = '';
+  const playerDiv = document.createElement('div');
+  playerDiv.id = 'ytPlayerInstance';
+  container.appendChild(playerDiv);
+
+  try {
+    currentYTPlayer = new YT.Player('ytPlayerInstance', {
+      videoId: videoId,
+      playerVars: {
+        autoplay: 0,
+        controls: 1,
+        rel: 0,
+        modestbranding: 1,
+        fs: 1,
+        iv_load_policy: 3,
+        playsinline: 1,
+        origin: window.location.origin
+      },
+      events: {
+        onStateChange: onPlayerStateChange
+      }
+    });
+  } catch (err) {
+    console.error('Failed to create YT.Player instance:', err);
+  }
+}
+
+function onPlayerStateChange(event) {
+  // YT.PlayerState.ENDED is 0
+  if (event.data === 0 || (window.YT && event.data === window.YT.PlayerState.ENDED)) {
+    // 1. Immediately pause and seek back to 0 so YouTube cannot display third-party suggestions!
+    try {
+      if (currentYTPlayer && typeof currentYTPlayer.seekTo === 'function') {
+        currentYTPlayer.seekTo(0);
+        currentYTPlayer.pauseVideo();
+      }
+    } catch (e) {}
+
+    // 2. Show custom Cambodian ended overlay with Replay and Quiz
+    const overlay = document.getElementById('videoEndedOverlay');
+    if (overlay) overlay.classList.remove('hidden');
+  } else if (event.data === 1 || (window.YT && event.data === window.YT.PlayerState.PLAYING)) {
+    const overlay = document.getElementById('videoEndedOverlay');
+    if (overlay) overlay.classList.add('hidden');
+  }
+}
+
+function replayLessonVideo() {
+  const overlay = document.getElementById('videoEndedOverlay');
+  if (overlay) overlay.classList.add('hidden');
+  if (currentYTPlayer && typeof currentYTPlayer.playVideo === 'function') {
+    try {
+      currentYTPlayer.seekTo(0);
+      currentYTPlayer.playVideo();
+    } catch (e) {}
+  }
+}
+
+function openLessonVideoAdminModal() {
+  if (!STATE.currentLesson) {
+    showToast('សូមជ្រើសរើសមេរៀនជាមុនសិន', 'warning');
+    return;
+  }
+
+  const { monthId, weekId, lessonId, title, monthTitle, weekTitle } = STATE.currentLesson;
+
+  const titleEl = document.getElementById('adminModalLessonTitle');
+  const breadcrumbsEl = document.getElementById('adminModalLessonBreadcrumbs');
+  if (titleEl) titleEl.textContent = title || 'មេរៀន';
+  if (breadcrumbsEl) breadcrumbsEl.textContent = `${monthTitle || 'Month'} > ${weekTitle || 'Week'} > ${title || 'Lesson'}`;
+
+  const urlInput = document.getElementById('adminYoutubeUrlInput');
+  const deleteBtn = document.getElementById('adminDeleteVideoBtn');
+
+  if (currentLessonVideoId) {
+    if (urlInput) urlInput.value = `https://www.youtube.com/watch?v=${currentLessonVideoId}`;
+    handleAdminYoutubeUrlInput(urlInput ? urlInput.value : '');
+    if (deleteBtn) deleteBtn.classList.remove('hidden');
+  } else {
+    if (urlInput) urlInput.value = '';
+    handleAdminYoutubeUrlInput('');
+    if (deleteBtn) deleteBtn.classList.add('hidden');
+  }
+
+  openModal('lessonVideoAdminModal');
+}
+
+function handleAdminYoutubeUrlInput(url) {
+  const previewBox = document.getElementById('adminVideoPreviewBox');
+  const previewThumb = document.getElementById('adminVideoPreviewThumb');
+  const previewBadge = document.getElementById('adminPreviewVideoId');
+
+  const videoId = extractYouTubeIdFromClient(url);
+  if (videoId) {
+    if (previewThumb) previewThumb.src = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+    if (previewBadge) previewBadge.textContent = `Video ID: ${videoId}`;
+    if (previewBox) previewBox.classList.remove('hidden');
+  } else {
+    if (previewBox) previewBox.classList.add('hidden');
+  }
+}
+
+function extractYouTubeIdFromClient(url) {
+  if (!url) return null;
+  const clean = url.trim();
+  if (/^[a-zA-Z0-9_-]{11}$/.test(clean)) return clean;
+  const m1 = clean.match(/(?:v=|\/v\/|embed\/|shorts\/|youtu\.be\/|\/watch\?.*v=)([a-zA-Z0-9_-]{11})/);
+  if (m1) return m1[1];
+  return null;
+}
+
+async function handleSaveLessonVideo() {
+  if (!STATE.currentLesson) return;
+  const { monthId, weekId, lessonId } = STATE.currentLesson;
+  const urlInput = document.getElementById('adminYoutubeUrlInput');
+  const url = urlInput ? urlInput.value.trim() : '';
+
+  if (!url) {
+    showToast('សូមបញ្ចូល Link YouTube ជាមុនសិន!', 'warning');
+    return;
+  }
+
+  const userId = STATE.currentUser?.id;
+  if (!userId) {
+    showToast('សូមចូលគណនីជា Admin ជាមុនសិន', 'error');
+    return;
+  }
+
+  try {
+    showToast('⏳ កំពុងរក្សាទុកវីដេអូ...', 'info');
+    const res = await fetch('/api/lesson/video/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId,
+        monthId,
+        weekId,
+        lessonId,
+        youtubeUrl: url,
+        action: 'save'
+      })
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      showToast(data.error || 'បរាជ័យក្នុងការរក្សាទុកវីដេអូ', 'error');
+      return;
+    }
+
+    showToast(data.message || 'បានរក្សាទុកវីដេអូបង្រៀនដោយជោគជ័យ!', 'success');
+    closeModal('lessonVideoAdminModal');
+
+    loadLessonVideo(data.video?.videoId);
+  } catch (err) {
+    console.error('Save video error:', err);
+    showToast('មានបញ្ហាបច្ចេកទេសក្នុងការរក្សាទុកវីដេអូ', 'error');
+  }
+}
+
+async function handleDeleteLessonVideo() {
+  if (!STATE.currentLesson) return;
+  if (!confirm('តើលោកគ្រូពិតជាចង់លុបវីដេអូបង្រៀនចេញពីមេរៀននេះមែនទេ?')) return;
+
+  const { monthId, weekId, lessonId } = STATE.currentLesson;
+  const userId = STATE.currentUser?.id;
+
+  try {
+    showToast('⏳ កំពុងលុបវីដេអូ...', 'info');
+    const res = await fetch('/api/lesson/video/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId,
+        monthId,
+        weekId,
+        lessonId,
+        action: 'delete'
+      })
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      showToast(data.error || 'បរាជ័យក្នុងការលុបវីដេអូ', 'error');
+      return;
+    }
+
+    showToast(data.message || 'បានលុបវីដេអូចេញរួចរាល់!', 'success');
+    closeModal('lessonVideoAdminModal');
+
+    loadLessonVideo(null);
+  } catch (err) {
+    console.error('Delete video error:', err);
+    showToast('មានបញ្ហាក្នុងការលុបវីដេអូ', 'error');
+  }
 }
 
 // ==========================================
@@ -814,7 +1236,11 @@ async function toggleLessonAudio() {
     const res = await fetch('/api/tts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: STATE.currentLesson.content, lang: 'en' })
+      body: JSON.stringify({ 
+        text: STATE.currentLesson.content, 
+        lang: 'en',
+        tutor: STATE.activeTutor || 'sorn'
+      })
     });
 
     if (!res.ok) throw new Error('Audio generation failed');
@@ -1035,7 +1461,8 @@ async function playTTS(text, btnElement) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         text: cleanSpeechText,
-        lang: lang
+        lang: lang,
+        tutor: STATE.activeTutor || 'sorn'
       })
     });
 
@@ -1215,9 +1642,13 @@ async function sendChatMessage() {
   chatBox.scrollTop = chatBox.scrollHeight;
 
   // Append thinking bubble
+  const isPiseth = STATE.activeTutor === 'piseth';
+  const teacherName = isPiseth ? 'អ្នកគ្រូពិសិដ្ឋ (Teacher Piseth)' : 'គ្រូសន (Teacher Sorn)';
+  const teacherEmoji = isPiseth ? '👩‍🏫' : '👨‍🏫';
+
   const thinkBubble = document.createElement('div');
   thinkBubble.className = 'chat-bubble ai';
-  thinkBubble.innerHTML = '⏳ <em>គ្រូសនកំពុងគិត...</em>';
+  thinkBubble.innerHTML = `⏳ <em>${isPiseth ? 'អ្នកគ្រូពិសិដ្ឋកំពុងឆ្លើយ...' : 'គ្រូសនកំពុងគិត...'}</em>`;
   chatBox.appendChild(thinkBubble);
   chatBox.scrollTop = chatBox.scrollHeight;
 
@@ -1229,7 +1660,8 @@ async function sendChatMessage() {
         userId: STATE.currentUser?.id || 'guest',
         message: msg,
         lessonTitle: STATE.currentLesson?.title || 'General English',
-        preferredAI: STATE.preferredAI || 'auto'
+        preferredAI: STATE.preferredAI || 'auto',
+        tutor: STATE.activeTutor || (isPiseth ? 'piseth' : 'sorn')
       })
     });
 
@@ -1239,7 +1671,7 @@ async function sendChatMessage() {
 
     thinkBubble.innerHTML = `
       <div class="ai-bubble-header">
-        <span class="ai-bubble-author">👨‍🏫 គ្រូសន (Teacher Sorn)</span>
+        <span class="ai-bubble-author">${teacherEmoji} ${teacherName}</span>
         <span class="ai-bubble-badge">${provider}</span>
       </div>
       <div class="ai-bubble-content">${formatMarkdownText(cleanReply)}</div>
@@ -1283,6 +1715,32 @@ function initAIStudioTab() {
   // Load past history if user logged in
   if (STATE.currentUser && !STATE.chatHistoryLoaded) {
     loadStudioChatHistory();
+  }
+}
+
+function handleStudioTutorChange() {
+  const select = document.getElementById('aiTutorSelect');
+  if (!select) return;
+  const tutor = select.value;
+  STATE.studioTutor = tutor;
+
+  const avatar = document.querySelector('.ai-studio-avatar-emoji');
+  const nameEl = document.querySelector('.ai-studio-name');
+  const badgeEl = document.querySelector('.ai-badge-verified');
+  const subEl = document.querySelector('.ai-studio-sub');
+
+  if (tutor === 'piseth') {
+    if (avatar) avatar.textContent = '👩‍🏫';
+    if (nameEl) nameEl.textContent = 'អ្នកគ្រូ ពិសិដ្ឋ (Teacher Piseth AI)';
+    if (badgeEl) badgeEl.textContent = '✓ គ្រូបង្រៀនថ្នាក់ដំបូង & Phonics';
+    if (subEl) subEl.textContent = 'វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline • ជំនាញថ្នាក់ដំបូង សូរសព្ទ Phonics ព្យញ្ជនៈ ស្រៈ វាក្យសព្ទគ្រឹះ និងសន្ទនាសាមញ្ញសម្រាប់កូនៗ';
+    showToast('👩‍🏫 បានប្តូរទៅកាន់៖ អ្នកគ្រូ ពិសិដ្ឋ (ថ្នាក់ដំបូង)', 'info');
+  } else {
+    if (avatar) avatar.textContent = '👨‍🏫';
+    if (nameEl) nameEl.textContent = 'គ្រូសន (Teacher Sorn AI)';
+    if (badgeEl) badgeEl.textContent = '✓ គ្រូជំនាញភាសាអង់គ្លេស';
+    if (subEl) subEl.textContent = 'វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline • ជួយឆ្លើយចម្ងល់ ពន្យល់វេយ្យាករណ៍ បកប្រែ និងហាត់និយាយ';
+    showToast('👨‍🏫 បានប្តូរទៅកាន់៖ គ្រូសន (ថ្នាក់ទូទៅ ១២ ខែ)', 'info');
   }
 }
 
@@ -1333,14 +1791,18 @@ async function sendStudioChatMessage() {
   chatBox.scrollTop = chatBox.scrollHeight;
 
   // Append thinking bubble
+  const isPiseth = (STATE.studioTutor || 'piseth') === 'piseth';
+  const teacherName = isPiseth ? 'អ្នកគ្រូពិសិដ្ឋ (Teacher Piseth)' : 'គ្រូសន (Teacher Sorn)';
+  const teacherEmoji = isPiseth ? '👩‍🏫' : '👨‍🏫';
+
   const thinkBubble = document.createElement('div');
   thinkBubble.className = 'chat-bubble ai';
   thinkBubble.innerHTML = `
     <div class="ai-bubble-header">
-      <span class="ai-bubble-author">👨‍🏫 គ្រូសន (Teacher Sorn)</span>
+      <span class="ai-bubble-author">${teacherEmoji} ${teacherName}</span>
       <span class="ai-bubble-badge">កំពុងដំណើរការ...</span>
     </div>
-    <div class="ai-bubble-content">⏳ <em>គ្រូសនកំពុងគិត និងរៀបចំការឆ្លើយតប...</em></div>
+    <div class="ai-bubble-content">⏳ <em>${isPiseth ? 'អ្នកគ្រូពិសិដ្ឋកំពុងគិត និងរៀបចំការពន្យល់...' : 'គ្រូសនកំពុងគិត និងរៀបចំការឆ្លើយតប...'}</em></div>
   `;
   chatBox.appendChild(thinkBubble);
   chatBox.scrollTop = chatBox.scrollHeight;
@@ -1361,7 +1823,8 @@ async function sendStudioChatMessage() {
         message: msg,
         preferredAI: STATE.preferredAI || 'auto',
         mode: mode,
-        lessonTitle: STATE.currentLesson?.title || 'General English Study'
+        lessonTitle: STATE.currentLesson?.title || (isPiseth ? 'Beginner Foundation English' : 'General English Study'),
+        tutor: isPiseth ? 'piseth' : 'sorn'
       })
     });
 
@@ -1372,7 +1835,7 @@ async function sendStudioChatMessage() {
 
     thinkBubble.innerHTML = `
       <div class="ai-bubble-header">
-        <span class="ai-bubble-author">👨‍🏫 គ្រូសន (Teacher Sorn)</span>
+        <span class="ai-bubble-author">${teacherEmoji} ${teacherName}</span>
         <span class="ai-bubble-badge">${provider}${model}</span>
       </div>
       <div class="ai-bubble-content">${formatMarkdownText(cleanReply)}</div>

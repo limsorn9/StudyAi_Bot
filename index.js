@@ -42,6 +42,7 @@ const quizState = {};
 
 // Load Curriculum Data
 const curriculum = JSON.parse(fs.readFileSync('./curriculum.json', 'utf8'));
+const beginnerCourse = require('./beginner_curriculum.js');
 
 // Initialize Firebase Admin
 let firebaseCreds;
@@ -1311,11 +1312,14 @@ bot.hears('❓ ជំនួយ (Help)', (ctx) => {
   );
 });
 
-// Generate Keyboard for 12 Months
+// Generate Keyboard for 12 Months & Beginner Course
 function getMonthsKeyboard() {
+  const rows = [];
+  // Top Banner: Beginner Class by Teacher Piseth
+  rows.push([Markup.button.callback('👩‍🏫 ថ្នាក់ដំបូង • អ្នកគ្រូ ពិសិដ្ឋ (Beginner Class)', 'beginner_menu')]);
+
   const buttons = curriculum.months.map(m => Markup.button.callback(m.title.split('៖')[0], `month_${m.id}`));
   // Chunk buttons into rows of 3
-  const rows = [];
   for(let i=0; i<buttons.length; i+=3) {
     rows.push(buttons.slice(i, i+3));
   }
@@ -1349,7 +1353,97 @@ bot.action(/month_(.+)/, async (ctx) => {
 });
 
 bot.action('back_to_months', async (ctx) => {
-  await ctx.editMessageText("សូមជ្រើសរើសខែដែលអ្នកចង់រៀន៖", getMonthsKeyboard());
+  await ctx.editMessageText("សូមជ្រើសរើសថ្នាក់ដែលអ្នកចង់រៀន៖", getMonthsKeyboard());
+});
+
+// Beginner Course (Teacher Piseth) Actions
+bot.action('beginner_menu', async (ctx) => {
+  const teacher = beginnerCourse.teacher;
+  const buttons = beginnerCourse.weeks.map(w => [Markup.button.callback(w.title.split('៖')[0] || w.title, `beginner_week_${w.id}`)]);
+  buttons.push([Markup.button.callback('🔙 ថ្នាក់ទូទៅ ១២ ខែ (គ្រូសន)', 'back_to_months')]);
+
+  await ctx.editMessageText(
+    `👩‍🏫 *${teacher.name} (${teacher.englishName})*\n` +
+    `_${teacher.role}_\n\n` +
+    `🌟 *កម្មវិធីសិក្សាថ្នាក់ដំបូង (Beginner Level)*\n` +
+    `សូមជ្រើសរើសសប្តាហ៍សិក្សាខាងក្រោម៖`,
+    {
+      parse_mode: 'Markdown',
+      ...Markup.inlineKeyboard(buttons)
+    }
+  );
+});
+
+bot.action(/beginner_week_(.+)/, async (ctx) => {
+  const weekId = ctx.match[1];
+  const week = beginnerCourse.weeks.find(w => w.id === weekId);
+  if (!week) return ctx.answerCbQuery("រកមិនឃើញទិន្នន័យ");
+
+  const buttons = week.lessons.map(l => [Markup.button.callback(l.title.split('៖')[0] || l.title, `beginner_lesson_${weekId}_${l.id}`)]);
+  buttons.push([Markup.button.callback('🔙 ថ្នាក់ដំបូង (Beginner Menu)', 'beginner_menu')]);
+
+  await ctx.editMessageText(
+    `👩‍🏫 *${week.title}*\n${week.description || ''}\n\nសូមជ្រើសរើសមេរៀន៖`,
+    {
+      parse_mode: 'Markdown',
+      ...Markup.inlineKeyboard(buttons)
+    }
+  );
+});
+
+bot.action(/beginner_lesson_(.+)_(.+)/, async (ctx) => {
+  const weekId = ctx.match[1];
+  const lessonId = ctx.match[2];
+  const week = beginnerCourse.weeks.find(w => w.id === weekId);
+  const lesson = week?.lessons.find(l => l.id === lessonId);
+  if (!lesson) return ctx.answerCbQuery("រកមិនឃើញមេរៀន");
+
+  const text = `👩‍🏫 *${beginnerCourse.teacher.name}* • ថ្នាក់ដំបូង\n` +
+    `📖 *${lesson.title}*\n\n` +
+    lesson.content;
+
+  const maxLen = 3900;
+  if (text.length > maxLen) {
+    const part1 = text.substring(0, maxLen);
+    const part2 = text.substring(maxLen);
+    await ctx.reply(part1, { parse_mode: 'Markdown' });
+    await ctx.reply(part2, {
+      parse_mode: 'Markdown',
+      ...Markup.inlineKeyboard([
+        [Markup.button.callback('🔙 សប្តាហ៍នេះ', `beginner_week_${weekId}`)],
+        [Markup.button.callback('👩‍🏫 បញ្ជីថ្នាក់ដំបូង', 'beginner_menu')]
+      ])
+    });
+  } else {
+    await ctx.reply(text, {
+      parse_mode: 'Markdown',
+      ...Markup.inlineKeyboard([
+        [Markup.button.callback('🔙 សប្តាហ៍នេះ', `beginner_week_${weekId}`)],
+        [Markup.button.callback('👩‍🏫 បញ្ជីថ្នាក់ដំបូង', 'beginner_menu')]
+      ])
+    });
+  }
+});
+
+bot.command(['piseth', 'beginner', 'foundation'], async (ctx) => {
+  const teacher = beginnerCourse.teacher;
+  const msg = `👩‍🏫 *${teacher.name} (${teacher.englishName})*\n` +
+    `_${teacher.role}_\n\n` +
+    `${teacher.welcomeGreeting}\n\n` +
+    `📚 *កម្មវិធីសិក្សាថ្នាក់ដំបូង (Beginner Foundation Course)៖*\n` +
+    `• សប្តាហ៍ទី ១៖ ព្យញ្ជនៈ ស្រៈ និងសូរសព្ទ Phonics (A-Z)\n` +
+    `• សប្តាហ៍ទី ២៖ ការរាប់លេខ ១-១០០ ពណ៌ និងរូបរាង\n` +
+    `• សប្តាហ៍ទី ៣៖ ការស្វាគមន៍ ការណែនាំខ្លួន និងគ្រួសារ\n` +
+    `• សប្តាហ៍ទី ៤៖ សម្ភារៈសិក្សា និងប្រយោគបញ្ជាគ្រឹះ\n\n` +
+    `👉 *សរុប ២៤ មេរៀនគ្រឹះ* ជាមួយការពន្យល់ងាយៗ សំឡេងអាន និងប្រឡង Quiz!`;
+
+  await ctx.reply(msg, {
+    parse_mode: 'Markdown',
+    ...Markup.inlineKeyboard([
+      [Markup.button.callback('🌟 មើលមេរៀនថ្នាក់ដំបូង (Beginner Lessons)', 'beginner_menu')],
+      [Markup.button.callback('📚 ថ្នាក់ទូទៅ ១២ ខែ (គ្រូសន)', 'back_to_months')]
+    ])
+  });
 });
 
 // Handle Week Selection

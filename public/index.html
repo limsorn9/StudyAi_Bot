@@ -12,6 +12,9 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   
+  <!-- YouTube IFrame Player API -->
+  <script src="https://www.youtube.com/iframe_api"></script>
+  
   <!-- Google Identity Services (Chrome One Tap & Native Sign-In) -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 
@@ -251,12 +254,37 @@
       ============================================== -->
       <section id="tab-curriculum" class="tab-pane">
         <div class="section-title">
-          <h2>📚 កម្មវិធីសិក្សាភាសាអង់គ្លេស ១២ ខែ</h2>
-          <p>កម្មវិធីសិក្សាស្តង់ដារ ២៨៨ មេរៀន ចែកជា ១២ ខែ និង ៤៨ សប្តាហ៍</p>
+          <h2>📚 កម្មវិធីសិក្សាភាសាអង់គ្លេសស្វ័យប្រវត្ត</h2>
+          <p>ជ្រើសរើសរៀនថ្នាក់ដំបូង (អ្នកគ្រូ ពិសិដ្ឋ) ឬថ្នាក់ទូទៅ ១២ ខែ (គ្រូសន)</p>
         </div>
 
-        <!-- Month Navigation Pills -->
-        <div class="months-bar" id="monthsTabsBar">
+        <!-- Course Level Switcher: Beginner (Teacher Piseth) vs 12 Months (Teacher Sorn) -->
+        <div class="course-level-switch-wrap mb-4">
+          <div class="course-level-switcher glass-panel">
+            <button class="course-level-btn active" id="courseLevelBeginnerBtn" onclick="switchCourseLevel('beginner')">
+              <span class="course-icon">👩‍🏫</span>
+              <div class="course-btn-text">
+                <span class="course-badge">ថ្នាក់ដំបូង • កម្រិតគ្រឹះ</span>
+                <span class="course-title">ថ្នាក់ដំបូង (អ្នកគ្រូ ពិសិដ្ឋ AI)</span>
+              </div>
+            </button>
+            <button class="course-level-btn" id="courseLevelStandardBtn" onclick="switchCourseLevel('standard')">
+              <span class="course-icon">👨‍🏫</span>
+              <div class="course-btn-text">
+                <span class="course-badge">ថ្នាក់ទូទៅ • ១២ ខែ</span>
+                <span class="course-title">ថ្នាក់ទូទៅ ១២ ខែ (គ្រូសន AI)</span>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <!-- Instructor Banner Card -->
+        <div class="course-instructor-card glass-panel mb-4" id="curriculumInstructorCard">
+          <!-- Populated by JS: Shows Teacher Piseth or Teacher Sorn info -->
+        </div>
+
+        <!-- Month Navigation Pills (Only shown for 12 Months) -->
+        <div class="months-bar" id="monthsTabsBar" style="display: none;">
           <!-- Populated by JS -->
         </div>
 
@@ -286,6 +314,61 @@
               <h1 id="lessonTitleDisplay" class="lesson-title">មេរៀន</h1>
               <div class="lesson-badges">
                 <span id="lessonStatusBadge" class="badge badge-cyan">មេរៀនធម្មតា</span>
+              </div>
+            </div>
+
+            <!-- Lesson Video Player Section -->
+            <div class="lesson-video-box glass-panel" id="lessonVideoBox">
+              <div class="lesson-video-header">
+                <div class="video-header-left">
+                  <div class="video-badge-icon">🎬</div>
+                  <div class="video-header-titles">
+                    <div class="video-header-title">វីដេអូបង្រៀនមេរៀននេះ (Lesson Video)</div>
+                    <div class="video-header-sub" id="lessonVideoStatusSub">ទស្សនាការពន្យល់មេរៀនដោយផ្ទាល់ពីលោកគ្រូ</div>
+                  </div>
+                </div>
+                <!-- Admin Only Action: Visible if STATE.currentUser?.isAdmin -->
+                <div class="video-admin-actions hidden" id="videoAdminControls">
+                  <button class="btn btn-outline btn-sm admin-manage-video-btn" onclick="openLessonVideoAdminModal()">
+                    <span>⚙️ គ្រប់គ្រងវីដេអូ (Admin)</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Video Embed Player Container -->
+              <div class="video-player-container" id="videoPlayerContainer">
+                <!-- If video exists, YT.Player is loaded into #ytPlayerIframe -->
+                <div id="ytPlayerWrapper" class="yt-player-wrapper hidden">
+                  <div id="ytPlayerIframe"></div>
+                  <!-- Custom End-Screen Overlay to completely block YouTube suggestions -->
+                  <div id="videoEndedOverlay" class="video-ended-overlay hidden">
+                    <div class="video-ended-card">
+                      <div class="ended-icon">🎉</div>
+                      <h3 class="ended-title">អ្នកបានទស្សនាវីដេអូចប់ហើយ!</h3>
+                      <p class="ended-sub">សូមបន្តអានខ្លឹមសារមេរៀនខាងក្រោម ឬចូលប្រឡងតេស្តសមត្ថភាព (Quiz)</p>
+                      <div class="ended-actions">
+                        <button class="btn btn-primary" onclick="replayLessonVideo()">
+                          <span>🔄 មើលវីដេអូឡើងវិញ (Replay)</span>
+                        </button>
+                        <button class="btn btn-gold" onclick="startCurrentLessonQuiz()">
+                          <span>📝 ចូលប្រឡង Quiz មេរៀននេះ</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Placeholder when no video is uploaded yet -->
+                <div id="noVideoPlaceholder" class="no-video-placeholder">
+                  <div class="placeholder-icon">📹</div>
+                  <div class="placeholder-title">មិនទាន់មានវីដេអូបង្រៀនសម្រាប់មេរៀននេះនៅឡើយទេ</div>
+                  <div class="placeholder-sub">លោកគ្រូកំពុងរៀបចំថត និងបញ្ចូលវីដេអូបន្ថែមក្នុងពេលឆាប់ៗនេះ</div>
+                  <div class="admin-quick-add hidden" id="adminQuickAddBox">
+                    <button class="btn btn-primary btn-sm mt-3" onclick="openLessonVideoAdminModal()">
+                      <span>➕ បញ្ចូល Link វីដេអូឥឡូវនេះ (Admin Only)</span>
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -328,10 +411,10 @@
           <!-- Right: AI Tutor Chat Drawer -->
           <div class="ai-tutor-card glass-panel">
             <div class="ai-header">
-              <div class="ai-avatar">🤖</div>
+              <div class="ai-avatar" id="lessonDrawerAvatar">👩‍🏫</div>
               <div class="ai-header-text">
-                <div class="ai-name">គ្រូសន (Teacher Sorn AI)</div>
-                <div class="ai-status">🟢 កំពុងអនឡាញ • ជួយឆ្លើយសំណួរមេរៀន</div>
+                <div class="ai-name" id="lessonDrawerName">អ្នកគ្រូពិសិដ្ឋ (Teacher Piseth AI)</div>
+                <div class="ai-status" id="lessonDrawerStatus">🟢 កំពុងអនឡាញ • គ្រូបង្រៀនថ្នាក់ដំបូង</div>
               </div>
             </div>
 
@@ -383,6 +466,15 @@
             </div>
 
             <div class="ai-studio-controls">
+              <!-- Teacher Selector (Teacher Piseth vs Teacher Sorn) -->
+              <div class="engine-selector-box">
+                <label for="aiTutorSelect" class="engine-label">គ្រូបង្រៀន (Teacher):</label>
+                <select id="aiTutorSelect" class="engine-select font-bold" onchange="handleStudioTutorChange()">
+                  <option value="piseth">👩‍🏫 អ្នកគ្រូ ពិសិដ្ឋ (ថ្នាក់ដំបូង & Phonics)</option>
+                  <option value="sorn">👨‍🏫 គ្រូសន (ថ្នាក់ទូទៅ ១២ ខែ)</option>
+                </select>
+              </div>
+
               <!-- Engine Selector -->
               <div class="engine-selector-box">
                 <label for="aiEngineSelect" class="engine-label">ម៉ាស៊ីន AI (Engine):</label>
@@ -1116,6 +1208,60 @@
           <span>រំលងសិន (Skip for now)</span>
         </button>
       </form>
+    </div>
+  </div>
+
+  <!-- ==============================================
+       ADMIN ONLY: LESSON YOUTUBE VIDEO MODAL
+  ============================================== -->
+  <div id="lessonVideoAdminModal" class="modal-overlay hidden">
+    <div class="modal-card glass-panel max-w-lg">
+      <div class="modal-header">
+        <div class="modal-title">🎬 គ្រប់គ្រងវីដេអូបង្រៀនមេរៀន (Admin Only)</div>
+        <button class="modal-close" onclick="closeModal('lessonVideoAdminModal')">✕</button>
+      </div>
+
+      <div class="admin-modal-body p-4">
+        <div class="admin-modal-lesson-info p-3 rounded-xl border border-slate-700/80 mb-4 bg-slate-800/80">
+          <div class="text-xs text-indigo-400 font-bold uppercase tracking-wider">មេរៀនបច្ចុប្បន្ន</div>
+          <div id="adminModalLessonTitle" class="text-sm font-semibold text-white mt-1">Lesson Title</div>
+          <div id="adminModalLessonBreadcrumbs" class="text-xs text-slate-400 mt-0.5">Month > Week > Lesson</div>
+        </div>
+
+        <div class="form-group mb-4">
+          <label class="form-label font-bold text-slate-200">
+            🔗 Link វីដេអូ YouTube របស់លោកគ្រូ (Paste YouTube Link):
+          </label>
+          <input type="text" id="adminYoutubeUrlInput" 
+                 placeholder="ឧ. https://www.youtube.com/watch?v=XXXXXX ឬ https://youtu.be/XXXXXX" 
+                 class="form-input" 
+                 oninput="handleAdminYoutubeUrlInput(this.value)">
+          <div class="text-[12px] text-slate-400 mt-1">
+            💡 គាំទ្រ Link YouTube គ្រប់ទម្រង់ (Standard, Share Link, Shorts, Embed)។ សិស្សមើលមិនឃើញ Link នេះទេ!
+          </div>
+        </div>
+
+        <!-- Real-time Preview Card -->
+        <div id="adminVideoPreviewBox" class="admin-video-preview-box hidden mb-4">
+          <div class="text-xs text-emerald-400 font-bold mb-2">👁️ រូបភាព Preview វីដេអូ (Video Preview):</div>
+          <div class="preview-thumbnail-wrap">
+            <img id="adminVideoPreviewThumb" src="" alt="YouTube Preview" class="preview-thumbnail-img">
+            <div class="preview-badge" id="adminPreviewVideoId">ID: ...</div>
+          </div>
+        </div>
+
+        <div class="modal-actions-row flex items-center gap-2 pt-2">
+          <button type="button" class="btn btn-primary flex-1 py-3 font-bold" onclick="handleSaveLessonVideo()">
+            <span>💾 រក្សាទុកវីដេអូ (Save Video)</span>
+          </button>
+          <button type="button" id="adminDeleteVideoBtn" class="btn btn-danger py-3 px-4 font-bold hidden" onclick="handleDeleteLessonVideo()">
+            <span>🗑️ លុបវីដេអូ</span>
+          </button>
+          <button type="button" class="btn btn-outline py-3 px-4" onclick="closeModal('lessonVideoAdminModal')">
+            <span>បោះបង់</span>
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 

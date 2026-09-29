@@ -3937,3 +3937,490 @@ body.day-mode .ambient-glow {
   opacity: 0.03 !important;
 }
 
+/* ==========================================================================
+   LESSON YOUTUBE VIDEO SECTION & CONTROLS
+   ========================================================================== */
+
+.lesson-video-box {
+  margin-bottom: 24px;
+  padding: 18px;
+  border-radius: 20px;
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(16px);
+}
+
+.lesson-video-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.video-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.video-badge-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(220, 38, 38, 0.4));
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+}
+
+.video-header-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: #ffffff;
+  font-family: var(--font-khmer), var(--font-outfit), sans-serif;
+}
+
+.video-header-sub {
+  font-size: 12.5px;
+  color: #94a3b8;
+  font-family: var(--font-khmer), sans-serif;
+}
+
+.admin-manage-video-btn {
+  border-color: rgba(99, 102, 241, 0.4);
+  color: #a5b4fc;
+}
+
+.admin-manage-video-btn:hover {
+  background: rgba(99, 102, 241, 0.15);
+  color: #c7d2fe;
+}
+
+/* 16:9 Responsive Video Aspect Ratio Container */
+.video-player-container {
+  position: relative;
+  width: 100%;
+  padding-bottom: 56.25%; /* 16:9 Ratio */
+  height: 0;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #090d16;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.5);
+}
+
+.yt-player-wrapper,
+.yt-player-wrapper iframe,
+#ytPlayerIframe,
+#ytPlayerIframe iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+/* Custom Ended Overlay - Blocks YouTube Suggested Videos Completely */
+.video-ended-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(11, 15, 25, 0.94);
+  backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 25;
+  padding: 20px;
+  animation: fadeIn 0.3s ease;
+}
+
+.video-ended-card {
+  max-width: 440px;
+  width: 100%;
+  text-align: center;
+  background: rgba(30, 41, 59, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.6);
+}
+
+.ended-icon {
+  font-size: 42px;
+  margin-bottom: 10px;
+  animation: bounce 1.5s infinite;
+}
+
+.ended-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: #38bdf8;
+  margin-bottom: 8px;
+  font-family: var(--font-khmer);
+}
+
+.ended-sub {
+  font-size: 13px;
+  color: #cbd5e1;
+  line-height: 1.6;
+  margin-bottom: 20px;
+  font-family: var(--font-khmer);
+}
+
+.ended-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Placeholder when no video exists */
+.no-video-placeholder {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
+  background: radial-gradient(circle at center, rgba(30, 41, 59, 0.6), rgba(15, 23, 42, 0.9));
+  border: 2px dashed rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+}
+
+.placeholder-icon {
+  font-size: 44px;
+  margin-bottom: 12px;
+  opacity: 0.8;
+}
+
+.placeholder-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #e2e8f0;
+  margin-bottom: 6px;
+  font-family: var(--font-khmer);
+}
+
+.placeholder-sub {
+  font-size: 12.5px;
+  color: #94a3b8;
+  max-width: 400px;
+  font-family: var(--font-khmer);
+}
+
+/* Admin Modal Thumbnail Preview */
+.admin-video-preview-box {
+  background: rgba(15, 23, 42, 0.7);
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.preview-thumbnail-wrap {
+  position: relative;
+  border-radius: 10px;
+  overflow: hidden;
+  max-height: 200px;
+}
+
+.preview-thumbnail-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.preview-badge {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  background: rgba(0, 0, 0, 0.8);
+  color: #38bdf8;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* Day Mode Compatibility for Video Box */
+body.day-mode .lesson-video-box {
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.06) !important;
+}
+
+body.day-mode .video-header-title {
+  color: #0f172a !important;
+}
+
+body.day-mode .video-header-sub {
+  color: #475569 !important;
+}
+
+body.day-mode .video-player-container {
+  border-color: #cbd5e1 !important;
+}
+
+body.day-mode .no-video-placeholder {
+  background: #f8fafc !important;
+  border-color: #cbd5e1 !important;
+}
+
+body.day-mode .placeholder-title {
+  color: #0f172a !important;
+}
+
+body.day-mode .placeholder-sub {
+  color: #64748b !important;
+}
+
+body.day-mode .video-ended-card {
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.12) !important;
+}
+
+body.day-mode .ended-title {
+  color: #0284c7 !important;
+}
+
+body.day-mode .ended-sub {
+  color: #334155 !important;
+}
+
+/* ==========================================================================
+   BEGINNER COURSE & TEACHER PISETH STYLES
+   ========================================================================== */
+
+.course-level-switch-wrap {
+  width: 100%;
+  margin-bottom: 20px;
+}
+
+.course-level-switcher {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 8px;
+  border-radius: 18px;
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.course-level-btn {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  border-radius: 14px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  text-align: left;
+}
+
+.course-level-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #ffffff;
+}
+
+.course-level-btn.active {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(6, 182, 212, 0.15));
+  border-color: rgba(16, 185, 129, 0.4);
+  color: #ffffff;
+  box-shadow: 0 4px 20px rgba(16, 185, 129, 0.2);
+}
+
+#courseLevelStandardBtn.active {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(56, 189, 248, 0.15));
+  border-color: rgba(99, 102, 241, 0.4);
+  box-shadow: 0 4px 20px rgba(99, 102, 241, 0.2);
+}
+
+.course-icon {
+  font-size: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.course-btn-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.course-badge {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #34d399;
+}
+
+#courseLevelStandardBtn .course-badge {
+  color: #38bdf8;
+}
+
+.course-title {
+  font-size: 15px;
+  font-weight: 800;
+  font-family: var(--font-khmer);
+}
+
+/* Instructor Banner Card */
+.course-instructor-card {
+  padding: 20px;
+  border-radius: 20px;
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 22px;
+  backdrop-filter: blur(14px);
+}
+
+.instructor-card-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+}
+
+.instructor-avatar-wrap {
+  position: relative;
+  width: 58px;
+  height: 58px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.25), rgba(6, 182, 212, 0.25));
+  border: 2px solid rgba(16, 185, 129, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.instructor-avatar-emoji {
+  font-size: 32px;
+}
+
+.instructor-details {
+  flex: 1;
+}
+
+.instructor-name-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.instructor-name {
+  font-size: 18px;
+  font-weight: 800;
+  color: #ffffff;
+  font-family: var(--font-khmer);
+  margin: 0;
+}
+
+.instructor-bio {
+  font-size: 13.5px;
+  color: #cbd5e1;
+  line-height: 1.6;
+  margin-bottom: 12px;
+  font-family: var(--font-khmer);
+}
+
+.instructor-badges-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pill-chip {
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 12px;
+  font-weight: 600;
+  color: #e2e8f0;
+  font-family: var(--font-khmer);
+}
+
+.beginner-week-card {
+  border-left: 4px solid #10b981;
+}
+
+.beginner-lesson-item:hover {
+  border-color: #10b981;
+}
+
+/* Day Mode Overrides for Course Switcher & Instructor */
+body.day-mode .course-level-switcher {
+  background: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05) !important;
+}
+
+body.day-mode .course-level-btn {
+  color: #64748b !important;
+}
+
+body.day-mode .course-level-btn.active {
+  background: #ecfdf5 !important;
+  border-color: #10b981 !important;
+  color: #065f46 !important;
+}
+
+body.day-mode #courseLevelStandardBtn.active {
+  background: #eff6ff !important;
+  border-color: #3b82f6 !important;
+  color: #1e40af !important;
+}
+
+body.day-mode .course-title {
+  color: #0f172a !important;
+}
+
+body.day-mode .course-instructor-card {
+  background: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.06) !important;
+}
+
+body.day-mode .instructor-name {
+  color: #0f172a !important;
+}
+
+body.day-mode .instructor-bio {
+  color: #334155 !important;
+}
+
+body.day-mode .pill-chip {
+  background: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+@media (max-width: 640px) {
+  .course-level-switcher {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+

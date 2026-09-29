@@ -27,13 +27,17 @@ function shuffle(arr) {
 }
 
 function generateVocabQuiz(lessonContent, lessonType) {
-  // Parse words from lesson content (format: "1. word = ន...")
+  // Parse words from lesson content (format: "1. word = ន..." or "1. 🇬🇧 word = 🇰🇭 ន...")
   const lines = lessonContent.split('\n');
   const words = [];
   for (const line of lines) {
-    const match = line.match(/^\d+\.\s*(.+?)\s*=\s*(.+)$/);
+    const match = line.match(/^\d+\.\s*(?:🇬🇧\s*)?(.+?)\s*=\s*(?:🇰🇭\s*)?(.+)$/);
     if (match) {
-      words.push({ eng: match[1].trim(), kh: match[2].trim() });
+      const eng = match[1].replace(/^[🇬🇧\s]+/, '').trim();
+      const kh = match[2].replace(/^[🇰🇭\s]+/, '').trim();
+      if (eng && kh) {
+        words.push({ eng, kh });
+      }
     }
   }
 
@@ -332,26 +336,44 @@ function generateAnnualSubjectQuiz(curriculum, subjectKey, count = 20) {
 
 /**
  * Main function: generate 10 quiz questions from a lesson
+ * Supports:
+ * - generateQuiz(lesson)
+ * - generateQuiz(curriculum, monthId, weekId, lessonId)
  */
-function generateQuiz(lesson) {
+function generateQuiz(lessonOrCurriculum, monthId, weekId, lessonId) {
+  let lesson = lessonOrCurriculum;
+
+  if (lessonOrCurriculum && monthId && weekId && lessonId) {
+    if (lessonOrCurriculum.months) {
+      const m = lessonOrCurriculum.months.find(m => m.id === monthId);
+      const w = m?.weeks.find(w => w.id === weekId);
+      lesson = w?.lessons.find(l => l.id === lessonId);
+    } else if (lessonOrCurriculum.id === monthId && lessonOrCurriculum.weeks) {
+      const w = lessonOrCurriculum.weeks.find(w => w.id === weekId);
+      lesson = w?.lessons.find(l => l.id === lessonId);
+    }
+  }
+
+  if (!lesson) return generateSentenceQuiz(10);
+
   const title = lesson.title || '';
   const content = lesson.content || '';
 
-  if (title.includes('វេយ្យាករណ៍') || title.includes('Grammar')) {
-    return generateGrammarQuiz(content);
-  } else if (title.includes('ពាក្យ') || title.includes('Vocabulary')) {
-    return generateVocabQuiz(content, 'vocab');
-  } else if (title.includes('កិរិយាសព្ទ') || title.includes('Verb')) {
-    return generateVocabQuiz(content, 'verbs');
-  } else if (title.includes('គុណនាម') || title.includes('Adjective')) {
-    return generateVocabQuiz(content, 'adjectives');
-  } else if (title.includes('សន្ទនា') || title.includes('Conversation')) {
+  // Try extracting vocabulary first if available in lesson
+  const vocabQuestions = generateVocabQuiz(content, 'vocab');
+  if (vocabQuestions && vocabQuestions.length >= 4) {
+    return vocabQuestions;
+  }
+
+  if (title.includes('វេយ្យាករណ៍') || title.includes('Grammar') || title.includes('Phonics') || title.includes('អក្សរ')) {
+    return generateGrammarQuiz(content) || generateSentenceQuiz(10);
+  } else if (title.includes('សន្ទនា') || title.includes('Conversation') || title.includes('Greetings')) {
     return generateConversationQuiz(10);
   } else if (title.includes('ល្បះ') || title.includes('Sentence')) {
     return generateSentenceQuiz(10);
   }
 
-  return generateGrammarQuiz(content);
+  return generateGrammarQuiz(content) || generateSentenceQuiz(10);
 }
 
 module.exports = {

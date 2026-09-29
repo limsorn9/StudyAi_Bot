@@ -12,6 +12,7 @@ const { generateCertificateCard, generateCertificateHTML, getGradeTitle } = requ
 const { redeemLicenseKey, getUserLicenseInfo } = require('./license_manager.js');
 const irregularVerbs = require('./irregular_verbs.js');
 const { sendOtpEmail, sendConfirmEmail } = require('./mailer.js');
+const beginnerCourse = require('./beginner_curriculum.js');
 
 function hashPassword(password) {
   return crypto.createHash('sha256').update(password + '_studyai_secret_salt_2026').digest('hex');
@@ -95,6 +96,24 @@ function createWebAPIRouter({ db, auth, curriculum, bot, SUPER_ADMIN_IDS, checkV
     return false;
   }
 
+  /**
+   * Verify if a user is an authorized Admin / Super Admin
+   */
+  async function isUserAdmin(userId) {
+    if (!userId) return false;
+    const strId = userId.toString().trim();
+    if (SUPER_ADMIN_IDS && SUPER_ADMIN_IDS.some(id => id.toString().trim() === strId)) return true;
+    if (db) {
+      try {
+        const snap = await db.ref(`users/${strId}/profile`).once('value');
+        const prof = snap.val() || {};
+        if (prof.role === 'admin' || prof.isAdmin === true) return true;
+        if (prof.linkedTelegramId && SUPER_ADMIN_IDS && SUPER_ADMIN_IDS.some(id => id.toString().trim() === prof.linkedTelegramId.toString().trim())) return true;
+      } catch (e) {}
+    }
+    return false;
+  }
+
 
 
   // ==========================================
@@ -160,15 +179,28 @@ function createWebAPIRouter({ db, auth, curriculum, bot, SUPER_ADMIN_IDS, checkV
       preferredAI = 'auto',
       mode = 'chat',
       extraContext = '',
-      clientHistory = []
+      clientHistory = [],
+      tutor = 'sorn'
     } = options;
 
-    // 1. Build Persona System Prompt based on Mode
-    let systemPrompt = `You are Teacher Sorn (គ្រូសន), a renowned and encouraging English teacher at Teacher SSOnline English Institute (វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline).
+    const isPiseth = tutor === 'piseth' || (lessonTitle && (lessonTitle.includes('ថ្នាក់ដំបូង') || lessonTitle.includes('Beginner') || lessonTitle.includes('Piseth') || lessonTitle.includes('ពិសិដ្ឋ')));
+
+    // 1. Build Persona System Prompt based on Instructor (Teacher Piseth vs Teacher Sorn)
+    let systemPrompt = '';
+    if (isPiseth) {
+      systemPrompt = `You are Teacher Piseth (អ្នកគ្រូពិសិដ្ឋ), a gentle, loving, patient, and highly encouraging female English teacher specializing in beginner foundation, phonics, and elementary English at Teacher SSOnline English Academy (វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline).
+You speak warm, kind, and polite Khmer (ភាសាខ្មែរ) and crystal clear, simple American English.
+Always refer to yourself as អ្នកគ្រូពិសិដ្ឋ (Teacher Piseth) or អ្នកគ្រូ when replying in Khmer.
+Address the student warmly and affectionately as កូនៗ, ប្អូន, or សិស្សជាទីស្រឡាញ់.
+Explain everything in the simplest, friendliest, step-by-step manner. Include clear pronunciation guides (សូរសព្ទ), lots of friendly emojis (🌟, 📚, 💖, 👏), and easy beginner examples.
+Always encourage and praise the student's effort!`;
+    } else {
+      systemPrompt = `You are Teacher Sorn (គ្រូសន), a renowned and encouraging English teacher at Teacher SSOnline English Institute (វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline).
 You speak fluent Khmer (ភាសាខ្មែរ) and natural American/British English.
 Always refer to yourself as គ្រូសន (Teacher Sorn) when replying in Khmer.
 Structure your answers clearly using clean Markdown, bold headers, bullet points, and practical examples.
 Keep your tone warm, friendly, professional, and educational.`;
+    }
 
     if (mode === 'grammar') {
       systemPrompt += `\n\n[SPECIAL MODE: GRAMMAR ANALYZER & WRITING COACH]
@@ -1936,6 +1968,7 @@ Provide practical English pronunciation coaching:
           isTelegram: !!account.linkedTelegramId,
           linkedTelegramId: account.linkedTelegramId || null,
           isVIP,
+          isAdmin: await isUserAdmin(effectiveUserId),
           yearlyEligible: yearly.eligible,
           vipDetails: yearly
         },
@@ -2006,6 +2039,7 @@ Provide practical English pronunciation coaching:
           phone: tgProfile.phone || null,
           isTelegram: true,
           isVIP,
+          isAdmin: await isUserAdmin(telegramUserId),
           yearlyEligible: yearly.eligible,
           vipDetails: yearly,
           completedLessonsCount: Object.keys(tgData.completed_lessons || {}).length,
@@ -2058,6 +2092,7 @@ Provide practical English pronunciation coaching:
           phone: profile.phone || null,
           username: profile.username || '',
           gmail: profile.gmail || null,
+          isAdmin: await isUserAdmin(userId),
           isVIP,
           vipDetails: yearly,
           completedLessons,
@@ -2135,16 +2170,59 @@ Provide practical English pronunciation coaching:
         }))
       }));
 
-      res.json({ success: true, months: summaryMonths });
+      // Beginner Course taught by Teacher Piseth (អ្នកគ្រូពិសិដ្ឋ)
+      const summaryBeginner = {
+        id: beginnerCourse.id,
+        title: beginnerCourse.title,
+        teacher: beginnerCourse.teacher,
+        weeksCount: beginnerCourse.weeks.length,
+        weeks: beginnerCourse.weeks.map(w => ({
+          id: w.id,
+          title: w.title,
+          description: w.description,
+          lessonsCount: w.lessons.length,
+          lessons: w.lessons.map(l => ({
+            id: l.id,
+            title: l.title
+          }))
+        }))
+      };
+
+      res.json({ success: true, months: summaryMonths, beginner: summaryBeginner });
     } catch (err) {
       res.status(500).json({ error: 'Failed to fetch curriculum' });
     }
   });
 
-  router.get('/lesson/:monthId/:weekId/:lessonId', (req, res) => {
+  function extractYouTubeVideoId(url) {
+    if (!url || typeof url !== 'string') return null;
+    const clean = url.trim();
+    if (/^[a-zA-Z0-9_-]{11}$/.test(clean)) return clean;
+    const m1 = clean.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+    if (m1) return m1[1];
+    const m2 = clean.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+    if (m2) return m2[1];
+    const m3 = clean.match(/embed\/([a-zA-Z0-9_-]{11})/);
+    if (m3) return m3[1];
+    const m4 = clean.match(/shorts\/([a-zA-Z0-9_-]{11})/);
+    if (m4) return m4[1];
+    return null;
+  }
+
+  router.get('/lesson/:monthId/:weekId/:lessonId', async (req, res) => {
     try {
       const { monthId, weekId, lessonId } = req.params;
-      const month = curriculum.months.find(m => m.id === monthId);
+      
+      let month = null;
+      let isBeginner = false;
+
+      if (monthId === 'beginner' || monthId === 'm0') {
+        isBeginner = true;
+        month = beginnerCourse;
+      } else {
+        month = curriculum.months.find(m => m.id === monthId);
+      }
+
       if (!month) return res.status(404).json({ error: 'Month not found' });
 
       const week = month.weeks.find(w => w.id === weekId);
@@ -2153,18 +2231,94 @@ Provide practical English pronunciation coaching:
       const lesson = week.lessons.find(l => l.id === lessonId);
       if (!lesson) return res.status(404).json({ error: 'Lesson not found' });
 
+      // Fetch saved video if available from Firebase Realtime Database
+      let videoData = null;
+      if (db) {
+        try {
+          const videoKey = `${monthId}_${weekId}_${lessonId}`;
+          const vSnap = await db.ref(`curriculum_videos/${videoKey}`).once('value');
+          videoData = vSnap.val();
+        } catch (e) {
+          console.warn('Error reading video data:', e.message);
+        }
+      }
+
       res.json({
         success: true,
+        isBeginner,
+        teacher: isBeginner ? beginnerCourse.teacher : {
+          id: 'sorn',
+          name: 'គ្រូសន',
+          englishName: 'Teacher Sorn',
+          avatar: '👨‍🏫',
+          role: 'នាយកវិទ្យាស្ថាន & គ្រូបង្រៀនភាសាអង់គ្លេសទូទៅ'
+        },
         month: { id: month.id, title: month.title },
         week: { id: week.id, title: week.title },
         lesson: {
           id: lesson.id,
           title: lesson.title,
-          content: lesson.content
+          content: lesson.content,
+          video: videoData ? { videoId: videoData.videoId, updatedAt: videoData.updatedAt } : null
         }
       });
     } catch (err) {
       res.status(500).json({ error: 'Failed to fetch lesson' });
+    }
+  });
+
+  // Admin Only Endpoint: Add / Update / Delete Lesson Video
+  router.post('/lesson/video/update', async (req, res) => {
+    try {
+      const { userId, monthId, weekId, lessonId, youtubeUrl, action } = req.body;
+      if (!userId) return res.status(401).json({ error: 'សូមចូលគណនីជា Admin ជាមុនសិន' });
+
+      // Strict Admin Permission Check
+      const adminAuthorized = await isUserAdmin(userId);
+      if (!adminAuthorized) {
+        return res.status(403).json({ error: '⛔ អ្នកគ្មានសិទ្ធិជា Admin ក្នុងការបញ្ចូល ឬកែប្រែវីដេអូទេ!' });
+      }
+
+      if (!monthId || !weekId || !lessonId) {
+        return res.status(400).json({ error: 'Missing lesson parameters' });
+      }
+
+      if (!db) return res.status(500).json({ error: 'Database disconnected' });
+
+      const videoKey = `${monthId}_${weekId}_${lessonId}`;
+
+      // If action is delete
+      if (action === 'delete' || !youtubeUrl || !youtubeUrl.trim()) {
+        await db.ref(`curriculum_videos/${videoKey}`).remove();
+        return res.json({
+          success: true,
+          message: 'បានលុបវីដេអូចេញពីមេរៀននេះដោយជោគជ័យ!',
+          video: null
+        });
+      }
+
+      const videoId = extractYouTubeVideoId(youtubeUrl);
+      if (!videoId) {
+        return res.status(400).json({ error: 'Link YouTube មិនត្រឹមត្រូវ! សូមពិនិត្យមើល Link ម្តងទៀត (ឧ. https://youtu.be/... ឬ https://youtube.com/watch?v=...)' });
+      }
+
+      const videoData = {
+        videoId,
+        youtubeUrl: `https://www.youtube.com/watch?v=${videoId}`,
+        updatedAt: Date.now(),
+        updatedBy: userId
+      };
+
+      await db.ref(`curriculum_videos/${videoKey}`).set(videoData);
+
+      return res.json({
+        success: true,
+        message: 'បានបញ្ចូល និងរក្សាទុកវីដេអូបង្រៀនដោយជោគជ័យ!',
+        video: { videoId: videoData.videoId, updatedAt: videoData.updatedAt }
+      });
+    } catch (err) {
+      console.error('Update lesson video error:', err);
+      res.status(500).json({ error: 'បរាជ័យក្នុងការរក្សាទុកវីដេអូ' });
     }
   });
 
@@ -2212,12 +2366,20 @@ Provide practical English pronunciation coaching:
         rawQuestions = generateAnnualSubjectQuiz(curriculum, subjectKey, 20);
         quizTitle = SUBJECT_EXAMS[subjectKey].title;
       } else {
-        // Lesson quiz
-        const qList = generateQuiz(curriculum, monthId, weekId, lessonId);
+        // Lesson quiz (Standard Curriculum or Beginner Course)
+        let qList = [];
+        let l = null;
+        if (monthId === 'beginner' || monthId === 'm0') {
+          const w = beginnerCourse.weeks.find(w => w.id === weekId);
+          l = w?.lessons.find(l => l.id === lessonId);
+          qList = l ? generateQuiz(l) : [];
+        } else {
+          qList = generateQuiz(curriculum, monthId, weekId, lessonId);
+          const m = curriculum.months.find(m => m.id === monthId);
+          const w = m?.weeks.find(w => w.id === weekId);
+          l = w?.lessons.find(l => l.id === lessonId);
+        }
         rawQuestions = qList || [];
-        const m = curriculum.months.find(m => m.id === monthId);
-        const w = m?.weeks.find(w => w.id === weekId);
-        const l = w?.lessons.find(l => l.id === lessonId);
         quizTitle = l ? l.title : 'Lesson Quiz';
       }
 
@@ -2526,7 +2688,7 @@ Provide practical English pronunciation coaching:
 
   router.post('/tts', async (req, res) => {
     try {
-      const { text, lang } = req.body;
+      const { text, lang, tutor } = req.body;
       if (!text) return res.status(400).json({ error: 'Missing text parameter' });
 
       // Clean text of emojis & markdown
@@ -2535,10 +2697,13 @@ Provide practical English pronunciation coaching:
 
       // Check for Khmer unicode characters (\u1780-\u17FF)
       const hasKhmer = /[\u1780-\u17FF]/.test(cleanText);
-      // If there are Khmer characters, ALWAYS use km-KH-PisethNeural so both Khmer and English words are read properly!
-      // An English voice (en-US-AriaNeural) skips/mutes all Khmer words!
       const isPureEnglish = (lang === 'en' && !hasKhmer) || (!hasKhmer && /[a-zA-Z]{3,}/.test(cleanText));
-      const voice = isPureEnglish ? 'en-US-GuyNeural' : 'km-KH-PisethNeural';
+      
+      // Female voice for Teacher Piseth (អ្នកគ្រូពិសិដ្ឋ) vs Male voice for Teacher Sorn (គ្រូសន)
+      const isPisethTutor = tutor === 'piseth';
+      const voice = isPureEnglish 
+        ? (isPisethTutor ? 'en-US-JennyNeural' : 'en-US-GuyNeural')
+        : (isPisethTutor ? 'km-KH-SreymomNeural' : 'km-KH-PisethNeural');
 
       const edgeTts = new MsEdgeTTS();
       await edgeTts.setMetadata(voice, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
@@ -2564,7 +2729,7 @@ Provide practical English pronunciation coaching:
   // 1. General & Lesson AI Chatbot Endpoint
   router.post('/chat', async (req, res) => {
     try {
-      const { userId, message, lessonTitle, preferredAI, mode, extraContext, clientHistory } = req.body;
+      const { userId, message, lessonTitle, preferredAI, mode, extraContext, clientHistory, tutor } = req.body;
       if (!message || !message.trim()) {
         return res.status(400).json({ error: 'Missing message parameter' });
       }
@@ -2575,7 +2740,8 @@ Provide practical English pronunciation coaching:
         preferredAI: preferredAI || 'auto',
         mode: mode || 'chat',
         extraContext,
-        clientHistory
+        clientHistory,
+        tutor: tutor || (lessonTitle && (lessonTitle.includes('ថ្នាក់ដំបូង') || lessonTitle.includes('Piseth') || lessonTitle.includes('ពិសិដ្ឋ')) ? 'piseth' : 'sorn')
       });
 
       res.json({
