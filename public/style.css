@@ -3645,3 +3645,295 @@ body.night-mode-full .lesson-drawer {
   box-shadow: -15px 0 50px rgba(0, 0, 0, 0.85);
 }
 
+/* ====================================================
+   DAY MODE: CRISP BLACK/DARK TEXT (ពេលថ្ងៃអក្សរខ្មៅច្បាស់)
+   ==================================================== */
+body.day-mode,
+body.day-mode p,
+body.day-mode span:not(.badge-status):not(.pulse-dot):not(.user-tier-badge):not(.gradient-text):not(.google-icon-svg):not(.theme-icon),
+body.day-mode h1,
+body.day-mode h2,
+body.day-mode h3,
+body.day-mode h4,
+body.day-mode h5,
+body.day-mode h6,
+body.day-mode .hero-title,
+body.day-mode .hero-desc,
+body.day-mode .section-title h2,
+body.day-mode .section-title p,
+body.day-mode .brand-title,
+body.day-mode .art-title,
+body.day-mode .art-director,
+body.day-mode .sync-title,
+body.day-mode .sync-sub,
+body.day-mode .nav-item,
+body.day-mode .user-name,
+body.day-mode .month-tab-btn,
+body.day-mode .lesson-title,
+body.day-mode .lesson-desc,
+body.day-mode .lesson-name,
+body.day-mode .card-title,
+body.day-mode .card-desc,
+body.day-mode .exam-card-title,
+body.day-mode .exam-desc,
+body.day-mode .modal-title,
+body.day-mode .prof-item .val,
+body.day-mode .prof-item .label,
+body.day-mode .drawer-name,
+body.day-mode .ai-bubble-content,
+body.day-mode .ai-bubble-author,
+body.day-mode .verbs-table th,
+body.day-mode .verbs-table td,
+body.day-mode label,
+body.day-mode .stat-val,
+body.day-mode .stat-label,
+body.day-mode .quiz-question-text,
+body.day-mode .quiz-option-text,
+body.day-mode .lesson-drawer-content,
+body.day-mode .lesson-section-title,
+body.day-mode .lesson-explanation,
+body.day-mode .grammar-rule,
+body.day-mode .vocab-word,
+body.day-mode .vocab-meaning,
+body.day-mode .tts-btn,
+body.day-mode .copy-btn,
+body.day-mode .player-time,
+body.day-mode .btn-glass,
+body.day-mode .btn-outline {
+  color: #0f172a !important;
+}
+
+body.day-mode .hero-desc,
+body.day-mode .section-title p,
+body.day-mode .sync-sub,
+body.day-mode .lesson-desc,
+body.day-mode .card-desc,
+body.day-mode .art-director,
+body.day-mode .prof-item .label,
+body.day-mode .verbs-table td,
+body.day-mode .text-muted,
+body.day-mode .text-slate-400,
+body.day-mode .text-slate-300 {
+  color: #334155 !important;
+}
+
+/* Day Mode Navbar & Header */
+body.day-mode .navbar {
+  background: rgba(255, 255, 255, 0.94) !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+}
+
+body.day-mode .nav-item {
+  color: #334155 !important;
+}
+body.day-mode .nav-item:hover {
+  color: #0f172a !important;
+  background: rgba(0, 0, 0, 0.05) !important;
+}
+body.day-mode .nav-item.active {
+  color: #4f46e5 !important;
+  background: rgba(79, 70, 229, 0.1) !important;
+  border-color: rgba(79, 70, 229, 0.3) !important;
+}
+
+/* Day Mode Glass Panels & Cards */
+body.day-mode .glass-panel {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.06) !important;
+}
+
+body.day-mode .hero-card {
+  background: linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%) !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.08) !important;
+}
+
+body.day-mode .hero-badge {
+  background: rgba(79, 70, 229, 0.1) !important;
+  border-color: rgba(79, 70, 229, 0.25) !important;
+  color: #4f46e5 !important;
+}
+
+body.day-mode .art-card {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08) !important;
+}
+
+body.day-mode .sync-banner {
+  background: linear-gradient(135deg, rgba(6, 182, 212, 0.08) 0%, #ffffff 100%) !important;
+  border: 1px solid #cbd5e1 !important;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Day Mode Lesson Cards & Tabs */
+body.day-mode .month-tab-btn {
+  background: #f1f5f9 !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #334155 !important;
+}
+body.day-mode .month-tab-btn.active {
+  background: #4f46e5 !important;
+  color: #ffffff !important;
+  border-color: #4f46e5 !important;
+}
+
+body.day-mode .lesson-card {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05) !important;
+}
+body.day-mode .lesson-card:hover {
+  background: #f8fafc !important;
+  border-color: #818cf8 !important;
+  box-shadow: 0 10px 25px rgba(79, 70, 229, 0.12) !important;
+}
+
+/* Day Mode Modals */
+body.day-mode .modal-overlay {
+  background: rgba(15, 23, 42, 0.45) !important;
+  backdrop-filter: blur(8px) !important;
+}
+body.day-mode .modal-card {
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15) !important;
+}
+body.day-mode .profile-info-list {
+  background: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+/* Day Mode Inputs */
+body.day-mode input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+body.day-mode textarea,
+body.day-mode select {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border: 1px solid #cbd5e1 !important;
+}
+body.day-mode input:focus,
+body.day-mode textarea:focus,
+body.day-mode select:focus {
+  border-color: #4f46e5 !important;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2) !important;
+}
+
+/* Day Mode Verbs Table */
+body.day-mode .verbs-table-container {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.05) !important;
+}
+body.day-mode .verbs-table th {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+  border-bottom: 2px solid #cbd5e1 !important;
+}
+body.day-mode .verbs-table td {
+  border-bottom: 1px solid #e2e8f0 !important;
+  color: #0f172a !important;
+}
+body.day-mode .verbs-table tr:hover td {
+  background: rgba(79, 70, 229, 0.05) !important;
+}
+
+/* Day Mode AI Tutor Studio */
+body.day-mode .ai-studio-chat-card {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06) !important;
+}
+body.day-mode .chat-bubble.ai {
+  background: #f1f5f9 !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #0f172a !important;
+}
+body.day-mode .ai-bubble-badge {
+  background: rgba(79, 70, 229, 0.1) !important;
+  color: #4f46e5 !important;
+  border: 1px solid rgba(79, 70, 229, 0.25) !important;
+}
+body.day-mode .tts-btn,
+body.day-mode .copy-btn {
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #334155 !important;
+}
+body.day-mode .tts-btn:hover,
+body.day-mode .copy-btn:hover {
+  background: #e0e7ff !important;
+  color: #4338ca !important;
+  border-color: #6366f1 !important;
+}
+
+/* Day Mode Floating Drawer */
+body.day-mode .floating-chat-drawer {
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.15) !important;
+}
+body.day-mode .drawer-pill {
+  background: #f1f5f9 !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #334155 !important;
+}
+body.day-mode .drawer-pill:hover {
+  background: #4f46e5 !important;
+  color: #ffffff !important;
+}
+body.day-mode .drawer-action-btn {
+  background: #f1f5f9 !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #334155 !important;
+}
+
+/* Day Mode Lesson Drawer */
+body.day-mode .lesson-drawer {
+  background: #ffffff !important;
+  border-left: 1px solid #e2e8f0 !important;
+  box-shadow: -10px 0 35px rgba(0, 0, 0, 0.1) !important;
+}
+body.day-mode .lesson-tab-btn {
+  background: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #334155 !important;
+}
+body.day-mode .lesson-tab-btn.active {
+  background: #4f46e5 !important;
+  color: #ffffff !important;
+}
+body.day-mode .lesson-vocab-item {
+  background: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+/* Day Mode Audio Player */
+body.day-mode .bubble-audio-player {
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08) !important;
+}
+body.day-mode .player-ctrl-btn {
+  background: #f1f5f9 !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #0f172a !important;
+}
+body.day-mode .player-ctrl-btn.play-pause-btn {
+  background: #4f46e5 !important;
+  color: #ffffff !important;
+}
+body.day-mode .player-seek-slider {
+  background: #e2e8f0 !important;
+}
+body.day-mode .player-time {
+  color: #334155 !important;
+}
+
+/* Ambient glow subtle in day mode */
+body.day-mode .ambient-glow {
+  opacity: 0.03 !important;
+}
+
