@@ -1347,132 +1347,82 @@ function cancelAuthWaiting() {
   closeModal('authWaitingModal');
 }
 
-async function startGoogleSecurityAuth() {
+let isAuthSubmitting = false;
+
+async function handleChromeGmailAutoSelected(val) {
+  if (!val) return;
+  const cleanEmail = val.trim().toLowerCase();
+  if (cleanEmail.endsWith('@gmail.com') && !isAuthSubmitting) {
+    isAuthSubmitting = true;
+    showToast(`⚡ បានជ្រើសរើស Gmail ពី Chrome: ${cleanEmail}! កំពុងចូលរៀន...`, 'info');
+    try {
+      await sendGoogleAuthToServer({
+        email: cleanEmail,
+        name: cleanEmail.split('@')[0],
+        googleId: 'g_' + Math.random().toString(36).substring(2, 10)
+      });
+    } catch (err) {
+      isAuthSubmitting = false;
+      showToast(err.message, 'error');
+    }
+  }
+}
+
+async function triggerChromeGoogleAuth() {
   try {
-    showToast('⏳ កំពុងហៅប្រព័ន្ធសុវត្ថិភាព Google...', 'info');
+    showToast('⏳ កំពុងហៅគណនី Gmail ពី Chrome...', 'info');
 
-    let gUser = null;
-
-    // 1. Try Firebase Google Sign-In Popup (Select account UI)
+    // 1. Try Firebase Google Popup (natively opens Chrome's Google Account Picker)
     if (window.firebase && window.firebase.auth) {
       try {
         const provider = new firebase.auth.GoogleAuthProvider();
         provider.setCustomParameters({ prompt: 'select_account' });
         const result = await firebase.auth().signInWithPopup(provider);
         if (result && result.user && result.user.email) {
-          gUser = {
+          return await sendGoogleAuthToServer({
             email: result.user.email,
             name: result.user.displayName || result.user.email.split('@')[0],
             photoUrl: result.user.photoURL || '',
             googleId: result.user.uid
-          };
+          });
         }
       } catch (fbErr) {
-        console.warn('Firebase popup note:', fbErr.message);
+        console.warn('Firebase popup attempt:', fbErr.message);
       }
     }
 
-    // 2. Fallback to quick seamless prompt if popup is blocked
-    if (!gUser || !gUser.email) {
-      const promptGmail = prompt('សូមជ្រើសរើស ឬបញ្ចូលអាសយដ្ឋាន Gmail (@gmail.com) របស់អ្នកដើម្បីទទួលសំបុត្រ Confirm៖');
-      if (!promptGmail) return;
-
-      const cleanGmail = promptGmail.trim().toLowerCase();
-      if (!cleanGmail.endsWith('@gmail.com')) {
-        return showToast('❌ តម្រូវឱ្យប្រើប្រាស់គណនី Gmail (@gmail.com) ប៉ុណ្ណោះ!', 'error');
-      }
-
-      gUser = {
-        email: cleanGmail,
-        name: cleanGmail.split('@')[0],
-        googleId: 'g_' + Math.random().toString(36).substring(2, 10)
-      };
-    }
-
-    // Close select modals
-    closeModal('loginModal');
-    closeModal('registerModal');
-
-    // 3. Dispatch security confirmation email request to server
-    showToast('✉️ កំពុងផ្ញើសំបុត្របញ្ជាក់សុវត្ថិភាពទៅ Gmail...', 'info');
-    const deviceId = getOrCreateDeviceId();
-    const res = await fetch('/api/auth/google-start-confirmation', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...gUser,
-        deviceId,
-        userAgent: navigator.userAgent
-      })
-    });
-
-    const data = await res.json();
-    if (!data.success) throw new Error(data.error || 'ផ្ញើសំបុត្របញ្ជាក់មិនជោគជ័យ');
-
-    // If server does not have SMTP credentials configured yet, complete direct login safely
-    if (!data.delivered) {
-      console.warn('SMTP not configured on server, establishing direct Google Auth session...');
-      return await sendGoogleAuthToServer({
-        ...gUser,
-        deviceId
-      });
-    }
-
-    // 4. Open Auth Waiting Modal
-    const icon = document.getElementById('authWaitingIcon');
-    const title = document.getElementById('authWaitingTitle');
-    const desc = document.getElementById('authWaitingDesc');
-    const status = document.getElementById('authWaitingStatus');
-
-    if (icon) {
-      icon.textContent = '✉️';
-      icon.className = 'w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl animate-pulse bg-sky-500/20 border border-sky-500/40 text-sky-400';
-    }
-    if (title) title.textContent = `✉️ សូមពិនិត្យ Gmail (${data.email})`;
-    if (desc) {
-      desc.innerHTML = `ប្រព័ន្ធបានបញ្ជូនសំបុត្របញ្ជាក់សុវត្ថិភាពទៅកាន់ <strong>${data.email}</strong> រួចរាល់ហើយ។<br>សូមបើក Gmail (Inbox ឬ Spam) របស់អ្នក រួចចុចប៊ូតុង <strong>«✅ ចុចបញ្ជាក់ និងចូលរៀន (Confirm)»</strong> ដើម្បីចូលរៀនលើ Browser នេះស្វ័យប្រវត្ត។`;
-    }
-    if (status) status.textContent = '⏳ កំពុងរង់ចាំលោកអ្នកចុច Confirm លើ Gmail...';
-
-    openModal('authWaitingModal');
-
-    // 5. Poll for confirmation from student's Gmail
-    if (googleConfirmPollInterval) clearInterval(googleConfirmPollInterval);
-    const token = data.token;
-    let pollCount = 0;
-
-    googleConfirmPollInterval = setInterval(async () => {
-      pollCount++;
-      if (pollCount > 150) { // 5 minutes timeout
-        clearInterval(googleConfirmPollInterval);
-        googleConfirmPollInterval = null;
-        closeModal('authWaitingModal');
-        showToast('⏳ ការបញ្ជាក់ផុតកំណត់ពេល។ សូមសាកល្បងម្តងទៀត។', 'warning');
-        return;
-      }
-
+    // 2. Try Google Identity Services One Tap if initialized
+    if (window.google && window.google.accounts && window.google.accounts.id) {
       try {
-        const pollRes = await fetch(`/api/auth/confirm-email/status?token=${encodeURIComponent(token)}&deviceId=${encodeURIComponent(deviceId)}`);
-        const pollData = await pollRes.json();
-
-        if (pollData.verified && pollData.user) {
-          clearInterval(googleConfirmPollInterval);
-          googleConfirmPollInterval = null;
-          closeModal('authWaitingModal');
-          setCurrentUser(pollData.user, pollData.sessionToken, pollData.deviceId);
-          showToast(`🎉 ស្វាគមន៍ ${pollData.user.name}! បញ្ជាក់សុវត្ថិភាព Gmail ជោគជ័យ`, 'success');
-          refreshUserProfile();
-        }
+        window.google.accounts.id.prompt();
       } catch (e) {}
-    }, 2000);
+    }
 
+    // 3. Focus Chrome's auto-select input so Chrome displays the saved account chip
+    const loginInput = document.getElementById('loginChromeGmailInput');
+    const regInput = document.getElementById('regChromeGmailInput');
+    const targetInput = (!document.getElementById('loginModal')?.classList.contains('hidden') && loginInput)
+      ? loginInput
+      : regInput;
+
+    if (targetInput) {
+      targetInput.focus();
+      targetInput.click();
+    } else {
+      const promptGmail = prompt('សូមជ្រើសរើស ឬបញ្ចូលអាសយដ្ឋាន Gmail (@gmail.com) របស់អ្នកពី Chrome៖');
+      if (promptGmail) handleChromeGmailAutoSelected(promptGmail);
+    }
   } catch (err) {
-    showToast(err.message || 'មានបញ្ហាក្នុងការផ្ទៀងផ្ទាត់ Google', 'error');
+    showToast(err.message, 'error');
   }
 }
 
+async function startGoogleSecurityAuth() {
+  return triggerChromeGoogleAuth();
+}
+
 // Backward compatibility alias
-const handleGoogleSignIn = startGoogleSecurityAuth;
+const handleGoogleSignIn = triggerChromeGoogleAuth;
 
 async function sendGoogleAuthToServer(payload) {
   showToast('⏳ កំពុងផ្ទៀងផ្ទាត់គណនី Google...', 'info');

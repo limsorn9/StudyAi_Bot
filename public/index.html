@@ -11,6 +11,9 @@
   <!-- Firebase Web SDK for Google Sign-in -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  
+  <!-- Google Identity Services (Chrome One Tap & Native Sign-In) -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
 
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -609,19 +612,23 @@
         <p class="text-sm text-slate-300">ចូលរៀនរហ័ស & សុវត្ថិភាពខ្ពស់ (មិនបាច់វាយអក្សរ ០-Typing)៖</p>
       </div>
 
-      <!-- Option 1: Google Security (Gmail) -->
+      <!-- Option 1: Google Security (Gmail from Chrome) -->
       <div class="google-auth-btn-wrap mb-3">
-        <button type="button" class="btn btn-google btn-block btn-lg" onclick="startGoogleSecurityAuth()">
+        <button type="button" class="btn btn-google btn-block btn-lg" onclick="triggerChromeGoogleAuth()">
           <svg class="google-icon-svg" viewBox="0 0 24 24">
             <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.15z"/>
             <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
             <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
             <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
           </svg>
-          <span>🌐 ចូលរៀនតាមប្រព័ន្ធសុវត្ថិភាព Google (Gmail)</span>
+          <span>🌐 ហៅ Gmail ពី Chrome (1-Click Google)</span>
         </button>
-        <div class="text-xs text-slate-400 mt-1 text-center">
-          រើស Gmail របស់អ្នក ➜ ផ្ញើសំបុត្របញ្ជាក់ ➜ ចុច Confirm ក្នុង Gmail ចូលរៀនភ្លាមៗ
+        <div class="mt-2 p-3 bg-slate-800/80 border border-slate-700/80 rounded-xl text-left">
+          <label class="text-xs text-slate-300 block mb-1">⚡ រើស Gmail ពី Chrome ភ្លាមៗ (Auto-Select)៖</label>
+          <input type="email" id="loginChromeGmailInput" autocomplete="email" placeholder="ចុចទីនេះដើម្បីរើស Gmail ពី Chrome" class="form-input text-sm font-semibold tracking-wide text-center" oninput="handleChromeGmailAutoSelected(this.value)">
+          <div class="text-[11px] text-slate-400 text-center mt-1">
+            👉 គ្រាន់តែចុចលើប្រអប់នេះ Chrome នឹងបង្ហាញ Gmail របស់អ្នកឱ្យរើសភ្លាមៗ (០-Typing)
+          </div>
         </div>
       </div>
 
@@ -672,19 +679,23 @@
         <p class="text-sm text-slate-300">ចុះឈ្មោះរហ័ស មិនបាច់វាយអក្សរ (0-Typing System)៖</p>
       </div>
 
-      <!-- Option 1: Google Security (Gmail) -->
+      <!-- Option 1: Google Security (Gmail from Chrome) -->
       <div class="google-auth-btn-wrap mb-3">
-        <button type="button" class="btn btn-google btn-block btn-lg" onclick="startGoogleSecurityAuth()">
+        <button type="button" class="btn btn-google btn-block btn-lg" onclick="triggerChromeGoogleAuth()">
           <svg class="google-icon-svg" viewBox="0 0 24 24">
             <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.15z"/>
             <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
             <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
             <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
           </svg>
-          <span>🌐 ចុះឈ្មោះតាមប្រព័ន្ធសុវត្ថិភាព Google (Gmail)</span>
+          <span>🌐 ហៅ Gmail ពី Chrome ចុះឈ្មោះភ្លាមៗ</span>
         </button>
-        <div class="text-xs text-slate-400 mt-1 text-center">
-          រើស Gmail របស់អ្នក ➜ ផ្ញើសំបុត្របញ្ជាក់ ➜ ចុច Confirm ក្នុង Gmail ចូលរៀនភ្លាមៗ
+        <div class="mt-2 p-3 bg-slate-800/80 border border-slate-700/80 rounded-xl text-left">
+          <label class="text-xs text-slate-300 block mb-1">⚡ រើស Gmail ពី Chrome ភ្លាមៗ (Auto-Select)៖</label>
+          <input type="email" id="regChromeGmailInput" autocomplete="email" placeholder="ចុចទីនេះដើម្បីរើស Gmail ពី Chrome" class="form-input text-sm font-semibold tracking-wide text-center" oninput="handleChromeGmailAutoSelected(this.value)">
+          <div class="text-[11px] text-slate-400 text-center mt-1">
+            👉 គ្រាន់តែចុចលើប្រអប់នេះ Chrome នឹងបង្ហាញ Gmail របស់អ្នកឱ្យរើសភ្លាមៗ (០-Typing)
+          </div>
         </div>
       </div>
 
