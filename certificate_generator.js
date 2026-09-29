@@ -80,11 +80,7 @@ async function generateCertificateHTML(data) {
     finalStudentName = data.khmerName;
   }
 
-  const studentPhotoTag = data.photoUrl ? `
-    <div class="stu-photo-frame" style="width: 82px; height: 104px; border: 2px solid #b8860b; border-radius: 4px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.15); background: #f8fafc;">
-      <img src="${data.photoUrl}" alt="Student Photo" style="width: 100%; height: 100%; object-fit: cover;">
-    </div>
-  ` : '';
+
 
   const baseUrl = process.env.RENDER_EXTERNAL_URL || process.env.BASE_URL || '';
   const botUser = process.env.TELEGRAM_BOT_USERNAME || 'StudyAiEngKH_bot';
@@ -142,6 +138,13 @@ async function generateCertificateHTML(data) {
   const qrTag     = qrDataUrl          ? `<div class="qr-frame"><img src="${qrDataUrl}" alt="QR"/></div>`   : '';
   const sigTag    = directorSigDataUrl ? `<img src="${directorSigDataUrl}" alt="Director Signature" class="sig-director" />` : '<div style="height:60px;"></div>';
   const stampOvr  = schoolStampDataUrl ? `<img src="${schoolStampDataUrl}" alt="Official Stamp" class="stamp-official" />` : '';
+
+  // Student Photo in Header (no stamp, elegant frame)
+  const studentPhotoTag = data.photoUrl ? `
+    <div class="stu-photo-frame">
+      <img src="${data.photoUrl}" alt="Student Photo" class="stu-photo-img" />
+    </div>
+  ` : '';
 
   return `<!DOCTYPE html>
 <html lang="km">
@@ -235,7 +238,28 @@ async function generateCertificateHTML(data) {
       object-fit: contain; border-radius: 50%;
       filter: drop-shadow(0 4px 12px rgba(0,0,0,0.18));
     }
-    .hdr-spacer { width: 260px; } /* Balanced spacer matching logo side */
+    .hdr-spacer {
+      width: 260px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding-top: 15px;
+    }
+    .stu-photo-frame {
+      width: 82px;
+      height: 104px;
+      border: 2px solid #b8860b;
+      border-radius: 4px;
+      overflow: hidden;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+      background: #f8fafc;
+    }
+    .stu-photo-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
     .hdr-center { flex: 1; text-align: center; padding: 0 10px; }
     .kingdom-box { margin-bottom: 3px; }
     .kingdom-title {
@@ -310,7 +334,7 @@ async function generateCertificateHTML(data) {
 
     /* QR Col (Left) */
     .qr-col {
-      display: flex; flex-direction: column; gap: 2px; width: 140px;
+      display: flex; flex-direction: column; gap: 2px; width: 140px; margin-bottom: 4px;
     }
     .qr-frame {
       background: #fff; border: 2px solid #c5a059; border-radius: 6px;
@@ -333,24 +357,25 @@ async function generateCertificateHTML(data) {
     .cert-code-pill {
       margin-top: 5px; font-size: 8.5px; color: #8b1c1c; font-weight: 800;
       background: rgba(139,28,28,0.06); padding: 3px 10px; border-radius: 12px;
-      border: 1px solid rgba(139,28,28,0.15);
+      border: 1px solid rgba(139,28,28,0.15); display: inline-block;
     }
 
     /* ========================================================
        DIRECTOR BLOCK: EXACT REPLICA OF USER'S 100% MOCKUP IMAGE
+       Stamp height = logo height = 175px
        ======================================================== */
     .dir-block {
       position: relative;
-      width: 480px;
-      height: 215px;
+      width: 460px;
+      height: 200px;
     }
 
     .stamp-official {
       position: absolute;
       left: 0;
       top: 0;
-      width: 195px;
-      height: 195px;
+      width: 175px;
+      height: 175px; /* Exactly matches logo height (175px) */
       object-fit: contain;
       z-index: 1;
       pointer-events: none;
@@ -359,8 +384,8 @@ async function generateCertificateHTML(data) {
 
     .dir-date-khmer {
       position: absolute;
-      left: 125px;
-      top: 32px;
+      left: 112px;
+      top: 25px;
       z-index: 2;
       font-family: 'Battambang', sans-serif;
       font-size: 13px;
@@ -371,8 +396,8 @@ async function generateCertificateHTML(data) {
 
     .dir-role-kh {
       position: absolute;
-      left: 160px;
-      top: 60px;
+      left: 145px;
+      top: 52px;
       z-index: 2;
       font-family: 'Khmer OS Muol Light', 'Khmer OS Moul Light', 'Moul', cursive;
       font-size: 15px;
@@ -383,18 +408,18 @@ async function generateCertificateHTML(data) {
 
     .sig-director {
       position: absolute;
-      left: 180px;
-      top: 88px;
+      left: 165px;
+      top: 78px;
       z-index: 3;
-      width: 165px;
-      height: 75px;
+      width: 160px;
+      height: 72px;
       object-fit: contain;
     }
 
     .dir-name-kh {
       position: absolute;
-      left: 218px;
-      top: 165px;
+      left: 200px;
+      top: 152px;
       z-index: 2;
       font-family: 'Khmer OS Muol Light', 'Khmer OS Moul Light', 'Moul', cursive;
       font-size: 22px;
@@ -443,7 +468,7 @@ async function generateCertificateHTML(data) {
             <div class="hdr-name-kh">វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline</div>
             <div class="hdr-name-en">TEACHER SSONLINE ENGLISH LANGUAGE INSTITUTE</div>
           </div>
-          <div class="hdr-spacer" style="display: flex; justify-content: flex-end; align-items: center;">${studentPhotoTag}</div>
+          <div class="hdr-spacer">${studentPhotoTag}</div>
         </div>
 
         <div class="orn-div"><div class="orn-bar"></div><span class="orn-sym">✦</span><div class="orn-bar"></div></div>
