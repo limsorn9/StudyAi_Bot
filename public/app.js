@@ -1498,26 +1498,60 @@ async function toggleStudioVoiceRecord() {
 let floatingMediaRecorder;
 let floatingAudioChunks = [];
 
-function toggleFloatingChat() {
+function toggleFloatingChat(forceState) {
   const drawer = document.getElementById('floatingChatDrawer');
-  if (drawer) {
-    drawer.classList.toggle('hidden');
-    if (!drawer.classList.contains('hidden')) {
-      const input = document.getElementById('floatingChatInput');
-      if (input) input.focus();
+  if (!drawer) return;
 
-      // Update context label
-      const label = document.getElementById('floatingContextLabel');
-      if (label) {
-        if (STATE.activeTab === 'lesson' && STATE.currentLesson) {
-          label.textContent = `🟢 មេរៀន៖ ${STATE.currentLesson.title.substring(0, 16)}...`;
-        } else {
-          label.textContent = '🟢 អនឡាញ • ជួយឆ្លើយគ្រប់ទំព័រ';
-        }
+  if (typeof forceState === 'boolean') {
+    if (forceState) {
+      drawer.classList.remove('hidden');
+    } else {
+      drawer.classList.add('hidden');
+    }
+  } else {
+    drawer.classList.toggle('hidden');
+  }
+
+  const isClosed = drawer.classList.contains('hidden');
+  if (!isClosed) {
+    const input = document.getElementById('floatingChatInput');
+    if (input) input.focus();
+
+    // Update context label
+    const label = document.getElementById('floatingContextLabel');
+    if (label) {
+      if (STATE.activeTab === 'lesson' && STATE.currentLesson) {
+        label.textContent = `🟢 មេរៀន៖ ${STATE.currentLesson.title.substring(0, 16)}...`;
+      } else {
+        label.textContent = '🟢 អនឡាញ • ជួយឆ្លើយគ្រប់ទំព័រ';
       }
     }
+    const chatBox = document.getElementById('floatingChatMessagesBox');
+    if (chatBox) chatBox.scrollTop = chatBox.scrollHeight;
   }
 }
+
+function closeFloatingChat() {
+  toggleFloatingChat(false);
+}
+
+// Global listener for ESC key to close floating drawer
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    closeFloatingChat();
+  }
+});
+
+// Click outside to close floating drawer
+document.addEventListener('click', (e) => {
+  const widget = document.getElementById('universalFloatingAi');
+  const drawer = document.getElementById('floatingChatDrawer');
+  if (widget && drawer && !drawer.classList.contains('hidden')) {
+    if (!widget.contains(e.target)) {
+      closeFloatingChat();
+    }
+  }
+});
 
 async function sendFloatingChatMessage() {
   const input = document.getElementById('floatingChatInput');

@@ -2940,55 +2940,102 @@ After the grade, provide helpful feedback in Khmer explaining why they got this 
 
   try {
     let aiResponse = "";
-    if (aiType === 'gemini') {
-      let lastError = null;
-      const geminiModels = ["gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-omni-1.1-flash", "gemma-4-31b-it"];
-      let success = false;
-      
+    let success = false;
+    let lastError = null;
+
+    // 1. FIRST PRIORITY: Groq (Ultra-fast & free quota saver)
+    const groqModels = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'mixtral-8x7b-32768'];
+    if (groqKeys && groqKeys.length > 0) {
+      const maxGroqTries = Math.max(groqKeys.length, 2);
+      for (let kTry = 0; kTry < maxGroqTries; kTry++) {
+        if (success) break;
+        const apiKey = getNextGroqKey();
+        if (!apiKey) continue;
+
+        for (const modelName of groqModels) {
+          try {
+            const groq = new Groq({ apiKey });
+            const chatCompletion = await groq.chat.completions.create({
+              messages: groqMessages,
+              model: modelName,
+              temperature: 0.7,
+              max_tokens: 1200
+            });
+            const text = chatCompletion.choices?.[0]?.message?.content;
+            if (text && text.trim().length > 0) {
+              aiResponse = text.trim();
+              success = true;
+              console.log(`[Telegram AI] Answer generated via Groq (${modelName})`);
+              break;
+            }
+          } catch (error) {
+            lastError = error;
+            console.warn(`[Telegram AI] Groq (${modelName}) failed: ${error.message}. Retrying...`);
+          }
+        }
+      }
+    }
+
+    // 2. SECOND PRIORITY: Gemini (Automatic fallback when Groq quota is exhausted or unavailable)
+    if (!success && geminiKeys && geminiKeys.length > 0) {
+      console.log("[Telegram AI] Groq exhausted or unavailable. Automatically falling back to Gemini...");
+      const geminiModels = [
+        "gemini-flash-lite-latest",
+        "gemini-3.8-flash",
+        "gemini-flash-latest",
+        "gemini-2.5-flash-lite",
+        "gemini-2.5-pro"
+      ];
+      const maxGeminiTries = Math.max(geminiKeys.length, 2);
+
       for (const modelName of geminiModels) {
-        for (let i = 0; i < (geminiKeys.length || 1); i++) {
+        if (success) break;
+        for (let kTry = 0; kTry < maxGeminiTries; kTry++) {
           try {
             const apiKey = getNextGeminiKey();
-            if (!apiKey) throw new Error("No GEMINI_API_KEYS configured in environment");
+            if (!apiKey) continue;
             const genAI = new GoogleGenerativeAI(apiKey);
             const model = genAI.getGenerativeModel({ model: modelName });
             const prompt = `${systemPrompt}\n\n[Past Conversation]\n${pastContextText}\n\nStudent: ${userText}\nTeacher:`;
             const result = await model.generateContent(prompt);
-            aiResponse = result.response.text();
-            lastError = null;
-            success = true;
-            break; // Break key loop
+            const text = result?.response?.text();
+            if (text && text.trim().length > 0) {
+              aiResponse = text.trim();
+              success = true;
+              console.log(`[Telegram AI] Answer generated via Gemini fallback (${modelName})`);
+              break; // Break key loop
+            }
           } catch (error) {
             lastError = error;
-            console.warn(`Gemini (${modelName}) key failed: ${error.message}. Retrying...`);
+            console.warn(`[Telegram AI] Gemini (${modelName}) failed: ${error.message}. Retrying...`);
           }
         }
-        if (success) break; // Break model loop
       }
-      if (lastError && !success) throw lastError;
-    } else if (aiType === 'groq') {
-      let lastError = null;
-      let success = false;
-      for (let i = 0; i < (groqKeys.length || 1); i++) {
-        try {
-          const apiKey = getNextGroqKey();
-          if (!apiKey) throw new Error("No GROQ_API_KEYS configured in environment");
-          const groq = new Groq({ apiKey: apiKey });
-          const chatCompletion = await groq.chat.completions.create({
-            messages: groqMessages,
-            model: 'openai/gpt-oss-120b',
-            temperature: 0.7,
-          });
-          aiResponse = chatCompletion.choices[0]?.message?.content || "No response";
-          lastError = null;
+    }
+
+    // 3. THIRD PRIORITY: OpenAI (Safety net)
+    if (!success && process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== "YOUR_OPENAI_KEY") {
+      try {
+        console.log("[Telegram AI] Falling back to OpenAI...");
+        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+        const res = await openai.chat.completions.create({
+          model: 'gpt-4o-mini',
+          messages: groqMessages,
+          temperature: 0.7
+        });
+        const text = res.choices?.[0]?.message?.content;
+        if (text && text.trim().length > 0) {
+          aiResponse = text.trim();
           success = true;
-          break; // Break loop on success
-        } catch (error) {
-          lastError = error;
-          console.warn(`Groq key failed: ${error.message}. Retrying...`);
+          console.log("[Telegram AI] Answer generated via OpenAI fallback");
         }
+      } catch (err) {
+        lastError = err;
       }
-      if (lastError && !success) throw lastError;
+    }
+
+    if (!success) {
+      throw lastError || new Error("All AI engines (Groq, Gemini, OpenAI) were exhausted or unavailable.");
     }
 
     await saveHistory(userId, 'user', userText); // Saved after fetching history
