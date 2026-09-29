@@ -973,8 +973,32 @@ bot.on('text', async (ctx) => {
   const menuOptions = ['📚 បញ្ជីមេរៀន (Lessons)', '🔄 ប្តូរគ្រូ AI', '🕰️ ប្រវត្តិសិក្សា', '❓ ជំនួយ (Help)'];
   if (menuOptions.includes(userText)) return;
 
-  // AI rate limit check
+  // 💎 VIP Gate - Free account cannot use AI chat
   const isVIP = await checkVIP(userId);
+  if (!isVIP) {
+    return ctx.reply(
+      `🧠 *មុខងារសួរជា AI សម្រាប់ VIP ប៉ុណ្ណោះ!*
+
+ខ្ញុំនឹង Free Account អ្នកអាច:
+✅ មើលមេរៀនទាំងអស់ (គ្រូបភ័ភព្ជីមើល)
+✅ មើលកិរិយាសព្ទប្រែប្រវល
+
+❌ សួរជាគ្រូ AI (ត្រូវការ VIP)
+❌ អានសម្លង (ត្រូវការ VIP)
+❌ ប្រឡង Quiz (ត្រូវការ VIP)
+❌ ផ្ញើសារជាសម្លង (ត្រូវការ VIP)
+
+💰 *តម្លៃ: 3$/ខែ | 30$/ឆ្នាំ*`,
+      {
+        parse_mode: 'Markdown',
+        reply_markup: Markup.inlineKeyboard([
+          [Markup.button.callback('💎 Upgrade VIP នៅសីលនេះ', 'vip_upgrade')]
+        ]).reply_markup
+      }
+    );
+  }
+
+  // AI rate limit check (VIP only gets here)
   const aiCheck = checkAILimit(userId, isVIP);
   if (!aiCheck.allowed) {
     return ctx.reply(aiCheck.message, { parse_mode: 'Markdown' });
@@ -1101,7 +1125,27 @@ bot.action(/tts_(.+)/, async (ctx) => {
 
   const isVIP = await checkVIP(userId);
 
-  // ⏱️ Rate limit check
+  // 💎 VIP Gate - Free account cannot use TTS
+  if (!isVIP) {
+    await ctx.answerCbQuery('🔒 VIP ប៉ុណ្ណោះ!');
+    return ctx.reply(
+      `🔊 *មុខងារអានជាសំឡេង (TTS) សម្រាប់ VIP ប៉ុណ្ណោះ!*\n\n` +
+      `✅ ចូលជា VIP ដើម្បីទទួលបាន:\n` +
+      `• 🔊 អានសារជាសំឡេង\n` +
+      `• 🧠 សួរជាគ្រូ AI\n` +
+      `• 📝 ប្រឡង Quiz MCQ\n` +
+      `• 🎤 ផ្ញើសារជាសំឡេង\n\n` +
+      `💰 *តម្លៃ: 3$/ខែ | 30$/ឆ្នាំ*`,
+      {
+        parse_mode: 'Markdown',
+        reply_markup: Markup.inlineKeyboard([
+          [Markup.button.callback('💎 Upgrade VIP នៅទីនេះ', 'vip_upgrade')]
+        ]).reply_markup
+      }
+    );
+  }
+
+  // ⏱️ Rate limit check (VIP only gets here)
   const limitCheck = checkTTSLimit(userId, isVIP);
   if (!limitCheck.allowed) {
     await ctx.answerCbQuery('⛔ ប្រើប្រាស់ច្រើន!');
