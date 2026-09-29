@@ -107,17 +107,21 @@ async function generateCertificateHTML(data) {
     if (fs.existsSync(f)) directorSigDataUrl = `data:image/jpeg;base64,${fs.readFileSync(f).toString('base64')}`;
   } catch (err) { console.error('Signature Error:', err); }
 
-  // Khmer date
+  // Khmer date & number helper
+  const toKhmerNum = (num) => {
+    const khDigits = ['០','១','២','៣','៤','៥','៦','៧','៨','៩'];
+    return String(num).replace(/[0-9]/g, d => khDigits[d]);
+  };
   const now = new Date();
   const khMonths = ['មករា','កុម្ភៈ','មីនា','មេសា','ឧសភា','មិថុនា','កក្កដា','សីហា','កញ្ញា','តុលា','វិច្ឆិកា','ធ្នូ'];
-  const khDateStr = `ថ្ងៃទី ${now.getDate()} ខែ${khMonths[now.getMonth()]} ឆ្នាំ${now.getFullYear()}`;
+  const khDateStr = `ថ្ងៃទី ${toKhmerNum(now.getDate())} ខែ${khMonths[now.getMonth()]} ឆ្នាំ${toKhmerNum(now.getFullYear())}`;
 
+  // Only ONE official stamp is used in the entire certificate, placed on the left & slightly above the director's signature
   const logoTag   = schoolLogoDataUrl  ? `<img src="${schoolLogoDataUrl}"  alt="Logo"  class="hdr-logo" />`  : '';
-  const stampTag  = schoolStampDataUrl ? `<img src="${schoolStampDataUrl}" alt="Stamp" class="hdr-right" />` : '';
   const wmTag     = schoolLogoDataUrl  ? `<img src="${schoolLogoDataUrl}"  alt=""      class="wm-logo" />`   : '';
   const qrTag     = qrDataUrl          ? `<div class="qr-frame"><img src="${qrDataUrl}" alt="QR"/></div>`   : '';
-  const sigTag    = directorSigDataUrl ? `<img src="${directorSigDataUrl}" alt="Signature" class="dir-sig-img" />` : '<div style="height:60px;"></div>';
-  const stampOvr  = schoolStampDataUrl ? `<img src="${schoolStampDataUrl}" alt="Stamp" class="stamp-overlay" />` : '';
+  const sigTag    = directorSigDataUrl ? `<img src="${directorSigDataUrl}" alt="Director Signature" class="sig-director" />` : '<div style="height:60px;"></div>';
+  const stampOvr  = schoolStampDataUrl ? `<img src="${schoolStampDataUrl}" alt="Official Stamp" class="stamp-official" />` : '';
 
   return `<!DOCTYPE html>
 <html lang="km">
@@ -215,103 +219,188 @@ async function generateCertificateHTML(data) {
     /* -------- HEADER -------- */
     .hdr {
       display: flex; align-items: center; justify-content: space-between;
-      margin-bottom: 4px; position: relative; z-index: 1;
+      margin-bottom: 2px; position: relative; z-index: 1;
     }
-    .hdr-logo, .hdr-right {
-      width: 78px; height: 78px;
+    .hdr-logo-box {
+      width: 90px; display: flex; align-items: center; justify-content: flex-start;
+    }
+    .hdr-logo {
+      width: 82px; height: 82px;
       object-fit: contain; border-radius: 50%;
+      filter: drop-shadow(0 2px 6px rgba(0,0,0,0.15));
     }
-    .hdr-center { flex: 1; text-align: center; padding: 0 12px; }
-    .hdr-name-kh {
+    .hdr-spacer { width: 90px; } /* Empty balancer - ONLY 1 stamp on whole certificate */
+    .hdr-center { flex: 1; text-align: center; padding: 0 10px; }
+    .kingdom-box { margin-bottom: 3px; }
+    .kingdom-title {
       font-family: 'Moul', cursive; font-size: 15px;
-      color: #8b1c1c; line-height: 1.6;
+      color: #0f172a; line-height: 1.4; letter-spacing: 0.5px;
+    }
+    .kingdom-motto {
+      font-family: 'Moul', cursive; font-size: 13px;
+      color: #0f172a; line-height: 1.4;
+    }
+    .hdr-kbach { color: #c5a059; font-size: 12px; letter-spacing: 3px; margin: 2px 0; }
+    .hdr-name-kh {
+      font-family: 'Moul', cursive; font-size: 14.5px;
+      color: #8b1c1c; line-height: 1.4;
     }
     .hdr-name-en {
       font-family: 'Cinzel', serif; font-size: 10px;
-      color: #1e3a8a; letter-spacing: 1.5px; font-weight: 800;
+      color: #1e3a8a; letter-spacing: 1.8px; font-weight: 800;
     }
-    .hdr-dots { text-align: center; color: #c5a059; font-size: 12px; letter-spacing: 4px; margin: 3px 0; }
 
     /* -------- DIVIDER -------- */
     .orn-div {
-      display: flex; align-items: center; gap: 8px;
-      margin: 8px 0; position: relative; z-index: 1;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      margin: 6px 0; position: relative; z-index: 1;
     }
-    .orn-bar { flex: 1; height: 2px; max-width: 170px;
+    .orn-bar { flex: 1; height: 2px; max-width: 180px;
       background: linear-gradient(90deg, transparent, #c5a059, #8b1c1c, #c5a059, transparent); }
     .orn-sym { color: #c5a059; font-size: 14px; }
 
     /* -------- MAIN TITLE -------- */
-    .main-title { text-align: center; position: relative; z-index: 1; margin: 6px 0; }
+    .main-title { text-align: center; position: relative; z-index: 1; margin: 4px 0 2px 0; }
     .title-kh {
-      font-family: 'Moul', cursive; font-size: 40px; color: #c0000b;
-      display: block; text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+      font-family: 'Moul', cursive; font-size: 42px; color: #c0000b;
+      display: block; text-shadow: 1px 1px 2px rgba(0,0,0,0.12);
+      letter-spacing: 1px;
     }
     .title-en {
-      font-family: 'Cinzel', serif; font-size: 12px; font-weight: 900;
-      color: #1e3a8a; letter-spacing: 2px; text-transform: uppercase;
+      font-family: 'Cinzel', serif; font-size: 11px; font-weight: 900;
+      color: #1e3a8a; letter-spacing: 2.2px; text-transform: uppercase;
+      margin-top: 2px;
     }
 
     /* -------- BODY -------- */
-    .cert-body { text-align: center; position: relative; z-index: 1; flex: 1; margin-top: 8px; }
-    .issuer  { font-size: 14px; color: #1e3a8a; font-weight: 700; margin-bottom: 4px; }
-    .present { font-size: 13px; color: #555; margin-bottom: 8px; font-style: italic; }
-    .name-lbl { font-size: 14px; color: #334155; margin-bottom: 4px; }
+    .cert-body { text-align: center; position: relative; z-index: 1; flex: 1; margin-top: 6px; }
+    .cert-institute-certifies {
+      font-size: 14px; color: #1e3a8a; font-weight: 700; margin-bottom: 2px;
+    }
+    .certifies-lbl {
+      font-family: 'Moul', cursive; font-size: 13.5px; color: #0f172a; margin-bottom: 6px;
+    }
+    .name-row {
+      display: flex; align-items: baseline; justify-content: center; gap: 10px;
+      margin: 6px 0 10px 0;
+    }
+    .name-prefix { font-size: 15px; color: #334155; font-weight: bold; }
     .stu-name {
       display: inline-block;
       font-family: 'Battambang', sans-serif;
-      font-size: 34px; font-weight: 900; color: #0f172a;
+      font-size: 32px; font-weight: 900; color: #0f172a;
       border-bottom: 2.5px solid #c5a059;
-      padding: 0 42px 5px 42px; margin-bottom: 14px;
+      padding: 0 36px 4px 36px;
     }
-    .achieve { font-size: 14px; color: #334155; line-height: 2; }
+    .achieve { font-size: 14px; color: #334155; line-height: 1.9; }
     .subj-red { font-size: 18px; font-weight: 900; color: #8b1c1c; }
-    .note { font-size: 12.5px; color: #64748b; margin-top: 6px; line-height: 1.7; }
-    .date-small { font-size: 11.5px; color: #94a3b8; margin-top: 8px; }
+    .official-decree-note {
+      font-size: 13px; color: #475569; margin-top: 6px; font-weight: 600;
+    }
 
     /* Grade boxes */
-    .grade-row { display: flex; justify-content: center; gap: 14px; margin: 14px 0; }
+    .grade-row { display: flex; justify-content: center; gap: 12px; margin: 12px 0 8px 0; }
     .g-box {
       background: linear-gradient(135deg, #fffdf5, #fef3d0);
       border: 1.5px solid #c5a059; border-radius: 8px;
-      padding: 8px 18px; text-align: center; min-width: 110px;
+      padding: 6px 16px; text-align: center; min-width: 105px;
       box-shadow: 0 2px 6px rgba(197,160,89,0.2);
     }
-    .g-lbl { font-size: 9.5px; color: #64748b; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
-    .g-val { font-size: 20px; font-weight: 900; color: #8b1c1c; font-family: 'Cinzel', serif; }
+    .g-lbl { font-size: 9px; color: #64748b; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
+    .g-val { font-size: 19px; font-weight: 900; color: #8b1c1c; font-family: 'Cinzel', serif; }
     .g-sub { font-size: 9.5px; color: #64748b; }
 
     /* -------- FOOTER -------- */
-    .cert-footer { position: relative; z-index: 1; margin-top: 14px; }
-    .footer-date { text-align: right; font-size: 13px; color: #334155; margin-bottom: 12px; }
-    .sig-row { display: flex; justify-content: space-between; align-items: flex-end; }
+    .cert-footer { position: relative; z-index: 1; margin-top: 10px; }
+    .footer-row {
+      display: flex; justify-content: space-between; align-items: flex-end;
+    }
 
-    /* QR left */
-    .qr-col { display: flex; flex-direction: column; gap: 4px; }
+    /* QR Col (Left) */
+    .qr-col {
+      display: flex; flex-direction: column; gap: 3px; width: 140px;
+    }
     .qr-frame {
       background: #fff; border: 2px solid #c5a059; border-radius: 6px;
       padding: 5px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); display: inline-block;
+      width: fit-content;
     }
-    .qr-frame img { display: block; width: 90px; height: 90px; }
-    .qr-lbl { font-size: 8.5px; color: #8b1c1c; font-weight: 900; letter-spacing: 1px; }
-    .qr-id  { font-size: 8.5px; color: #64748b; }
+    .qr-frame img { display: block; width: 88px; height: 88px; }
+    .qr-badge { font-size: 8.5px; color: #8b1c1c; font-weight: 900; letter-spacing: 0.8px; margin-top: 2px; }
+    .qr-id { font-size: 8.5px; color: #0f172a; font-weight: 700; }
+    .qr-sub { font-size: 8px; color: #64748b; }
 
-    /* Center */
-    .footer-center { text-align: center; font-size: 11px; color: #64748b; max-width: 250px; line-height: 1.5; }
-
-    /* Director right */
-    .dir-col { text-align: center; position: relative; width: 200px; }
-    .dir-sig-img { width: 130px; height: 60px; object-fit: contain; display: block; margin: 0 auto; mix-blend-mode: multiply; }
-    .stamp-overlay {
-      position: absolute; width: 100px; height: 100px;
-      bottom: 20px; right: -8px;
-      object-fit: contain; opacity: 0.92; mix-blend-mode: multiply;
-      transform: rotate(-8deg);
-      filter: drop-shadow(0 2px 4px rgba(185,28,28,0.3));
+    /* Center Note */
+    .footer-center {
+      flex: 1; text-align: center; padding: 0 10px 10px 10px;
+      display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
     }
-    .sig-line   { border-top: 1.5px solid #94a3b8; padding-top: 5px; font-size: 13px; color: #0f172a; font-weight: 800; }
-    .sig-role   { font-size: 11px; color: #64748b; }
-    .sig-inst   { font-size: 11px; color: #8b1c1c; font-weight: 800; }
+    .cert-legal-text {
+      font-size: 11px; color: #475569; line-height: 1.6; font-style: italic;
+    }
+    .cert-code-pill {
+      margin-top: 6px; font-size: 9px; color: #8b1c1c; font-weight: 800;
+      background: rgba(139,28,28,0.06); padding: 3px 10px; border-radius: 12px;
+      border: 1px solid rgba(139,28,28,0.15);
+    }
+
+    /* Director Block (Right) - Authentic Cambodian administrative stamp & signature */
+    .dir-block {
+      width: 290px; text-align: center;
+      display: flex; flex-direction: column; align-items: center;
+    }
+    .dir-date-khmer {
+      font-size: 11.5px; color: #334155; line-height: 1.5; margin-bottom: 2px;
+      text-align: center;
+    }
+    .dir-role-kh {
+      font-family: 'Moul', cursive; font-size: 13px; color: #0f172a;
+      margin-bottom: 4px;
+    }
+    /* Signature and Stamp Container */
+    .sig-stamp-container {
+      position: relative;
+      width: 280px;
+      height: 120px;
+      margin: 0 auto;
+    }
+    /* The single official stamp: BIGGER, on the LEFT, and shifted UP */
+    .stamp-official {
+      position: absolute;
+      left: 8px;
+      top: -14px; /* ខិតលើបន្តិច */
+      width: 142px; /* ធំជាងនឹង */
+      height: 142px;
+      object-fit: contain;
+      mix-blend-mode: multiply;
+      transform: rotate(-6deg);
+      z-index: 2;
+      filter: drop-shadow(0 2px 5px rgba(185,28,28,0.3));
+      pointer-events: none;
+    }
+    /* Director Signature: on the RIGHT */
+    .sig-director {
+      position: absolute;
+      right: 12px;
+      bottom: 8px;
+      width: 165px;
+      height: 85px;
+      object-fit: contain;
+      mix-blend-mode: multiply;
+      z-index: 1;
+    }
+    .dir-name-underline {
+      width: 200px;
+      border-top: 1.5px solid #94a3b8;
+      margin-top: 2px;
+      padding-top: 4px;
+    }
+    .dir-name-kh {
+      font-family: 'Moul', cursive; font-size: 14px; color: #0f172a;
+    }
+    .dir-name-en {
+      font-size: 10.5px; color: #64748b; font-weight: 700;
+    }
 
     @media print {
       body { background: none; padding: 0; }
@@ -348,15 +437,19 @@ async function generateCertificateHTML(data) {
     <div class="cert-content">
       ${wmTag}
 
-      <!-- HEADER -->
+      <!-- HEADER (Only Logo on Left, Center Kingdom & Institute, Right Balanced Spacer - NO STAMP) -->
       <div class="hdr">
-        <div>${logoTag}</div>
+        <div class="hdr-logo-box">${logoTag}</div>
         <div class="hdr-center">
-          <div class="hdr-name-kh">វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស<br>Teacher SSOnline</div>
-          <div class="hdr-dots">❖ · ✦ · ❖</div>
-          <div class="hdr-name-en">English Language Institute · Est. 2024</div>
+          <div class="kingdom-box">
+            <div class="kingdom-title">ព្រះរាជាណាចក្រកម្ពុជា</div>
+            <div class="kingdom-motto">ជាតិ សាសនា ព្រះមហាក្សត្រ</div>
+          </div>
+          <div class="hdr-kbach">❖ · ✦ · ❖</div>
+          <div class="hdr-name-kh">វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline</div>
+          <div class="hdr-name-en">TEACHER SSONLINE ENGLISH LANGUAGE INSTITUTE</div>
         </div>
-        <div>${stampTag}</div>
+        <div class="hdr-spacer"></div>
       </div>
 
       <div class="orn-div"><div class="orn-bar"></div><span class="orn-sym">✦</span><div class="orn-bar"></div></div>
@@ -371,22 +464,20 @@ async function generateCertificateHTML(data) {
 
       <!-- BODY -->
       <div class="cert-body">
-        <p class="issuer" style="margin-top:14px;">
-          ឧបស្ថានស្ថិត វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline
+        <p class="cert-institute-certifies">
+          វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline
         </p>
-        <p class="present">សូមប្រកាន់ជូន :</p>
-        <p class="name-lbl">ឈ្មោះ :</p>
-        <div class="stu-name">${studentName}</div>
+        <p class="certifies-lbl">សូមបញ្ជាក់ថា ៖</p>
+        <div class="name-row">
+          <span class="name-prefix">ឈ្មោះ ៖</span>
+          <span class="stu-name">${studentName}</span>
+        </div>
         <p class="achieve">
-          បានប្រឡងបញ្ចប់ដោយជោគជ័យ${isAnnualExam ? 'នូវការប្រឡងបញ្ចប់មុខវិជ្ជាប្រចាំឆ្នាំ' : 'នូវវគ្គសិក្សា'}<br>
+          បានប្រឡងបញ្ចប់ដោយជោគជ័យ${isAnnualExam ? 'នូវការប្រឡងបញ្ចប់មុខវិជ្ជាប្រចាំឆ្នាំ' : 'នូវវគ្គបណ្តុះបណ្តាល'}<br>
           <span class="subj-red">「 ${certTitle} 」</span>
         </p>
-        <p class="note">
-          ${isAnnualExam
-            ? 'ដែលបង្ហាញពីការខិតខំ ការយកចិត្តទុកដាក់ និងការរីកចម្រើនផ្នែកភាសាអង់គ្លេស'
-            : 'ដែលបង្ហាញពីការខិតខំប្រឹងប្រែង សមត្ថភាព និងឆ្នើមភាពដ៏ល្អ'
-          }<br>
-          Teacher SSOnline English Language Institute
+        <p class="official-decree-note">
+          វិញ្ញាបនបត្រនេះប្រគល់ជូនសាមីជនប្រើប្រាស់តាមការដែលអាចប្រើបាន។
         </p>
 
         <!-- Grade Boxes -->
@@ -402,42 +493,52 @@ async function generateCertificateHTML(data) {
             <div class="g-sub">${percent}%</div>
           </div>
           <div class="g-box">
-            <div class="g-lbl">ID / លេខសិស្ស</div>
-            <div class="g-val" style="font-size:13px;margin-top:4px;">${userId}</div>
+            <div class="g-lbl">Student ID / លេខសិស្ស</div>
+            <div class="g-val" style="font-size:13px;margin-top:3px;">${userId}</div>
+            <div class="g-sub">${dateStr}</div>
           </div>
         </div>
-
-        <p class="date-small">ព្រះរាជ ១៦ ខែច ទីសក្រាជ ភ្ជើមមិ អ.ស.២៥៦០ · ${dateStr}</p>
       </div>
 
-      <!-- FOOTER: QR + Sig -->
+      <!-- FOOTER: QR Left, Note Center, Director Sig + Single Big Stamp on Left Shifted Up -->
       <div class="cert-footer">
-        <div class="footer-date">${khDateStr}</div>
-        <div class="sig-row">
+        <div class="footer-row">
           <!-- QR Left -->
           <div class="qr-col">
             ${qrTag}
-            <div class="qr-lbl">▶ SCAN TO VERIFY</div>
+            <div class="qr-badge">▶ SCAN TO VERIFY</div>
             <div class="qr-id">CERT-${certId}</div>
-            <div class="qr-id">ID: ${userId}</div>
+            <div class="qr-sub">Student ID: ${userId}</div>
           </div>
 
           <!-- Center note -->
           <div class="footer-center">
-            <p>វិញ្ញាបនបត្រនេះចេញ​ ដោយ<br>Teacher SSOnline English Institute</p>
-            <br>
-            <p style="font-size:9.5px;color:#8b1c1c;font-weight:700;">
-              TMS-SSO-${now.getFullYear()}-${certId}
+            <p class="cert-legal-text">
+              វិញ្ញាបនបត្រផ្លូវការចេញដោយ<br>Teacher SSOnline English Institute
             </p>
+            <div class="cert-code-pill">
+              TMS-SSO-${now.getFullYear()}-${certId}
+            </div>
           </div>
 
-          <!-- Director Right -->
-          <div class="dir-col">
-            ${sigTag}
-            ${stampOvr}
-            <div class="sig-line">លីម សន (Lim Sorn)</div>
-            <div class="sig-role">នាយកវិទ្យាស្ថាន (School Director)</div>
-            <div class="sig-inst">TeacherSornAiBot</div>
+          <!-- Director Right: Date + Role + Container(Big Stamp Left Shifted Up + Sig Right) + Underline Name -->
+          <div class="dir-block">
+            <div class="dir-date-khmer">
+              រាជធានីភ្នំពេញ ថ្ងៃទី ${toKhmerNum(now.getDate())} ខែ${khMonths[now.getMonth()]} ឆ្នាំ${toKhmerNum(now.getFullYear())}
+            </div>
+            <div class="dir-role-kh">នាយកវិទ្យាស្ថាន</div>
+
+            <div class="sig-stamp-container">
+              <!-- ONLY 1 STAMP: BIGGER (142px), on LEFT, shifted UP (top: -14px) overlapping signature -->
+              ${stampOvr}
+              <!-- Director Signature: on RIGHT -->
+              ${sigTag}
+            </div>
+
+            <div class="dir-name-underline">
+              <div class="dir-name-kh">លីម សន</div>
+              <div class="dir-name-en">Lim Sorn (School Director)</div>
+            </div>
           </div>
         </div>
       </div>
