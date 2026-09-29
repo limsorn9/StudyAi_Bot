@@ -8,7 +8,7 @@ const OpenAI = require('openai');
 const express = require('express');
 const fs = require('fs');
 const irregularVerbs = require('./irregular_verbs.js');
-const { generateQuiz } = require('./quiz_generator.js');
+const { generateQuiz, generateAnnualSubjectQuiz, SUBJECT_EXAMS } = require('./quiz_generator.js');
 const { checkTTSLimit, recordTTSStart, recordTTSDone, checkAILimit, recordAIUsage, getTTSStats } = require('./rate_limiter.js');
 const {
   parseDuration,
@@ -279,8 +279,9 @@ const generateAndSendTTS = async (ctx, text) => {
 
 // Persistent Reply Keyboard Menu
 const mainMenuKeyboard = Markup.keyboard([
-  ['📚 បញ្ជីមេរៀន (Lessons)', '🕰️ ប្រវត្តិសិក្សា'],
-  ['💎 គណនី VIP (Upgrade)', '❓ ជំនួយ (Help)']
+  ['📚 បញ្ជីមេរៀន (Lessons)', '🎓 ប្រឡងបញ្ចប់មុខវិជ្ជា'],
+  ['🕰️ ប្រវត្តិសិក្សា', '💎 គណនី VIP (Upgrade)'],
+  ['❓ ជំនួយ (Help)']
 ]).resize();
 
 // Check Membership Button
@@ -313,6 +314,13 @@ bot.use(groupAdminGuard);
 bot.start(async (ctx) => {
   const userId = ctx.from.id;
   const username = ctx.from.first_name || 'Student';
+
+  // Handle QR verification link: e.g. /start verify_ABC123
+  const payload = ctx.startPayload || (ctx.message && ctx.message.text && ctx.message.text.split(' ')[1]);
+  if (payload && payload.startsWith('verify_')) {
+    const certId = payload.replace('verify_', '');
+    return handleCertificateVerification(ctx, certId);
+  }
 
   // Check channel membership first
   const ok = await isMember(userId);
@@ -1020,6 +1028,7 @@ function getMonthsKeyboard() {
   for(let i=0; i<buttons.length; i+=3) {
     rows.push(buttons.slice(i, i+3));
   }
+  rows.push([Markup.button.callback('🎓 ការប្រឡងបញ្ចប់មុខវិជ្ជាប្រចាំឆ្នាំ', 'annual_exams_menu')]);
   return Markup.inlineKeyboard(rows);
 }
 
@@ -1286,9 +1295,12 @@ async function renderQuizQuestion(ctx, userId, isEdit = false) {
     Markup.button.callback('❌ បោះបង់ការប្រឡង', 'q_cancel')
   ]);
 
+  const titleHeader = state.isAnnualExam
+    ? `🏆 *ការប្រឡងបញ្ចប់មុខវិជ្ជាប្រចាំឆ្នាំ (២០ សំណួរ)*\n📘 *${state.subjectTitle || state.lessonTitle}*`
+    : `🎯 *ការប្រឡងបញ្ចប់មេរៀន (MCQ Quiz)*\n📚 *${state.lessonTitle}*`;
+
   const questionText = (
-    `🎯 *ការប្រឡងបញ្ចប់មេរៀន (MCQ Quiz)*\n` +
-    `📚 *${state.lessonTitle}*\n` +
+    `${titleHeader}\n` +
     `━━━━━━━━━━━━━━━━━━━━━━\n` +
     `📝 *សំណួរទី ${currentQ + 1} នៃ ${total} ៖*\n\n` +
     `*${q.q}*\n\n` +
@@ -1545,9 +1557,13 @@ async function handleQuizSubmission(ctx, userId) {
   const gradeTitle = getGradeTitle(grade);
 
   // 1. Build Detailed Results Breakdown
+  const titleText = state.subjectTitle || state.lessonTitle;
+  const resultHeader = state.isAnnualExam
+    ? `🏆 *លទ្ធផលការប្រឡងបញ្ចប់មុខវិជ្ជាប្រចាំឆ្នាំ*\n📘 *${titleText}*`
+    : `🎯 *លទ្ធផលការប្រឡងបញ្ចប់មេរៀន*\n📚 *${titleText}*`;
+
   let resultMsg = (
-    `🎯 *លទ្ធផលការប្រឡងបញ្ចប់មេរៀន*\n` +
-    `📚 *${state.lessonTitle}*\n` +
+    `${resultHeader}\n` +
     `━━━━━━━━━━━━━━━━━━━━━━\n` +
     `🏆 និទ្ទេសសម្រេចបាន៖ *ថ្នាក់ ${grade}* (${gradeTitle})\n` +
     `🎯 ពិន្ទុប្រឡង៖ *${score} / ${total}* (${percent}%)\n` +
@@ -1569,9 +1585,12 @@ async function handleQuizSubmission(ctx, userId) {
   // Save Quiz Log to Firebase
   if (db) {
     try {
-      await db.ref(`users/${userId}/quiz_results/${state.lessonId}_${Date.now()}`).set({
-        lessonTitle: state.lessonTitle,
+      const logKey = state.isAnnualExam ? `annual_${state.subjectKey}_${Date.now()}` : `${state.lessonId}_${Date.now()}`;
+      await db.ref(`users/${userId}/quiz_results/${logKey}`).set({
+        lessonTitle: titleText,
         lessonId: state.lessonId,
+        isAnnualExam: !!state.isAnnualExam,
+        subjectKey: state.subjectKey || null,
         score,
         total,
         percent,
@@ -1585,8 +1604,7 @@ async function handleQuizSubmission(ctx, userId) {
   // Send Breakdown Message (Split if long)
   if (resultMsg.length > 3800) {
     const summary = (
-      `🎯 *លទ្ធផលការប្រឡងបញ្ចប់មេរៀន*\n` +
-      `📚 *${state.lessonTitle}*\n` +
+      `${resultHeader}\n` +
       `━━━━━━━━━━━━━━━━━━━━━━\n` +
       `🏆 និទ្ទេស៖ *ថ្នាក់ ${grade}* (${percent}%)\n` +
       `🎯 ពិន្ទុ៖ *${score} / ${total}*\n` +
@@ -1599,19 +1617,35 @@ async function handleQuizSubmission(ctx, userId) {
 
   // IF PASSED (Grade A, B, C): Mark Completed & Issue Certificate
   if (isPassed) {
-    // 1. Mark lesson completed in Firebase
+    // 1. Mark lesson or subject completed in Firebase
     if (db) {
-      await db.ref(`users/${userId}/completed_lessons/${state.lessonId}`).set({
-        lessonId: state.lessonId,
-        lessonTitle: state.lessonTitle,
-        monthId: state.monthId,
-        weekId: state.weekId,
-        grade,
-        score,
-        total,
-        percent,
-        completedAt: Date.now()
-      });
+      try {
+        if (state.isAnnualExam) {
+          await db.ref(`users/${userId}/subject_certifications/${state.subjectKey}`).set({
+            subjectKey: state.subjectKey,
+            subjectTitle: titleText,
+            grade,
+            score,
+            total,
+            percent,
+            completedAt: Date.now()
+          });
+        } else {
+          await db.ref(`users/${userId}/completed_lessons/${state.lessonId}`).set({
+            lessonId: state.lessonId,
+            lessonTitle: state.lessonTitle,
+            monthId: state.monthId,
+            weekId: state.weekId,
+            grade,
+            score,
+            total,
+            percent,
+            completedAt: Date.now()
+          });
+        }
+      } catch (err) {
+        console.error("Firebase completion record error:", err);
+      }
     }
 
     const studentName = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ') || `សិស្ស ID ${userId}`;
@@ -1621,28 +1655,62 @@ async function handleQuizSubmission(ctx, userId) {
     const certData = {
       studentName,
       userId,
-      lessonTitle: state.lessonTitle,
+      title: titleText,
+      lessonTitle: titleText,
       grade,
       score,
       total,
       percent,
       dateStr,
-      certId
+      certId,
+      isAnnualExam: !!state.isAnnualExam
     };
+
+    // Save to global certificates database for QR code verification
+    if (db) {
+      try {
+        await db.ref(`certificates/${certId}`).set({
+          certId,
+          userId,
+          studentName,
+          title: titleText,
+          grade,
+          score,
+          total,
+          percent,
+          dateStr,
+          isAnnualExam: !!state.isAnnualExam,
+          subjectKey: state.subjectKey || null,
+          issuedAt: Date.now(),
+          director: 'លីម សន (Lim Sorn)',
+          instructor: 'TeacherSornAiBot',
+          schoolName: 'វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline'
+        });
+      } catch (err) {
+        console.error("Firebase certificate save error:", err);
+      }
+    }
 
     // 2. Send Telegram Certificate Card
     const certCard = generateCertificateCard(certData);
     await ctx.reply(certCard, { parse_mode: 'Markdown' });
 
-    // 3. Send Printable HTML Certificate File
+    // 3. Send Printable HTML Certificate File with QR Code (A4 Landscape)
     try {
-      const certHtml = generateCertificateHTML(certData);
-      const safeFilename = `Certificate_${state.lessonId}.html`;
+      const certHtml = await generateCertificateHTML(certData);
+      const safeFilename = state.isAnnualExam
+        ? `Certificate_Annual_${state.subjectKey}.html`
+        : `Certificate_${state.lessonId}.html`;
+
       await ctx.replyWithDocument(
         { source: Buffer.from(certHtml, 'utf-8'), filename: safeFilename },
         {
-          caption: `🎓 *បណ្ណសរសើរផ្លូវការ (Certificate of Achievement)*\n` +
-                   `លោកគ្រូបានរៀបចំបណ្ណសរសើរយ៉ាងស្រស់ស្អាតជូនអ្នក! ចុចទាញយកដើម្បីបើកមើលលើទូរសព្ទ/កុំព្យូទ័រ ឬ Save ជា PDF!`,
+          caption: `🎓 *វិញ្ញាបនបត្រផ្លូវការ (Certificate of Achievement)*\n` +
+                   `🏫 *វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline*\n` +
+                   `👨‍💼 នាយកសាលារៀន៖ *លីម សន (Lim Sorn)*\n` +
+                   `👨‍🏫 គ្រូបន្ទុកថ្នាក់៖ *TeacherSornAiBot*\n` +
+                   `📄 ទម្រង់ *A4 ផ្តេក (A4 Landscape)* មាន *QR Code Verified* ស្កេនផ្ទៀងផ្ទាត់បាន!\n\n` +
+                   `📥 ចុចទាញយកឯកសារនេះដើម្បីបើកមើល ឬចុច *Print / Save as PDF*! 🎉`,
           parse_mode: 'Markdown'
         }
       );
@@ -1651,36 +1719,299 @@ async function handleQuizSubmission(ctx, userId) {
     }
 
     // 4. Navigation Buttons after Success
-    await ctx.reply(
-      `🌟 *អបអរសាទរ! អ្នកបានបញ្ចប់មេរៀននេះដោយជោគជ័យ!* 🌟\n\n` +
-      `តើអ្នកចង់បន្តទៅមេរៀនបន្ទាប់ ឬយ៉ាងណា?`,
-      {
-        parse_mode: 'Markdown',
-        reply_markup: Markup.inlineKeyboard([
-          [Markup.button.callback('➡️ ទៅមេរៀនបន្ទាប់', `next_lesson_${state.lessonId}`)],
-          [Markup.button.callback('📖 រៀនមេរៀននេះម្តងទៀត', `relearn_${state.lessonId}`)],
-          [Markup.button.callback('🔙 ត្រឡប់ទៅបញ្ជីមេរៀន', `week_${state.monthId}-${state.weekId}`)]
-        ]).reply_markup
-      }
-    );
+    if (state.isAnnualExam) {
+      await ctx.reply(
+        `🌟 *អបអរសាទរ! អ្នកបានប្រឡងបញ្ចប់មុខវិជ្ជានេះដោយជោគជ័យ!* 🌟\n\n` +
+        `តើអ្នកចង់បន្តប្រឡងមុខវិជ្ជាផ្សេងទៀត ឬត្រឡប់ទៅកម្មវិធីសិក្សា?`,
+        {
+          parse_mode: 'Markdown',
+          reply_markup: Markup.inlineKeyboard([
+            [Markup.button.callback('🎓 ប្រឡងមុខវិជ្ជាផ្សេងទៀត', 'annual_exams_menu')],
+            [Markup.button.callback('📚 ត្រឡប់ទៅកម្មវិធីសិក្សា', 'back_to_months')]
+          ]).reply_markup
+        }
+      );
+    } else {
+      await ctx.reply(
+        `🌟 *អបអរសាទរ! អ្នកបានបញ្ចប់មេរៀននេះដោយជោគជ័យ!* 🌟\n\n` +
+        `តើអ្នកចង់បន្តទៅមេរៀនបន្ទាប់ ឬយ៉ាងណា?`,
+        {
+          parse_mode: 'Markdown',
+          reply_markup: Markup.inlineKeyboard([
+            [Markup.button.callback('➡️ ទៅមេរៀនបន្ទាប់', `next_lesson_${state.lessonId}`)],
+            [Markup.button.callback('📖 រៀនមេរៀននេះម្តងទៀត', `relearn_${state.lessonId}`)],
+            [Markup.button.callback('🔙 ត្រឡប់ទៅបញ្ជីមេរៀន', `week_${state.monthId}-${state.weekId}`)]
+          ]).reply_markup
+        }
+      );
+    }
   } else {
     // FAILED (Grade D or F)
-    await ctx.reply(
-      `💪 *ព្យាយាមម្តងទៀតណា៎!* អ្នកទទួលបានពិន្ទុ *${score}/${total}* (ថ្នាក់ *${grade}*)។\n\n` +
-      `ដើម្បីបញ្ចប់មេរៀននេះដោយជោគជ័យ និងទទួលបានបណ្ណសរសើរ អ្នកត្រូវប្រឡងជាប់និទ្ទេស *A, B, ឬ C* (យ៉ាងតិច 7/10 ពិន្ទុឡើងទៅ)។`,
+    if (state.isAnnualExam) {
+      await ctx.reply(
+        `💪 *ព្យាយាមម្តងទៀតណា៎!* អ្នកទទួលបានពិន្ទុ *${score}/${total}* (ថ្នាក់ *${grade}*)។\n\n` +
+        `ដើម្បីទទួលបានវិញ្ញាបនបត្របញ្ចប់មុខវិជ្ជាប្រចាំឆ្នាំ អ្នកត្រូវប្រឡងជាប់និទ្ទេស *A, B, ឬ C* (ចាប់ពី 70% ឡើងទៅ)។`,
+        {
+          parse_mode: 'Markdown',
+          reply_markup: Markup.inlineKeyboard([
+            [Markup.button.callback('🔄 ប្រឡងមុខវិជ្ជានេះម្តងទៀត', `start_annual_${state.subjectKey}`)],
+            [Markup.button.callback('📋 ជ្រើសរើសមុខវិជ្ជាផ្សេង', 'annual_exams_menu')],
+            [Markup.button.callback('📚 ត្រឡប់ទៅកម្មវិធីសិក្សា', 'back_to_months')]
+          ]).reply_markup
+        }
+      );
+    } else {
+      await ctx.reply(
+        `💪 *ព្យាយាមម្តងទៀតណា៎!* អ្នកទទួលបានពិន្ទុ *${score}/${total}* (ថ្នាក់ *${grade}*)។\n\n` +
+        `ដើម្បីបញ្ចប់មេរៀននេះដោយជោគជ័យ និងទទួលបានបណ្ណសរសើរ អ្នកត្រូវប្រឡងជាប់និទ្ទេស *A, B, ឬ C* (យ៉ាងតិច 7/10 ពិន្ទុឡើងទៅ)។`,
+        {
+          parse_mode: 'Markdown',
+          reply_markup: Markup.inlineKeyboard([
+            [Markup.button.callback('🔄 ប្រឡងម្តងទៀត', `quiz_start_${state.lessonId}`)],
+            [Markup.button.callback('📖 អានមេរៀនឡើងវិញ', `relearn_${state.lessonId}`)],
+            [Markup.button.callback('🔙 ត្រឡប់ទៅបញ្ជីមេរៀន', `week_${state.monthId}-${state.weekId}`)]
+          ]).reply_markup
+        }
+      );
+    }
+  }
+
+  delete quizState[userId];
+}
+
+// ==========================================
+// ANNUAL SUBJECT FINAL EXAMS & QR CODE VERIFICATION SYSTEM
+// ==========================================
+
+/**
+ * Handle Certificate Verification (QR Code Scan or /verify command)
+ */
+async function handleCertificateVerification(ctx, rawCertId) {
+  const certId = (rawCertId || '').replace(/^CERT-/i, '').trim().toUpperCase();
+  if (!certId) {
+    return ctx.reply(
+      `🔍 *របៀបផ្ទៀងផ្ទាត់វិញ្ញាបនបត្រ៖*\n\n` +
+      `សូមវាយបញ្ជា៖ \`/verify <លេខកូដវិញ្ញាបនបត្រ>\`\n` +
+      `ឧទាហរណ៍៖ \`/verify ABC123\` ឬ \`/verify CERT-ABC123\``,
+      { parse_mode: 'Markdown' }
+    );
+  }
+
+  if (!db) {
+    return ctx.reply('⚠️ ប្រព័ន្ធទិន្នន័យ (Database) មិនទាន់ភ្ជាប់ទេ សូមព្យាយាមម្តងទៀតនៅពេលក្រោយ!');
+  }
+
+  try {
+    const snapshot = await db.ref(`certificates/${certId}`).once('value');
+    const cert = snapshot.val();
+
+    if (!cert) {
+      return ctx.reply(
+        `❌ *លទ្ធផលនៃការផ្ទៀងផ្ទាត់៖ រកមិនឃើញទិន្នន័យ!*\n\n` +
+        `លេខកូដវិញ្ញាបនបត្រ៖ \`CERT-${certId}\`\n\n` +
+        `⚠️ វិញ្ញាបនបត្រនេះមិនមាននៅក្នុងប្រព័ន្ធទិន្នន័យរបស់ *វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline* ឡើយ។ ` +
+        `សូមពិនិត្យមើលលេខកូដ ឬស្កេន QR Code ឡើងវិញ!`,
+        { parse_mode: 'Markdown' }
+      );
+    }
+
+    const card = (
+      `╔════════════════════════════════════════════╗\n` +
+      `   ✅ *ការផ្ទៀងផ្ទាត់វិញ្ញាបនបត្រត្រឹមត្រូវ* ✅\n` +
+      `       *OFFICIAL VERIFIED CERTIFICATE*\n` +
+      `╚════════════════════════════════════════════╝\n\n` +
+      `🏫 គ្រឹះស្ថាន៖ *${cert.schoolName || 'វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline'}*\n` +
+      `📜 លេខកូដសម្គាល់៖ \`CERT-${cert.certId}\`\n` +
+      `🛡️ ស្ថានភាព៖ *✅ វិញ្ញាបនបត្រស្របច្បាប់ និងមានសុពលភាព*\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `👤 ឈ្មោះសិស្ស៖ *${cert.studentName}*\n` +
+      `🆔 លេខសម្គាល់សិស្ស (ID)៖ \`${cert.userId}\`\n` +
+      `🎯 កម្មវិធី/មុខវិជ្ជា៖ *${cert.title}*\n` +
+      `🏆 និទ្ទេសសម្រេចបាន៖ *ថ្នាក់ ${cert.grade}* (${getGradeTitle(cert.grade)})\n` +
+      `🎯 ពិន្ទុប្រឡង៖ *${cert.score} / ${cert.total}* (${cert.percent}%)\n` +
+      `📅 កាលបរិច្ឆេទចេញ៖ *${cert.dateStr}*\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+      `👨‍💼 នាយកសាលារៀន៖ *${cert.director || 'លីម សន (Lim Sorn)'}*\n` +
+      `👨‍🏫 គ្រូបន្ទុកថ្នាក់៖ *${cert.instructor || 'TeacherSornAiBot'}*\n\n` +
+      `✨ _វិញ្ញាបនបត្រនេះត្រូវបានចេញ និងកត់ត្រាជាផ្លូវការនៅក្នុងប្រព័ន្ធទិន្នន័យ Teacher SSOnline។_`
+    );
+
+    await ctx.reply(card, { parse_mode: 'Markdown' });
+  } catch (err) {
+    console.error("Verification error:", err);
+    await ctx.reply('⚠️ មានបញ្ហាក្នុងការផ្ទៀងផ្ទាត់ សូមសាកល្បងម្តងទៀត!');
+  }
+}
+
+/**
+ * Display Annual Exams Menu
+ */
+async function sendAnnualExamsMenu(ctx) {
+  const userId = ctx.from.id;
+  const username = ctx.from.first_name || 'Student';
+
+  // 1. Check channel membership
+  if (!(await isMember(userId))) {
+    return ctx.reply('🔒 សូមចូលឆានែល @ssonlinechanel ជាមុនសិន!', {
+      reply_markup: Markup.inlineKeyboard([
+        [Markup.button.url('📢 ចូលឆានែល', CHANNEL_URL)],
+        [Markup.button.callback('✅ ខ្ញុំបានចូលហើយ', 'check_membership')]
+      ]).reply_markup
+    });
+  }
+
+  // 2. VIP Guard
+  const vip = await checkVIP(userId);
+  if (!vip) {
+    return ctx.reply(
+      `💎 *ការប្រឡងបញ្ចប់មុខវិជ្ជាប្រចាំឆ្នាំ សម្រាប់សមាជិក VIP ប៉ុណ្ណោះ!*\n\n` +
+      `✅ ចូលជា VIP ដើម្បីទទួលបានសិទ្ធិ:\n` +
+      `• ប្រឡងបញ្ចប់មុខវិជ្ជាទាំង ៧ ប្រភេទ (២០ សំណួរក្នុងមួយវិញ្ញាសា)\n` +
+      `• អាចកែប្រែ និងផ្ទៀងផ្ទាត់ចម្លើយមុន Submit\n` +
+      `• ទទួលបានវិញ្ញាបនបត្រផ្លូវការទម្រង់ A4 ផ្តេក (A4 Landscape)\n` +
+      `• ចុះហត្ថលេខាដោយ នាយកសាលារៀន លីម សន & គ្រូបន្ទុកថ្នាក់ TeacherSornAiBot\n` +
+      `• មាន QR Code Verified អាចស្កេនផ្ទៀងផ្ទាត់បាន!\n\n` +
+      `💰 តម្លៃ: 3$/ខែ | 30$/ឆ្នាំ`,
       {
         parse_mode: 'Markdown',
         reply_markup: Markup.inlineKeyboard([
-          [Markup.button.callback('🔄 ប្រឡងម្តងទៀត', `quiz_start_${state.lessonId}`)],
-          [Markup.button.callback('📖 អានមេរៀនឡើងវិញ', `relearn_${state.lessonId}`)],
-          [Markup.button.callback('🔙 ត្រឡប់ទៅបញ្ជីមេរៀន', `week_${state.monthId}-${state.weekId}`)]
+          [Markup.button.callback('💎 Upgrade VIP', 'vip_upgrade')],
+          [Markup.button.callback('🔑 បញ្ចូល License Key', 'enter_license_key')]
         ]).reply_markup
       }
     );
   }
 
-  delete quizState[userId];
+  const buttons = [
+    [Markup.button.callback('📘 1. វេយ្យាករណ៍ (Grammar in Use)', 'start_annual_grammar')],
+    [Markup.button.callback('🗣️ 2. ការសន្ទនា (Conversation & Speaking)', 'start_annual_conversation')],
+    [Markup.button.callback('📖 3. វាក្យសព្ទ (Vocabulary & Idioms)', 'start_annual_vocabulary')],
+    [Markup.button.callback('⚡ 4. កិរិយាសព្ទ (Verbs & Irregular Verbs)', 'start_annual_verbs')],
+    [Markup.button.callback('🎨 5. គុណនាម (Adjectives & Descriptions)', 'start_annual_adjectives')],
+    [Markup.button.callback('✍️ 6. ការបង្កើតល្បះ (Sentence Construction)', 'start_annual_sentences')],
+    [Markup.button.callback('🏆 7. ប្រឡងបញ្ចប់រួមប្រចាំឆ្នាំ (Grand Exam)', 'start_annual_grand')],
+    [Markup.button.callback('🔙 ត្រឡប់ទៅកម្មវិធីសិក្សា', 'back_to_months')]
+  ];
+
+  const text = (
+    `╔════════════════════════════════════════════╗\n` +
+    `   🎓 *វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline* 🎓\n` +
+    `        *TEACHER SSONLINE ENGLISH INSTITUTE*\n` +
+    `╚════════════════════════════════════════════╝\n\n` +
+    `🏛️ *ការប្រឡងបញ្ចប់មុខវិជ្ជាប្រចាំឆ្នាំ (Annual Subject Final Exams)*\n\n` +
+    `សួស្តី ${username}! សូមស្វាគមន៍មកកាន់មណ្ឌលប្រឡងបញ្ចប់មុខវិជ្ជាប្រចាំឆ្នាំ!\n\n` +
+    `📋 *លក្ខខណ្ឌ និងព័ត៌មាននៃការប្រឡង៖*\n` +
+    `• វិញ្ញាសានីមួយៗមាន *២០ សំណួរ* (MCQ)\n` +
+    `• អ្នកអាចចុច *⬅️ សំណួរមុន* ឬ *សំណួរបន្ទាប់ ➡️* ដើម្បីកែប្រែចម្លើយមុនពេល Submit\n` +
+    `• ប្រឡងជាប់និទ្ទេស *A, B, ឬ C* (ចាប់ពី 70% ឡើងទៅ) នឹងទទួលបាន៖\n` +
+    `   📜 *វិញ្ញាបនបត្រផ្លូវការទម្រង់ A4 ផ្តេក (A4 Landscape)*\n` +
+    `   👨‍💼 ចេញដោយនាយកសាលារៀន៖ *លីម សន (Lim Sorn)*\n` +
+    `   👨‍🏫 គ្រូបន្ទុកថ្នាក់៖ *TeacherSornAiBot*\n` +
+    `   🛡️ មានភ្ជាប់ *QR Code Verified* ស្កេនផ្ទៀងផ្ទាត់លើ Telegram!\n\n` +
+    `👇 *សូមជ្រើសរើសមុខវិជ្ជាដែលអ្នកចង់ប្រឡង៖*`
+  );
+
+  if (ctx.callbackQuery) {
+    try {
+      await ctx.editMessageText(text, {
+        parse_mode: 'Markdown',
+        reply_markup: Markup.inlineKeyboard(buttons).reply_markup
+      });
+    } catch (e) {
+      await ctx.reply(text, {
+        parse_mode: 'Markdown',
+        reply_markup: Markup.inlineKeyboard(buttons).reply_markup
+      });
+    }
+  } else {
+    await ctx.reply(text, {
+      parse_mode: 'Markdown',
+      reply_markup: Markup.inlineKeyboard(buttons).reply_markup
+    });
+  }
 }
+
+// Commands & Listeners for Annual Exams
+bot.command(['annualexam', 'finalexam', 'exam'], sendAnnualExamsMenu);
+bot.hears('🎓 ប្រឡងបញ្ចប់មុខវិជ្ជា', sendAnnualExamsMenu);
+
+// Callback to show Annual Exams Menu
+bot.action('annual_exams_menu', async (ctx) => {
+  await ctx.answerCbQuery();
+  await sendAnnualExamsMenu(ctx);
+});
+
+// Action to start Annual Exam for a subject
+bot.action(/start_annual_([a-z]+)/, async (ctx) => {
+  const subjectKey = ctx.match[1];
+  const userId = ctx.from.id.toString();
+
+  // 1. Membership Guard
+  if (!(await isMember(ctx.from.id))) {
+    await ctx.answerCbQuery('🔒 សូមចូលឆានែលជាមុន!');
+    return ctx.reply('🔒 សូមចូលឆានែល @ssonlinechanel ជាមុនសិន!');
+  }
+
+  // 2. VIP Guard
+  const vip = await checkVIP(ctx.from.id);
+  if (!vip) {
+    await ctx.answerCbQuery('💎 សម្រាប់ VIP ប៉ុណ្ណោះ!');
+    return sendVipUpgradeInfo(ctx);
+  }
+
+  const subj = SUBJECT_EXAMS[subjectKey];
+  if (!subj) {
+    return ctx.answerCbQuery('❌ មិនមានមុខវិជ្ជានេះទេ!');
+  }
+
+  await ctx.answerCbQuery(`🚀 ចាប់ផ្តើមប្រឡង ${subj.shortTitle}`);
+
+  const questions = generateAnnualSubjectQuiz(curriculum, subjectKey, 20);
+  if (!questions || questions.length === 0) {
+    return ctx.reply('⚠️ មិនអាចរៀបចំសំណួរបានទេ។ សូមសាកល្បងម្តងទៀត!');
+  }
+
+  quizState[userId] = {
+    questions,
+    currentQ: 0,
+    userAnswers: {},
+    lessonTitle: subj.title,
+    subjectTitle: subj.title,
+    subjectKey,
+    isAnnualExam: true,
+    lessonId: `annual_${subjectKey}`
+  };
+
+  await ctx.reply(
+    `🎓 *ការប្រឡងបញ្ចប់មុខវិជ្ជាប្រចាំឆ្នាំ*\n` +
+    `${subj.icon} *${subj.title}*\n\n` +
+    `ខ្ញុំបានរៀបចំវិញ្ញាសា *២០ សំណួរ* (MCQ) ជូនអ្នក!\n\n` +
+    `💡 *ការណែនាំ៖*\n` +
+    `• ចុចរើសចម្លើយ A, B, C, ឬ D\n` +
+    `• អាចចុច *⬅️ សំណួរមុន* ឬ *សំណួរបន្ទាប់ ➡️* ដើម្បីកែប្រែចម្លើយ\n` +
+    `• ចុច *"📤 បញ្ជូនចម្លើយ"* នៅសំណួរទី ២០ ដើម្បីបញ្ចប់ការប្រឡង\n` +
+    `• ជាប់និទ្ទេស A, B, C នឹងទទួលបានវិញ្ញាបនបត្រ A4 ផ្តេក មាន QR Code!\n\n` +
+    `🏁 *សូមចាប់ផ្ដើម!*`,
+    { parse_mode: 'Markdown' }
+  );
+
+  await renderQuizQuestion(ctx, userId, false);
+});
+
+// Verification command
+bot.command('verify', async (ctx) => {
+  const parts = ctx.message.text.trim().split(/\s+/);
+  if (parts.length < 2) {
+    return ctx.reply(
+      `🔍 *របៀបផ្ទៀងផ្ទាត់វិញ្ញាបនបត្រ៖*\n\n` +
+      `សូមវាយបញ្ជា៖ \`/verify <លេខកូដវិញ្ញាបនបត្រ>\`\n` +
+      `ឧទាហរណ៍៖ \`/verify ABC123\` ឬ \`/verify CERT-ABC123\``,
+      { parse_mode: 'Markdown' }
+    );
+  }
+  const certId = parts[1];
+  await handleCertificateVerification(ctx, certId);
+});
 
 // View Quiz History (scores)
 bot.command('scores', async (ctx) => {
