@@ -1,17 +1,7 @@
 const fs = require('fs');
+const vocabCategories = require('./vocab_data.js');
 
-const vocabCategories = [
-  { name: 'សមាជិកគ្រួសារ (Family Members)', words: ['ឪពុក = Father', 'ម្តាយ = Mother', 'បងប្រុស = Older Brother', 'ប្អូនស្រី = Younger Sister', 'ជីតា = Grandfather', 'ជីដូន = Grandmother', 'ពូ = Uncle', 'មីង = Aunt', 'កូនប្រុស = Son', 'កូនស្រី = Daughter'] },
-  { name: 'រាងកាយ (Body Parts)', words: ['ក្បាល = Head', 'ភ្នែក = Eye', 'ដៃ = Hand', 'ជើង = Foot/Leg', 'មាត់ = Mouth', 'ច្រមុះ = Nose', 'ត្រចៀក = Ear', 'សក់ = Hair', 'ធ្មេញ = Tooth', 'មុខ = Face'] },
-  { name: 'ពណ៌ (Colors)', words: ['ក្រហម = Red', 'ខៀវ = Blue', 'ខ្មៅ = Black', 'ស = White', 'បៃតង = Green', 'លឿង = Yellow', 'ផ្កាឈូក = Pink', 'ស្វាយ = Purple', 'ប្រផេះ = Gray', 'ត្នោត = Brown'] },
-  { name: 'អាហារ (Food)', words: ['បាយ = Rice', 'សាច់ជ្រូក = Pork', 'សាច់មាន់ = Chicken', 'ត្រី = Fish', 'នំប៉័ង = Bread', 'ស៊ុត = Egg', 'ទឹកដោះគោ = Milk', 'បន្លែ = Vegetable', 'សាច់គោ = Beef', 'ស៊ុប = Soup'] },
-  { name: 'ផ្លែឈើ (Fruits)', words: ['ផ្លែប៉ោម = Apple', 'ចេក = Banana', 'ក្រូច = Orange', 'ស្វាយ = Mango', 'ទំពាំងបាយជូរ = Grape', 'ម្នាស់ = Pineapple', 'ឪឡឹក = Watermelon', 'ល្ហុង = Papaya', 'ដូង = Coconut', 'ស្រ្តបឺរី = Strawberry'] },
-  { name: 'សត្វ (Animals)', words: ['ឆ្កែ = Dog', 'ឆ្មា = Cat', 'សត្វគោ = Cow', 'សេះ = Horse', 'បក្សី = Bird', 'ជ្រូក = Pig', 'មាន់ = Chicken', 'ត្រី = Fish', 'ខ្លា = Tiger', 'ដំរី = Elephant'] },
-  { name: 'យានយន្ត (Vehicles)', words: ['ឡាន = Car', 'ម៉ូតូ = Motorcycle', 'កង់ = Bicycle', 'យន្តហោះ = Airplane', 'រថភ្លើង = Train', 'ទូក = Boat', 'កប៉ាល់ = Ship', 'ឡានក្រុង = Bus', 'តាក់ស៊ី = Taxi', 'ឡានដឹកទំនិញ = Truck'] },
-  { name: 'ផ្ទះ (House)', words: ['បន្ទប់គេង = Bedroom', 'បន្ទប់ទឹក = Bathroom', 'ផ្ទះបាយ = Kitchen', 'ទ្វារ = Door', 'បង្អួច = Window', 'តុ = Table', 'កៅអី = Chair', 'គ្រែ = Bed', 'ទូរទស្សន៍ = Television', 'សួនច្បារ = Garden'] },
-  { name: 'សម្លៀកបំពាក់ (Clothes)', words: ['អាវ = Shirt', 'ខោ = Pants', 'ស្បែកជើង = Shoes', 'មួក = Hat', 'រ៉ូប = Dress', 'សំពត់ = Skirt', 'អាវរងា = Jacket/Coat', 'ស្រោមជើង = Socks', 'ខ្សែក្រវាត់ = Belt', 'វ៉ែនតា = Glasses'] },
-  { name: 'មុខរបរ (Occupations)', words: ['គ្រូបង្រៀន = Teacher', 'គ្រូពេទ្យ = Doctor', 'ប៉ូលីស = Police', 'កសិករ = Farmer', 'សិស្ស = Student', 'វិស្វករ = Engineer', 'អ្នកចំរៀង = Singer', 'អ្នកបើកបរ = Driver', 'ចុងភៅ = Chef', 'គិលានុបដ្ឋាយិកា = Nurse'] }
-];
+
 
 const verbCategories = [
   { name: 'កិរិយាសព្ទប្រចាំថ្ងៃ (Daily Verbs)', words: ['ញ៉ាំ = Eat', 'ផឹក = Drink', 'គេង = Sleep', 'ដើរ = Walk', 'រត់ = Run', 'អាន = Read', 'សរសេរ = Write', 'ស្តាប់ = Listen', 'និយាយ = Speak', 'មើល = Look/Watch'] },
