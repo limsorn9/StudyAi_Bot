@@ -26,6 +26,12 @@ const {
   getDashboardMarkup,
   getGenKeyMarkup
 } = require('./admin_dashboard.js');
+const {
+  getGradeTitle,
+  generateCertificateCard,
+  generateCertificateHTML,
+  findNextLesson
+} = require('./certificate_generator.js');
 
 
 // In-memory quiz state: { userId: { questions, currentQ, score, lessonId, answers } }
@@ -1047,41 +1053,20 @@ bot.action('back_to_months', async (ctx) => {
 });
 
 // Handle Week Selection
-bot.action(/week_([^-]+)-(.+)/, async (ctx) => {
-  const monthId = ctx.match[1];
-  const weekId = ctx.match[2];
-
+// Helper: Display Lesson Content & Controls
+async function displayLessonContent(ctx, monthId, weekId, lessonId, userId) {
   const monthData = curriculum.months.find(m => m.id === monthId);
-  if (!monthData) return ctx.answerCbQuery("រកមិនឃើញទិន្នន័យខែ");
+  if (!monthData) return ctx.reply("❌ រកមិនឃើញទិន្នន័យខែ!");
 
   const weekData = monthData.weeks.find(w => w.id === weekId);
-  if (!weekData) return ctx.answerCbQuery("រកមិនឃើញសប្តាហ៍");
-
-  const buttons = weekData.lessons.map(l => [Markup.button.callback(l.title, `lesson_${monthId}-${weekId}-${l.id}`)]);
-  buttons.push([Markup.button.callback('🔙 ត្រឡប់ក្រោយ (Back)', `month_${monthId}`)]);
-
-  await ctx.editMessageText(`📅 ${monthData.title} > ${weekData.title}\nសូមជ្រើសរើសមេរៀន៖`, Markup.inlineKeyboard(buttons));
-});
-
-// Handle Lesson Selection
-bot.action(/lesson_([^-]+)-([^-]+)-(.+)/, async (ctx) => {
-  const monthId = ctx.match[1];
-  const weekId = ctx.match[2];
-  const lessonId = ctx.match[3];
-  
-  const monthData = curriculum.months.find(m => m.id === monthId);
-  if (!monthData) return ctx.answerCbQuery("រកមិនឃើញទិន្នន័យខែ");
-  
-  const weekData = monthData.weeks.find(w => w.id === weekId);
-  if (!weekData) return ctx.answerCbQuery("រកមិនឃើញសប្តាហ៍");
+  if (!weekData) return ctx.reply("❌ រកមិនឃើញសប្តាហ៍!");
 
   const lessonData = weekData.lessons.find(l => l.id === lessonId);
-  if (!lessonData) return ctx.answerCbQuery("រកមិនឃើញមេរៀន");
+  if (!lessonData) return ctx.reply("❌ រកមិនឃើញមេរៀន!");
 
-  const userId = ctx.from.id;
   await setUserState(userId, `learning_${monthId}_${weekId}_${lessonId}`);
-  
-  // Store the lesson text to read it later via TTS
+
+  // Store the lesson text for TTS
   await db.ref(`users/${userId}/latestResponse`).set(lessonData.content);
 
   // Record History
@@ -1091,15 +1076,22 @@ bot.action(/lesson_([^-]+)-([^-]+)-(.+)/, async (ctx) => {
   });
 
   const isVIP = await checkVIP(userId);
+  const lessonKey = `${monthId}-${weekId}-${lessonId}`;
+  const compSnap = await db.ref(`users/${userId}/completed_lessons/${lessonKey}`).once('value');
+  const isCompleted = !!compSnap.val();
 
-  await ctx.reply(lessonData.content, 
-    Markup.inlineKeyboard([
-      [Markup.button.callback(isVIP ? '🔊 អានជាសំឡេង (Listen)' : '🔒 🔊 អានជាសំឡេង (VIP)', `tts_${userId}`)],
-      [Markup.button.callback(isVIP ? '📝 ប្រឡងបញ្ចប់មេរៀន (Quiz)' : '🔒 📝 ប្រឡងបញ្ចប់មេរៀន (VIP)', `quiz_start_${monthId}-${weekId}-${lessonId}`)],
-      [Markup.button.callback('🔙 ត្រឡប់ទៅបញ្ជីមេរៀន', `week_${monthId}-${weekId}`)]
-    ])
-  );
-  
+  const keyboardRows = [
+    [Markup.button.callback(isVIP ? '🔊 អានជាសំឡេង (Listen)' : '🔒 🔊 អានជាសំឡេង (VIP)', `tts_${userId}`)],
+    [Markup.button.callback(isVIP ? '📝 ប្រឡងបញ្ចប់មេរៀន (Quiz)' : '🔒 📝 ប្រឡងបញ្ចប់មេរៀន (VIP)', `quiz_start_${monthId}-${weekId}-${lessonId}`)]
+  ];
+
+  if (isCompleted) {
+    keyboardRows.push([Markup.button.callback('➡️ ទៅមេរៀនបន្ទាប់', `next_lesson_${monthId}-${weekId}-${lessonId}`)]);
+  }
+  keyboardRows.push([Markup.button.callback('🔙 ត្រឡប់ទៅបញ្ជីមេរៀន', `week_${monthId}-${weekId}`)]);
+
+  await ctx.reply(lessonData.content, Markup.inlineKeyboard(keyboardRows));
+
   if (isVIP) {
     const topicName = lessonData.title.includes(':') ? lessonData.title.split(':')[1].trim() : lessonData.title;
     await ctx.reply(`💬 គ្រូ AI ជំនាញផ្នែក "${topicName}" នៅទីនេះហើយ! បើមានចម្ងល់សូមឆាតសួរ។`);
@@ -1111,25 +1103,221 @@ bot.action(/lesson_([^-]+)-([^-]+)-(.+)/, async (ctx) => {
       { parse_mode: 'Markdown' }
     );
   }
+}
+
+// Handle Week Selection (Display lessons list with completed checkmarks)
+bot.action(/week_([^-]+)-(.+)/, async (ctx) => {
+  const monthId = ctx.match[1];
+  const weekId = ctx.match[2];
+  const userId = ctx.from.id.toString();
+
+  const monthData = curriculum.months.find(m => m.id === monthId);
+  if (!monthData) return ctx.answerCbQuery("រកមិនឃើញទិន្នន័យខែ");
+
+  const weekData = monthData.weeks.find(w => w.id === weekId);
+  if (!weekData) return ctx.answerCbQuery("រកមិនឃើញសប្តាហ៍");
+
+  // Fetch completed lessons for this student
+  let completedMap = {};
+  try {
+    const compSnap = await db.ref(`users/${userId}/completed_lessons`).once('value');
+    completedMap = compSnap.val() || {};
+  } catch (e) {}
+
+  const buttons = weekData.lessons.map(l => {
+    const key = `${monthId}-${weekId}-${l.id}`;
+    const comp = completedMap[key];
+    const prefix = comp ? '✅ ' : '';
+    const suffix = comp ? ` (ជាប់ ថ្នាក់ ${comp.grade})` : '';
+    return [Markup.button.callback(`${prefix}${l.title}${suffix}`, `lesson_${monthId}-${weekId}-${l.id}`)];
+  });
+  buttons.push([Markup.button.callback('🔙 ត្រឡប់ក្រោយ (Back)', `month_${monthId}`)]);
+
+  await ctx.editMessageText(`📅 ${monthData.title} > ${weekData.title}\nសូមជ្រើសរើសមេរៀន៖`, Markup.inlineKeyboard(buttons));
+});
+
+// Handle Lesson Click: Check if already completed
+bot.action(/lesson_([^-]+)-([^-]+)-(.+)/, async (ctx) => {
+  await ctx.answerCbQuery();
+  const monthId = ctx.match[1];
+  const weekId = ctx.match[2];
+  const lessonId = ctx.match[3];
+  const userId = ctx.from.id.toString();
+
+  const monthData = curriculum.months.find(m => m.id === monthId);
+  if (!monthData) return;
+  const weekData = monthData.weeks.find(w => w.id === weekId);
+  if (!weekData) return;
+  const lessonData = weekData.lessons.find(l => l.id === lessonId);
+  if (!lessonData) return;
+
+  const lessonKey = `${monthId}-${weekId}-${lessonId}`;
+  let compData = null;
+  try {
+    const compSnap = await db.ref(`users/${userId}/completed_lessons/${lessonKey}`).once('value');
+    compData = compSnap.val();
+  } catch (e) {}
+
+  // If already completed: show congratulatory prompt with options
+  if (compData) {
+    const completedDate = new Date(compData.completedAt).toLocaleString('en-GB', {
+      timeZone: 'Asia/Phnom_Penh',
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
+
+    const promptText = (
+      `🎉 *អ្នកបានរៀន និងប្រឡងជាប់មេរៀននេះដោយជោគជ័យរួចហើយ!* 🎉\n\n` +
+      `📚 មេរៀន៖ *${lessonData.title}*\n` +
+      `🏆 និទ្ទេសសម្រេចបាន៖ *ថ្នាក់ ${compData.grade}* (${compData.score}/${compData.total} ពិន្ទុ)\n` +
+      `📅 កាលបរិច្ឆេទបញ្ចប់៖ *${completedDate}*\n\n` +
+      `👇 *តើអ្នកចង់រៀនមេរៀននេះម្តងទៀត ឬទៅមេរៀនបន្ទាប់វិញ?*`
+    );
+
+    return ctx.reply(promptText, {
+      parse_mode: 'Markdown',
+      reply_markup: Markup.inlineKeyboard([
+        [Markup.button.callback('📖 រៀនមេរៀននេះម្តងទៀត', `relearn_${monthId}-${weekId}-${lessonId}`)],
+        [Markup.button.callback('➡️ ទៅមេរៀនបន្ទាប់', `next_lesson_${monthId}-${weekId}-${lessonId}`)],
+        [Markup.button.callback('🔙 ត្រឡប់ទៅបញ្ជីមេរៀន', `week_${monthId}-${weekId}`)]
+      ]).reply_markup
+    });
+  }
+
+  // First time or not yet passed: display lesson directly
+  await displayLessonContent(ctx, monthId, weekId, lessonId, userId);
+});
+
+// Re-learn action (force reload lesson content)
+bot.action(/relearn_([^-]+)-([^-]+)-(.+)/, async (ctx) => {
+  await ctx.answerCbQuery();
+  const monthId = ctx.match[1];
+  const weekId = ctx.match[2];
+  const lessonId = ctx.match[3];
+  const userId = ctx.from.id.toString();
+  await displayLessonContent(ctx, monthId, weekId, lessonId, userId);
+});
+
+// Next Lesson action
+bot.action(/next_lesson_([^-]+)-([^-]+)-(.+)/, async (ctx) => {
+  await ctx.answerCbQuery();
+  const monthId = ctx.match[1];
+  const weekId = ctx.match[2];
+  const lessonId = ctx.match[3];
+  const userId = ctx.from.id.toString();
+
+  const next = findNextLesson(curriculum, monthId, weekId, lessonId);
+  if (!next || next.isEnd) {
+    return ctx.reply(
+      `🏆 *អបអរសាទរយ៉ាងក្រៃលែង!* 🎉\n\n` +
+      `អ្នកបានរៀន និងប្រឡងបញ្ចប់គ្រប់មេរៀនទាំងអស់ក្នុងកម្មវិធីសិក្សាហើយ! 👏🌟\n` +
+      `អ្នកពិតជាមានការតស៊ូ និងឆ្នើមណាស់!`,
+      { parse_mode: 'Markdown' }
+    );
+  }
+
+  await ctx.reply(`➡️ *កំពុងបន្តទៅកាន់មេរៀនបន្ទាប់៖*\n📚 ${next.lessonTitle}`, { parse_mode: 'Markdown' });
+  await displayLessonContent(ctx, next.monthId, next.weekId, next.lessonId, userId);
 });
 
 
-// ========================
-// QUIZ SYSTEM
-// ========================
+// ==========================================
+// INTERACTIVE QUIZ SYSTEM (PREV / NEXT / SUBMIT / CERTIFICATE)
+// ==========================================
 
-function sendQuestion(ctx, userId, state) {
-  const q = state.questions[state.currentQ];
-  const qNum = state.currentQ + 1;
+/**
+ * Render Question with Options, Navigation (Prev/Next), and Submit
+ */
+async function renderQuizQuestion(ctx, userId, isEdit = false) {
+  const state = quizState[userId];
+  if (!state) return;
+
+  const currentQ = state.currentQ;
   const total = state.questions.length;
-  const text = `📝 *សំណួរទី ${qNum}/${total}*\n\n${q.q}`;
-  return ctx.reply(text, {
-    parse_mode: 'Markdown',
-    reply_markup: Markup.inlineKeyboard([
-      [Markup.button.callback(q.c[0], `quiz_ans_A`), Markup.button.callback(q.c[1], `quiz_ans_B`)],
-      [Markup.button.callback(q.c[2], `quiz_ans_C`), Markup.button.callback(q.c[3], `quiz_ans_D`)]
-    ]).reply_markup
-  });
+  const q = state.questions[currentQ];
+  const selected = state.userAnswers[currentQ]; // 'A', 'B', 'C', 'D' or undefined
+
+  // Option button text with indicator if selected
+  const getOptLabel = (choiceLetter, fullText) => {
+    const cleanText = fullText.replace(/^[A-D]\)\s*/, '');
+    if (selected === choiceLetter) {
+      return `🔘 [ ${choiceLetter} ] ${cleanText}`;
+    }
+    return `${choiceLetter}) ${cleanText}`;
+  };
+
+  const keyboardRows = [
+    [
+      Markup.button.callback(getOptLabel('A', q.c[0]), 'q_ans_A'),
+      Markup.button.callback(getOptLabel('B', q.c[1]), 'q_ans_B')
+    ],
+    [
+      Markup.button.callback(getOptLabel('C', q.c[2]), 'q_ans_C'),
+      Markup.button.callback(getOptLabel('D', q.c[3]), 'q_ans_D')
+    ]
+  ];
+
+  // Navigation Row: Prev & Next
+  const navRow = [];
+  if (currentQ > 0) {
+    navRow.push(Markup.button.callback('⬅️ សំណួរមុន', 'q_nav_prev'));
+  }
+  if (currentQ < total - 1) {
+    navRow.push(Markup.button.callback('សំណួរបន្ទាប់ ➡️', 'q_nav_next'));
+  }
+  if (navRow.length > 0) {
+    keyboardRows.push(navRow);
+  }
+
+  // Submit Row
+  const answeredCount = Object.keys(state.userAnswers).length;
+  if (currentQ === total - 1 || answeredCount === total) {
+    keyboardRows.push([
+      Markup.button.callback(`📤 បញ្ជូនចម្លើយ (${answeredCount}/${total})`, 'q_submit')
+    ]);
+  } else {
+    keyboardRows.push([
+      Markup.button.callback(`📊 ឆ្លើយបាន (${answeredCount}/${total}) | បញ្ជូន`, 'q_submit')
+    ]);
+  }
+
+  // Cancel Row
+  keyboardRows.push([
+    Markup.button.callback('❌ បោះបង់ការប្រឡង', 'q_cancel')
+  ]);
+
+  const questionText = (
+    `🎯 *ការប្រឡងបញ្ចប់មេរៀន (MCQ Quiz)*\n` +
+    `📚 *${state.lessonTitle}*\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━\n` +
+    `📝 *សំណួរទី ${currentQ + 1} នៃ ${total} ៖*\n\n` +
+    `*${q.q}*\n\n` +
+    (selected ? `👉 ចម្លើយដែលអ្នកបានជ្រើស: *[ ${selected} ]*` : `_សូមចុចជ្រើសរើសចម្លើយមួយខាងក្រោម៖_`)
+  );
+
+  const markup = Markup.inlineKeyboard(keyboardRows);
+
+  if (isEdit) {
+    try {
+      await ctx.editMessageText(questionText, {
+        parse_mode: 'Markdown',
+        reply_markup: markup.reply_markup
+      });
+    } catch (e) {
+      // If message hasn't changed or edit fails, send new
+      if (!e.message.includes('message is not modified')) {
+        await ctx.reply(questionText, {
+          parse_mode: 'Markdown',
+          reply_markup: markup.reply_markup
+        });
+      }
+    }
+  } else {
+    await ctx.reply(questionText, {
+      parse_mode: 'Markdown',
+      reply_markup: markup.reply_markup
+    });
+  }
 }
 
 // Start Quiz
@@ -1138,9 +1326,9 @@ bot.action(/quiz_start_([^-]+)-([^-]+)-(.+)/, async (ctx) => {
   const monthId = ctx.match[1];
   const weekId = ctx.match[2];
   const lessonId = ctx.match[3];
-  const userId = ctx.from.id;
+  const userId = ctx.from.id.toString();
 
-  // ✅ Check channel membership first
+  // 1. Channel membership guard
   const member = await isMember(userId);
   if (!member) {
     return ctx.reply(
@@ -1155,15 +1343,16 @@ bot.action(/quiz_start_([^-]+)-([^-]+)-(.+)/, async (ctx) => {
     );
   }
 
-  // 💎 Check VIP
+  // 2. VIP Guard
   const vip = await checkVIP(userId);
   if (!vip) {
     return ctx.reply(
       `💎 *មុខងារប្រឡង (Quiz) សម្រាប់សមាជិក VIP ប៉ុណ្ណោះ!*\n\n` +
       `✅ ចូលជា VIP ដើម្បីទទួលបានសិទ្ធិ:\n` +
-      `• ប្រឡង Quiz ជា MCQ ១០ សំណួរ\n` +
-      `• ទទួលពិន្ទុ + ថ្នាក់ (A-F)\n` +
-      `• រក្សាទុកប្រវត្តិពិន្ទុ\n\n` +
+      `• ប្រឡង Quiz MCQ ១០ សំណួរ\n` +
+      `• អាចកែប្រែ និងទៅមុខថយក្រោយមុន Submit\n` +
+      `• ទទួលបានបណ្ណសរសើរផ្លូវការ (Certificate)\n` +
+      `• កត់ត្រាប្រវត្តិពិន្ទុ និងមេរៀនដែលបានបញ្ចប់\n\n` +
       `💰 តម្លៃ: 3$/ខែ | 30$/ឆ្នាំ`,
       {
         parse_mode: 'Markdown',
@@ -1190,113 +1379,308 @@ bot.action(/quiz_start_([^-]+)-([^-]+)-(.+)/, async (ctx) => {
   quizState[userId] = {
     questions,
     currentQ: 0,
-    score: 0,
+    userAnswers: {},
     lessonTitle: lessonData.title,
     lessonId: `${monthId}-${weekId}-${lessonId}`,
-    answers: []
+    monthId,
+    weekId,
+    lessonId
   };
 
-  await ctx.reply(`🎯 *ការប្រឡងបញ្ចប់មេរៀន*\n📚 ${lessonData.title}\n\nខ្ញុំបានរៀបចំ *${questions.length} សំណួរ* ជ្រើសរើសចម្លើយ (MCQ) !\nត្រូវចុចលើ A, B, C ឬ D ។ ចំណាំ: ចុចតែម្ដង!\n\n🏁 ចាប់ផ្ដើម!`, {
-    parse_mode: 'Markdown'
-  });
+  await ctx.reply(
+    `🎯 *ការប្រឡងបញ្ចប់មេរៀន*\n` +
+    `📚 *${lessonData.title}*\n\n` +
+    `ខ្ញុំបានរៀបចំ *${questions.length} សំណួរ* (MCQ)!\n\n` +
+    `💡 *ការណែនាំ៖*\n` +
+    `• ចុចរើសចម្លើយ A, B, C, ឬ D\n` +
+    `• អាចចុច *⬅️ សំណួរមុន* ឬ *សំណួរបន្ទាប់ ➡️* ដើម្បីកែប្រែចម្លើយបាន\n` +
+    `• នៅពេលរួចរាល់ ចុច *"📤 បញ្ជូនចម្លើយ"* ដើម្បីមើលពិន្ទុ និងបណ្ណសរសើរ!\n\n` +
+    `🏁 *សូមចាប់ផ្ដើម!*`,
+    { parse_mode: 'Markdown' }
+  );
 
-  await sendQuestion(ctx, userId, quizState[userId]);
+  await renderQuizQuestion(ctx, userId, false);
 });
 
-// Handle Quiz Answer
-bot.action(/quiz_ans_([ABCD])/, async (ctx) => {
-  await ctx.answerCbQuery();
-  const userId = ctx.from.id;
-  const chosen = ctx.match[1];
+// Quiz Answer Selection
+bot.action(/q_ans_([ABCD])/, async (ctx) => {
+  const userId = ctx.from.id.toString();
+  const state = quizState[userId];
+  if (!state) return ctx.answerCbQuery('⚠️ គ្មានការប្រឡងដែលកំពុងដំណើរការទេ!');
 
-  if (!quizState[userId]) {
-    return ctx.reply('⚠️ គ្មានការប្រឡងដែលកំពុងដំណើរការ! សូមចុច 📝 ប្រឡងបញ្ចប់មេរៀន ម្ដងទៀត។');
+  const chosen = ctx.match[1];
+  state.userAnswers[state.currentQ] = chosen;
+  await ctx.answerCbQuery(`✅ បានជ្រើស [ ${chosen} ]`);
+
+  // Automatically advance to next question if not at last question
+  if (state.currentQ < state.questions.length - 1) {
+    state.currentQ++;
   }
 
+  await renderQuizQuestion(ctx, userId, true);
+});
+
+// Quiz Navigation: Previous Question
+bot.action('q_nav_prev', async (ctx) => {
+  const userId = ctx.from.id.toString();
   const state = quizState[userId];
-  const q = state.questions[state.currentQ];
-  const isCorrect = chosen === q.a;
+  if (!state) return ctx.answerCbQuery('⚠️ គ្មានការប្រឡងកំពុងដំណើរការ!');
 
-  if (isCorrect) state.score++;
+  if (state.currentQ > 0) {
+    state.currentQ--;
+    await ctx.answerCbQuery();
+    await renderQuizQuestion(ctx, userId, true);
+  } else {
+    await ctx.answerCbQuery('នេះជាសំណួរដំបូងហើយ!');
+  }
+});
 
-  // Record answer
-  state.answers.push({
-    q: q.q,
-    chosen: `${chosen}) ${q.c.find(c => c.startsWith(chosen))}`.replace(/^[A-D]\) /, ''),
-    correct: q.c.find(c => c.startsWith(q.a)).replace(/^[A-D]\) /, ''),
-    isCorrect
+// Quiz Navigation: Next Question
+bot.action('q_nav_next', async (ctx) => {
+  const userId = ctx.from.id.toString();
+  const state = quizState[userId];
+  if (!state) return ctx.answerCbQuery('⚠️ គ្មានការប្រឡងកំពុងដំណើរការ!');
+
+  if (state.currentQ < state.questions.length - 1) {
+    state.currentQ++;
+    await ctx.answerCbQuery();
+    await renderQuizQuestion(ctx, userId, true);
+  } else {
+    await ctx.answerCbQuery('នេះជាសំណួរចុងក្រោយហើយ!');
+  }
+});
+
+// Cancel Quiz
+bot.action('q_cancel', async (ctx) => {
+  const userId = ctx.from.id.toString();
+  delete quizState[userId];
+  await ctx.answerCbQuery('❌ បានបោះបង់');
+  await ctx.editMessageText('❌ **បានបោះបង់ការប្រឡង។**\nអ្នកអាចចូលរៀន ឬចាប់ផ្តើមប្រឡងឡើងវិញបានគ្រប់ពេល!');
+});
+
+// Continue answering from submit prompt
+bot.action('q_continue', async (ctx) => {
+  const userId = ctx.from.id.toString();
+  await ctx.answerCbQuery();
+  await renderQuizQuestion(ctx, userId, true);
+});
+
+// Submit Quiz Trigger
+bot.action('q_submit', async (ctx) => {
+  const userId = ctx.from.id.toString();
+  const state = quizState[userId];
+  if (!state) return ctx.answerCbQuery('⚠️ គ្មានការប្រឡងកំពុងដំណើរការ!');
+
+  const answeredCount = Object.keys(state.userAnswers).length;
+  const total = state.questions.length;
+
+  if (answeredCount < total) {
+    await ctx.answerCbQuery();
+    const missing = total - answeredCount;
+    return ctx.editMessageText(
+      `⚠️ *អ្នកមិនទាន់បានឆ្លើយអស់គ្រប់សំណួរនៅឡើយទេ!*\n\n` +
+      `អ្នកឆ្លើយបានតែ *${answeredCount} / ${total}* សំណួរ (នៅសល់ *${missing}* សំណួរមិនទាន់ឆ្លើយ)។\n\n` +
+      `តើអ្នកពិតជាចង់បញ្ជូនចម្លើយឥឡូវនេះមែនទេ?`,
+      {
+        parse_mode: 'Markdown',
+        reply_markup: Markup.inlineKeyboard([
+          [Markup.button.callback('📤 បញ្ជូនចម្លើយភ្លាម (Submit Now)', 'q_confirm_submit')],
+          [Markup.button.callback('✏️ ត្រឡប់ទៅឆ្លើយបន្ត', 'q_continue')]
+        ]).reply_markup
+      }
+    );
+  }
+
+  await ctx.answerCbQuery();
+  await handleQuizSubmission(ctx, userId);
+});
+
+// Confirm submit even with missing answers
+bot.action('q_confirm_submit', async (ctx) => {
+  const userId = ctx.from.id.toString();
+  await ctx.answerCbQuery();
+  await handleQuizSubmission(ctx, userId);
+});
+
+/**
+ * Handle Quiz Submission, Grading, Detailed Breakdown & Certificate Generation
+ */
+async function handleQuizSubmission(ctx, userId) {
+  const state = quizState[userId];
+  if (!state) return;
+
+  const total = state.questions.length;
+  let score = 0;
+  const breakdown = [];
+
+  for (let i = 0; i < total; i++) {
+    const q = state.questions[i];
+    const userChoice = state.userAnswers[i];
+    const isCorrect = userChoice === q.a;
+    if (isCorrect) score++;
+
+    const chosenText = userChoice ? q.c.find(c => c.startsWith(userChoice)) : 'មិនបានឆ្លើយ';
+    const correctText = q.c.find(c => c.startsWith(q.a));
+
+    breakdown.push({
+      num: i + 1,
+      q: q.q,
+      userChoice,
+      chosenText,
+      correctText,
+      isCorrect
+    });
+  }
+
+  const percent = Math.round((score / total) * 100);
+
+  let grade = 'F';
+  if (percent >= 90) grade = 'A';
+  else if (percent >= 80) grade = 'B';
+  else if (percent >= 70) grade = 'C';
+  else if (percent >= 60) grade = 'D';
+  else grade = 'F';
+
+  const isPassed = ['A', 'B', 'C'].includes(grade);
+  const gradeTitle = getGradeTitle(grade);
+
+  // 1. Build Detailed Results Breakdown
+  let resultMsg = (
+    `🎯 *លទ្ធផលការប្រឡងបញ្ចប់មេរៀន*\n` +
+    `📚 *${state.lessonTitle}*\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━\n` +
+    `🏆 និទ្ទេសសម្រេចបាន៖ *ថ្នាក់ ${grade}* (${gradeTitle})\n` +
+    `🎯 ពិន្ទុប្រឡង៖ *${score} / ${total}* (${percent}%)\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+    `📋 *លម្អិតចម្លើយទាំង ${total} សំណួរ ៖*\n\n`
+  );
+
+  breakdown.forEach(item => {
+    if (item.isCorrect) {
+      resultMsg += `✅ *សំណួរទី ${item.num}:* ${item.q}\n`;
+      resultMsg += `   👉 ចម្លើយរបស់អ្នក: *${item.chosenText}* (ត្រឹមត្រូវ 🎉)\n\n`;
+    } else {
+      resultMsg += `❌ *សំណួរទី ${item.num}:* ${item.q}\n`;
+      resultMsg += `   👉 ចម្លើយរបស់អ្នក: ~${item.chosenText}~\n`;
+      resultMsg += `   ✅ ចម្លើយត្រឹមត្រូវ: *${item.correctText}*\n\n`;
+    }
   });
 
-  const feedback = isCorrect
-    ? `✅ *ត្រូវហើយ!* 🎉\n\nចម្លើយត្រឹមត្រូវ: *${q.c.find(c => c.startsWith(q.a))}*`
-    : `❌ *មិនត្រូវទេ!*\n\nអ្នកបានជ្រើស: ${q.c.find(c => c.startsWith(chosen))}\nចម្លើយត្រូវ: *${q.c.find(c => c.startsWith(q.a))}*`;
-
-  await ctx.reply(feedback, { parse_mode: 'Markdown' });
-
-  state.currentQ++;
-
-  if (state.currentQ < state.questions.length) {
-    await sendQuestion(ctx, userId, state);
-  } else {
-    // Quiz finished — show results
-    const score = state.score;
-    const total = state.questions.length;
-    const percent = Math.round((score / total) * 100);
-
-    let grade, emoji;
-    if (percent >= 90) { grade = 'A'; emoji = '🏆'; }
-    else if (percent >= 80) { grade = 'B'; emoji = '🥇'; }
-    else if (percent >= 70) { grade = 'C'; emoji = '🥈'; }
-    else if (percent >= 60) { grade = 'D'; emoji = '🥉'; }
-    else { grade = 'F'; emoji = '📖'; }
-
-    // Build result table
-    let resultText = `${emoji} *លទ្ធផលការប្រឡង*\n`;
-    resultText += `📚 ${state.lessonTitle}\n`;
-    resultText += `━━━━━━━━━━━━━━━━━\n`;
-    resultText += `🎯 ពិន្ទុ: *${score}/${total}* (${percent}%) - ថ្នាក់ *${grade}*\n`;
-    resultText += `━━━━━━━━━━━━━━━━━\n\n`;
-    resultText += `📋 *ចម្លើយលម្អិត:*\n`;
-
-    state.answers.forEach((ans, i) => {
-      const icon = ans.isCorrect ? '✅' : '❌';
-      resultText += `${icon} *ស${i + 1}.* ${ans.q}\n`;
-      if (!ans.isCorrect) {
-        resultText += `   👉 ចម្លើយត្រូវ: _${ans.correct}_\n`;
-      }
-      resultText += '\n';
-    });
-
-    if (percent >= 70) {
-      resultText += `🌟 *សូមអបអរ! អ្នកបានប្រឡងជាប់!*`;
-    } else {
-      resultText += `💪 *ព្យាយាមម្ដងទៀតបន្ទាប់ពីបានរៀនម្ដងទៀត!*`;
-    }
-
-    // Save result to Firebase
-    if (db) {
+  // Save Quiz Log to Firebase
+  if (db) {
+    try {
       await db.ref(`users/${userId}/quiz_results/${state.lessonId}_${Date.now()}`).set({
         lessonTitle: state.lessonTitle,
+        lessonId: state.lessonId,
         score,
         total,
         percent,
         grade,
+        isPassed,
         timestamp: Date.now()
+      });
+    } catch (e) {}
+  }
+
+  // Send Breakdown Message (Split if long)
+  if (resultMsg.length > 3800) {
+    const summary = (
+      `🎯 *លទ្ធផលការប្រឡងបញ្ចប់មេរៀន*\n` +
+      `📚 *${state.lessonTitle}*\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━\n` +
+      `🏆 និទ្ទេស៖ *ថ្នាក់ ${grade}* (${percent}%)\n` +
+      `🎯 ពិន្ទុ៖ *${score} / ${total}*\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━`
+    );
+    await ctx.reply(summary, { parse_mode: 'Markdown' });
+  } else {
+    await ctx.reply(resultMsg, { parse_mode: 'Markdown' });
+  }
+
+  // IF PASSED (Grade A, B, C): Mark Completed & Issue Certificate
+  if (isPassed) {
+    // 1. Mark lesson completed in Firebase
+    if (db) {
+      await db.ref(`users/${userId}/completed_lessons/${state.lessonId}`).set({
+        lessonId: state.lessonId,
+        lessonTitle: state.lessonTitle,
+        monthId: state.monthId,
+        weekId: state.weekId,
+        grade,
+        score,
+        total,
+        percent,
+        completedAt: Date.now()
       });
     }
 
-    // Split long message if needed
-    const maxLen = 3800;
-    if (resultText.length > maxLen) {
-      const summary = `${emoji} *លទ្ធផលការប្រឡង*\n📚 ${state.lessonTitle}\n━━━━━━━━━━━━━━━━━\n🎯 ពិន្ទុ: *${score}/${total}* (${percent}%) - ថ្នាក់ *${grade}*\n━━━━━━━━━━━━━━━━━\n${percent >= 70 ? '🌟 *សូមអបអរ! អ្នកបានប្រឡងជាប់!*' : '💪 *ព្យាយាមម្ដងទៀត!*'}`;
-      await ctx.reply(summary, { parse_mode: 'Markdown' });
-    } else {
-      await ctx.reply(resultText, { parse_mode: 'Markdown' });
+    const studentName = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ') || `សិស្ស ID ${userId}`;
+    const certId = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const dateStr = new Date().toLocaleDateString('km-KH');
+
+    const certData = {
+      studentName,
+      userId,
+      lessonTitle: state.lessonTitle,
+      grade,
+      score,
+      total,
+      percent,
+      dateStr,
+      certId
+    };
+
+    // 2. Send Telegram Certificate Card
+    const certCard = generateCertificateCard(certData);
+    await ctx.reply(certCard, { parse_mode: 'Markdown' });
+
+    // 3. Send Printable HTML Certificate File
+    try {
+      const certHtml = generateCertificateHTML(certData);
+      const safeFilename = `Certificate_${state.lessonId}.html`;
+      await ctx.replyWithDocument(
+        { source: Buffer.from(certHtml, 'utf-8'), filename: safeFilename },
+        {
+          caption: `🎓 *បណ្ណសរសើរផ្លូវការ (Certificate of Achievement)*\n` +
+                   `លោកគ្រូបានរៀបចំបណ្ណសរសើរយ៉ាងស្រស់ស្អាតជូនអ្នក! ចុចទាញយកដើម្បីបើកមើលលើទូរសព្ទ/កុំព្យូទ័រ ឬ Save ជា PDF!`,
+          parse_mode: 'Markdown'
+        }
+      );
+    } catch (e) {
+      console.error("Certificate document send error:", e);
     }
 
-    delete quizState[userId];
+    // 4. Navigation Buttons after Success
+    await ctx.reply(
+      `🌟 *អបអរសាទរ! អ្នកបានបញ្ចប់មេរៀននេះដោយជោគជ័យ!* 🌟\n\n` +
+      `តើអ្នកចង់បន្តទៅមេរៀនបន្ទាប់ ឬយ៉ាងណា?`,
+      {
+        parse_mode: 'Markdown',
+        reply_markup: Markup.inlineKeyboard([
+          [Markup.button.callback('➡️ ទៅមេរៀនបន្ទាប់', `next_lesson_${state.lessonId}`)],
+          [Markup.button.callback('📖 រៀនមេរៀននេះម្តងទៀត', `relearn_${state.lessonId}`)],
+          [Markup.button.callback('🔙 ត្រឡប់ទៅបញ្ជីមេរៀន', `week_${state.monthId}-${state.weekId}`)]
+        ]).reply_markup
+      }
+    );
+  } else {
+    // FAILED (Grade D or F)
+    await ctx.reply(
+      `💪 *ព្យាយាមម្តងទៀតណា៎!* អ្នកទទួលបានពិន្ទុ *${score}/${total}* (ថ្នាក់ *${grade}*)។\n\n` +
+      `ដើម្បីបញ្ចប់មេរៀននេះដោយជោគជ័យ និងទទួលបានបណ្ណសរសើរ អ្នកត្រូវប្រឡងជាប់និទ្ទេស *A, B, ឬ C* (យ៉ាងតិច 7/10 ពិន្ទុឡើងទៅ)។`,
+      {
+        parse_mode: 'Markdown',
+        reply_markup: Markup.inlineKeyboard([
+          [Markup.button.callback('🔄 ប្រឡងម្តងទៀត', `quiz_start_${state.lessonId}`)],
+          [Markup.button.callback('📖 អានមេរៀនឡើងវិញ', `relearn_${state.lessonId}`)],
+          [Markup.button.callback('🔙 ត្រឡប់ទៅបញ្ជីមេរៀន', `week_${state.monthId}-${state.weekId}`)]
+        ]).reply_markup
+      }
+    );
   }
-});
+
+  delete quizState[userId];
+}
 
 // View Quiz History (scores)
 bot.command('scores', async (ctx) => {
