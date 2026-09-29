@@ -25,6 +25,7 @@ const STATE = {
 
 document.addEventListener('DOMContentLoaded', async () => {
   initTelegramWebApp();
+  initFirebaseClient();
   loadSavedUserSession();
   await loadCurriculum();
   await loadVerbsData();
@@ -34,6 +35,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     refreshUserProfile();
   }
 });
+
+async function initFirebaseClient() {
+  try {
+    if (window.firebase) {
+      const res = await fetch('/api/auth/firebase-config');
+      const cfg = await res.json();
+      if (cfg && cfg.success && cfg.projectId && !firebase.apps.length) {
+        const fbConfig = {
+          projectId: cfg.projectId,
+          authDomain: cfg.authDomain,
+          databaseURL: cfg.databaseURL
+        };
+        if (cfg.apiKey) fbConfig.apiKey = cfg.apiKey;
+        firebase.initializeApp(fbConfig);
+        console.log('🔥 Firebase Web Client initialized:', cfg.projectId);
+      }
+    }
+  } catch (e) {
+    console.warn('Firebase client config init note:', e.message);
+  }
+}
 
 /**
  * Detect & Initialize Telegram WebApp (Mini App)
@@ -85,25 +107,53 @@ async function authenticateWithTelegram(tgUser) {
   }
 }
 
-function loadSavedUserSession() {
+function getOrCreateDeviceId() {
+  let id = localStorage.getItem('studyai_device_id');
+  if (!id) {
+    id = 'dev_' + Math.random().toString(36).substring(2, 10);
+    localStorage.setItem('studyai_device_id', id);
+  }
+  return id;
+}
+
+function setCurrentUser(user, sessionToken, deviceId) {
+  STATE.currentUser = user;
+  try {
+    localStorage.setItem('studyai_user_session', JSON.stringify(user));
+    if (sessionToken) localStorage.setItem('studyai_session_token', sessionToken);
+    if (deviceId) localStorage.setItem('studyai_device_id', deviceId);
+  } catch (e) {}
+
+  updateUserInterface();
+}
+
+async function loadSavedUserSession() {
   try {
     const saved = localStorage.getItem('studyai_user_session');
+    const sessionToken = localStorage.getItem('studyai_session_token');
+    const deviceId = getOrCreateDeviceId();
+
     if (saved) {
       const user = JSON.parse(saved);
       setCurrentUser(user);
+
+      // Verify active session with server
+      if (user.id && sessionToken) {
+        fetch(`/api/auth/check-session?userId=${encodeURIComponent(user.id)}&deviceId=${encodeURIComponent(deviceId)}&sessionToken=${encodeURIComponent(sessionToken)}`)
+          .then(res => res.json())
+          .then(data => {
+            if (data && data.valid === false && data.reason === 'revoked') {
+              console.warn('Device session has been revoked by user.');
+              handleLogout(true);
+              showToast('🔒 ឧបករណ៍នេះត្រូវបានផ្តាច់ចេញពីគណនីរួចរាល់ហើយ', 'info');
+            }
+          })
+          .catch(() => {});
+      }
     }
   } catch (e) {
     console.error('Failed to restore session:', e);
   }
-}
-
-function setCurrentUser(user) {
-  STATE.currentUser = user;
-  try {
-    localStorage.setItem('studyai_user_session', JSON.stringify(user));
-  } catch (e) {}
-
-  updateUserInterface();
 }
 
 function updateUserInterface() {
@@ -1136,116 +1186,285 @@ function openProfileModal() {
   }
 
   openModal('profileModal');
+  loadUserDevices();
 }
 
-function handleLogout() {
+function handleLogout(silent = false) {
   closeModal('profileModal');
   localStorage.removeItem('studyai_user_session');
+  localStorage.removeItem('studyai_session_token');
   STATE.currentUser = null;
   updateUserInterface();
-  showToast('បានចាកចេញពីគណនីជោគជ័យ', 'info');
-  navigateTo('dashboard');
+  if (!silent) {
+    showToast('បានចាកចេញពីគណនីជោគជ័យ', 'info');
+    navigateTo('dashboard');
+  }
 }
+
+// ------------------------------------------
+// MULTI-DEVICE MANAGEMENT
+// ------------------------------------------
+
+async function loadUserDevices() {
+  const container = document.getElementById('profileDevicesList');
+  if (!container || !STATE.currentUser) return;
+
+  const currentDeviceId = getOrCreateDeviceId();
+  container.innerHTML = '<div class="text-xs text-slate-500 text-center py-2">⏳ កំពុងផ្ទុកបញ្ជីឧបករណ៍...</div>';
+
+  try {
+    const res = await fetch(`/api/auth/devices/${encodeURIComponent(STATE.currentUser.id)}?currentDeviceId=${encodeURIComponent(currentDeviceId)}`);
+    const data = await res.json();
+    if (!data.success || !data.devices) {
+      container.innerHTML = '<div class="text-xs text-slate-500 text-center py-2">មិនមានព័ត៌មានឧបករណ៍ទេ</div>';
+      return;
+    }
+
+    if (data.devices.length === 0) {
+      container.innerHTML = '<div class="text-xs text-slate-500 text-center py-2">មិនមានឧបករណ៍សកម្ម</div>';
+      return;
+    }
+
+    container.innerHTML = data.devices.map(dev => {
+      const isCur = dev.isCurrent;
+      const lastActiveDate = dev.lastActive
+        ? new Date(dev.lastActive).toLocaleDateString('km-KH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+        : 'ថ្មីៗ';
+
+      return `
+        <div class="device-item-card ${isCur ? 'current' : ''}">
+          <div class="device-info-left">
+            <div class="device-name-title">
+              💻 ${dev.deviceName || 'Web Browser'}
+              ${isCur ? '<span class="device-current-tag">ឧបករណ៍នេះ</span>' : ''}
+            </div>
+            <div class="device-meta-sub">
+              សកម្មចុងក្រោយ៖ ${lastActiveDate} • IP: ${dev.ip || 'Local'}
+            </div>
+          </div>
+          ${!isCur ? `
+            <button type="button" class="btn btn-xs btn-outline-danger" onclick="revokeDevice('${dev.deviceId}')">
+              ផ្តាច់
+            </button>
+          ` : `
+            <span class="text-xs text-emerald-400 font-semibold">សកម្ម</span>
+          `}
+        </div>
+      `;
+    }).join('');
+  } catch (err) {
+    container.innerHTML = '<div class="text-xs text-rose-400 text-center py-2">ផ្ទុកបញ្ជីឧបករណ៍មិនបានជោគជ័យ</div>';
+  }
+}
+
+async function revokeDevice(targetDeviceId) {
+  if (!STATE.currentUser || !targetDeviceId) return;
+  if (!confirm('តើអ្នកពិតជាចង់ផ្តាច់គណនីចេញពីឧបករណ៍នោះមែនទេ?')) return;
+
+  try {
+    showToast('⏳ កំពុងផ្តាច់ឧបករណ៍...', 'info');
+    const res = await fetch('/api/auth/revoke-device', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: STATE.currentUser.id,
+        targetDeviceId
+      })
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'ផ្តាច់មិនបានជោគជ័យ');
+
+    showToast('✅ ផ្តាច់ឧបករណ៍បានជោគជ័យ!', 'success');
+    loadUserDevices();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+// ------------------------------------------
+// MODAL TABS SWITCHING
+// ------------------------------------------
 
 function switchLoginTab(tab) {
-  const standardForm = document.getElementById('standardLoginForm');
-  const syncForm = document.getElementById('syncCodeLoginForm');
-  const btnStd = document.getElementById('loginTabStandard');
-  const btnSync = document.getElementById('loginTabSync');
+  const secTg = document.getElementById('loginSectionTg');
+  const secEmail = document.getElementById('loginSectionEmail');
+  const tabTg = document.getElementById('loginTabTg');
+  const tabEmail = document.getElementById('loginTabEmail');
 
-  if (tab === 'standard') {
-    standardForm.classList.remove('hidden');
-    syncForm.classList.add('hidden');
-    btnStd.classList.add('active');
-    btnSync.classList.remove('active');
+  if (tab === 'email' || tab === 'gmail') {
+    if (secEmail) secEmail.classList.remove('hidden');
+    if (secTg) secTg.classList.add('hidden');
+    if (tabEmail) tabEmail.classList.add('active');
+    if (tabTg) tabTg.classList.remove('active');
   } else {
-    standardForm.classList.add('hidden');
-    syncForm.classList.remove('hidden');
-    btnStd.classList.remove('active');
-    btnSync.classList.add('active');
+    if (secTg) secTg.classList.remove('hidden');
+    if (secEmail) secEmail.classList.add('hidden');
+    if (tabTg) tabTg.classList.add('active');
+    if (tabEmail) tabEmail.classList.remove('active');
   }
 }
 
-async function handleStandardLogin(e) {
-  e.preventDefault();
-  const username = document.getElementById('loginUsername').value.trim();
-  const password = document.getElementById('loginPassword').value;
+function switchRegTab(tab) {
+  const secGmail = document.getElementById('regSectionGmail');
+  const secTg = document.getElementById('regSectionTg');
+  const tabGmail = document.getElementById('regTabGmail');
+  const tabTg = document.getElementById('regTabTg');
 
+  if (tab === 'telegram' || tab === 'tg') {
+    if (secTg) secTg.classList.remove('hidden');
+    if (secGmail) secGmail.classList.add('hidden');
+    if (tabTg) tabTg.classList.add('active');
+    if (tabGmail) tabGmail.classList.remove('active');
+  } else {
+    if (secGmail) secGmail.classList.remove('hidden');
+    if (secTg) secTg.classList.add('hidden');
+    if (tabGmail) tabGmail.classList.add('active');
+    if (tabTg) tabTg.classList.remove('active');
+  }
+}
+
+// ------------------------------------------
+// GOOGLE 1-CLICK AUTHENTICATION
+// ------------------------------------------
+
+async function handleGoogleSignIn() {
   try {
-    showToast('⏳ កំពុងផ្ទៀងផ្ទាត់...', 'info');
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password })
+    showToast('⏳ កំពុងដំណើរការ Google Sign-In...', 'info');
+
+    // 1. Check if Firebase Web SDK is available and configured
+    if (window.firebase && window.firebase.auth) {
+      try {
+        const provider = new firebase.auth.GoogleAuthProvider();
+        provider.setCustomParameters({ prompt: 'select_account' });
+        const result = await firebase.auth().signInWithPopup(provider);
+        const gUser = result.user;
+        if (gUser && gUser.email) {
+          return await sendGoogleAuthToServer({
+            email: gUser.email,
+            name: gUser.displayName || gUser.email.split('@')[0],
+            photoUrl: gUser.photoURL || '',
+            googleId: gUser.uid
+          });
+        }
+      } catch (fbErr) {
+        console.warn('Firebase popup attempt note:', fbErr.message);
+      }
+    }
+
+    // 2. Direct seamless Gmail input prompt
+    const promptGmail = prompt('សូមបញ្ចូលអាសយដ្ឋាន Gmail (@gmail.com) របស់អ្នកដើម្បីចូល/ចុះឈ្មោះដោយស្វ័យប្រវត្ត៖');
+    if (!promptGmail) return;
+
+    const cleanGmail = promptGmail.trim().toLowerCase();
+    if (!cleanGmail.endsWith('@gmail.com')) {
+      return showToast('❌ តម្រូវឱ្យប្រើប្រាស់គណនី Gmail (@gmail.com) ប៉ុណ្ណោះ!', 'error');
+    }
+
+    await sendGoogleAuthToServer({
+      email: cleanGmail,
+      name: cleanGmail.split('@')[0],
+      googleId: 'g_' + Math.random().toString(36).substring(2, 10)
     });
-    const data = await res.json();
-
-    if (!data.success) throw new Error(data.error);
-
-    setCurrentUser(data.user);
-    closeModal('loginModal');
-    showToast(`🎉 ស្វាគមន៍ ${data.user.name}! ចូលគណនីជោគជ័យ`, 'success');
-    refreshUserProfile();
   } catch (err) {
-    showToast(err.message, 'error');
+    showToast(err.message || 'មានបញ្ហាក្នុងការផ្ទៀងផ្ទាត់ Google', 'error');
   }
 }
 
-async function handleSyncCodeLogin(e) {
-  e.preventDefault();
-  const code = document.getElementById('loginSyncCode').value.trim();
+async function sendGoogleAuthToServer(payload) {
+  showToast('⏳ កំពុងផ្ទៀងផ្ទាត់គណនី Google...', 'info');
+  const deviceId = getOrCreateDeviceId();
+  const res = await fetch('/api/auth/google', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      ...payload,
+      deviceId,
+      userAgent: navigator.userAgent
+    })
+  });
+  const data = await res.json();
+  if (!data.success) throw new Error(data.error || 'ការផ្ទៀងផ្ទាត់មិនជោគជ័យ');
 
-  try {
-    showToast('⏳ កំពុងផ្ទៀងផ្ទាត់លេខកូដ Telegram...', 'info');
-    const res = await fetch('/api/auth/sync-code', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code })
-    });
-    const data = await res.json();
-
-    if (!data.success) throw new Error(data.error);
-
-    setCurrentUser(data.user);
-    closeModal('loginModal');
-    showToast(data.message, 'success');
-    refreshUserProfile();
-  } catch (err) {
-    showToast(err.message, 'error');
-  }
+  setCurrentUser(data.user, data.sessionToken, data.deviceId);
+  closeModal('loginModal');
+  closeModal('registerModal');
+  showToast(`🎉 ស្វាគមន៍ ${data.user.name}! ចូលគណនី Google (Gmail) ជោគជ័យ`, 'success');
+  refreshUserProfile();
 }
 
-async function handleRegister(e) {
-  e.preventDefault();
-  const fullName = document.getElementById('regFullName').value.trim();
-  const username = document.getElementById('regUsername').value.trim();
-  const gmail = document.getElementById('regGmail').value.trim();
-  const password = document.getElementById('regPassword').value;
-  const syncCode = document.getElementById('regSyncCode').value.trim();
+// ------------------------------------------
+// GMAIL REGISTRATION WITH 6-DIGIT OTP
+// ------------------------------------------
 
-  // Validate Gmail
+async function handleSendRegisterOtp(e) {
+  if (e) e.preventDefault();
+  const fullName = document.getElementById('regFullName')?.value?.trim();
+  const gmail = document.getElementById('regGmail')?.value?.trim();
+
+  if (!fullName) return showToast('❌ សូមបញ្ចូលឈ្មោះពេញរបស់អ្នក!', 'error');
+  if (!gmail) return showToast('❌ សូមបញ្ចូលអាសយដ្ឋាន Gmail!', 'error');
   if (!gmail.toLowerCase().endsWith('@gmail.com')) {
     return showToast('❌ តម្រូវឱ្យប្រើប្រាស់គណនី Gmail (@gmail.com) ប៉ុណ្ណោះ!', 'error');
   }
 
+  const btn = document.getElementById('btnSubmitRegGmail');
+  const origText = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span>⏳ កំពុងផ្ញើ OTP ទៅ Gmail...</span>';
+  }
+
   try {
-    showToast('⏳ កំពុងចុះឈ្មោះ និងភ្ជាប់ Firebase Auth...', 'info');
-    const res = await fetch('/api/auth/register', {
+    showToast('⏳ កំពុងផ្ញើលេខកូដ OTP ទៅកាន់ Gmail...', 'info');
+    const res = await fetch('/api/auth/send-register-otp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fullName, username, gmail, password, syncCode })
+      body: JSON.stringify({ fullName, gmail })
     });
     const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'ផ្ញើ OTP មិនជោគជ័យ');
 
-    if (!data.success) throw new Error(data.error);
+    STATE.pendingRegisterName = fullName;
+    STATE.pendingVerifyEmail = gmail;
+    STATE.pendingVerifyCode = data.previewCode || null;
 
-    setCurrentUser(data.user);
     closeModal('registerModal');
-    showToast(`🎉 ចុះឈ្មោះគណនី Gmail ជោគជ័យ! សូមផ្ទៀងផ្ទាត់លេខកូដ Firebase។`, 'success');
-    refreshUserProfile();
+    openVerifyEmailModal(gmail, data.previewCode, null);
+    showToast(`✅ ${data.message || 'បានផ្ញើលេខកូដ ៦ ខ្ទង់ទៅ Gmail!'}`, 'success');
+  } catch (err) {
+    showToast(err.message, 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = origText;
+    }
+  }
+}
 
-    // Trigger Firebase Email Verification Modal
-    openVerifyEmailModal(data.user.gmail, data.verificationCode, data.verificationLink);
+async function handleVerifyRegisterOtp(e) {
+  if (e) e.preventDefault();
+  const gmail = STATE.pendingVerifyEmail;
+  const fullName = STATE.pendingRegisterName;
+  const code = (document.getElementById('verifyOtpCodeInput')?.value || '').trim();
+
+  if (!gmail) return showToast('❌ មិនមានព័ត៌មាន Gmail ទេ!', 'error');
+  if (!code || code.length !== 6) return showToast('❌ សូមបញ្ចូលលេខកូដ OTP ៦ ខ្ទង់!', 'error');
+
+  try {
+    showToast('⏳ កំពុងផ្ទៀងផ្ទាត់ OTP...', 'info');
+    const deviceId = getOrCreateDeviceId();
+    const res = await fetch('/api/auth/verify-register-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fullName, gmail, code, deviceId, userAgent: navigator.userAgent })
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'ការផ្ទៀងផ្ទាត់មិនត្រឹមត្រូវ');
+
+    setCurrentUser(data.user, data.sessionToken, data.deviceId);
+    closeModal('verifyEmailModal');
+    showToast(`🎉 ${data.message || 'ចុះឈ្មោះ និងចូលគណនីជោគជ័យ!'}`, 'success');
+    refreshUserProfile();
   } catch (err) {
     showToast(err.message, 'error');
   }
@@ -1276,31 +1495,20 @@ function openVerifyEmailModal(gmail, verificationCode, verificationLink) {
     }
   }
 
-  const linkWrap = document.getElementById('verifyFirebaseLinkWrapper');
-  const linkBtn = document.getElementById('verifyFirebaseLinkBtn');
-  if (linkWrap && linkBtn) {
-    if (verificationLink) {
-      linkWrap.classList.remove('hidden');
-      linkBtn.href = verificationLink;
-    } else {
-      linkWrap.classList.add('hidden');
-    }
-  }
-
   openModal('verifyEmailModal');
 }
 
 function openVerifyEmailModalForCurrent() {
   if (!STATE.currentUser || !STATE.currentUser.gmail) return;
   closeModal('profileModal');
-  fetch('/api/auth/resend-email-code', {
+  fetch('/api/auth/send-register-otp', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ gmail: STATE.currentUser.gmail })
+    body: JSON.stringify({ fullName: STATE.currentUser.name, gmail: STATE.currentUser.gmail })
   })
     .then(res => res.json())
     .then(data => {
-      openVerifyEmailModal(STATE.currentUser.gmail, data.verificationCode, data.verificationLink);
+      openVerifyEmailModal(STATE.currentUser.gmail, data.previewCode, null);
     })
     .catch(() => {
       openVerifyEmailModal(STATE.currentUser.gmail, null, null);
@@ -1314,67 +1522,230 @@ function autoFillVerifyCode() {
   }
 }
 
-async function handleVerifyEmailCode(e) {
-  if (e) e.preventDefault();
-  const gmail = STATE.pendingVerifyEmail || STATE.currentUser?.gmail;
-  const code = (document.getElementById('verifyOtpCodeInput')?.value || '').trim();
+async function handleResendRegisterOtp() {
+  const gmail = STATE.pendingVerifyEmail;
+  const fullName = STATE.pendingRegisterName;
+  if (!gmail) return showToast('មិនមាន Gmail សម្រាប់ផ្ញើឡើងវិញទេ!', 'error');
 
-  if (!gmail) {
-    return showToast('❌ មិនមានព័ត៌មាន Email ផ្ទៀងផ្ទាត់ទេ!', 'error');
+  try {
+    showToast('⏳ កំពុងផ្ញើលេខកូដ OTP ឡើងវិញ...', 'info');
+    const res = await fetch('/api/auth/send-register-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fullName, gmail })
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'ផ្ញើលេខកូដមិនបាន');
+
+    showToast('✅ លេខកូដ OTP ថ្មីត្រូវបានផ្ញើទៅ Gmail!', 'success');
+    if (data.previewCode) {
+      STATE.pendingVerifyCode = data.previewCode;
+      const hintBox = document.getElementById('verifyCodeDemoHint');
+      const codeVal = document.getElementById('verifyCodeDemoVal');
+      if (hintBox && codeVal) {
+        hintBox.classList.remove('hidden');
+        codeVal.textContent = data.previewCode;
+      }
+    }
+  } catch (err) {
+    showToast(err.message, 'error');
   }
-  if (!code || code.length !== 6) {
-    return showToast('❌ សូមបញ្ចូលលេខកូដសម្ងាត់ ៦ ខ្ទង់!', 'error');
+}
+
+// ------------------------------------------
+// GMAIL LOGIN WITH 6-DIGIT OTP
+// ------------------------------------------
+
+async function handleSendLoginOtp(e) {
+  if (e) e.preventDefault();
+  const gmail = document.getElementById('loginGmailInput')?.value?.trim();
+  if (!gmail) return showToast('❌ សូមបញ្ចូលអាសយដ្ឋាន Gmail!', 'error');
+  if (!gmail.toLowerCase().endsWith('@gmail.com')) {
+    return showToast('❌ តម្រូវឱ្យប្រើប្រាស់គណនី Gmail (@gmail.com) ប៉ុណ្ណោះ!', 'error');
+  }
+
+  const btn = document.getElementById('btnSendLoginOtp');
+  const origText = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span>⏳ កំពុងផ្ញើ OTP...</span>';
   }
 
   try {
-    showToast('⏳ កំពុងផ្ទៀងផ្ទាត់ជាមួយ Firebase...', 'info');
-    const res = await fetch('/api/auth/verify-email-code', {
+    showToast('⏳ កំពុងផ្ញើលេខកូដ OTP...', 'info');
+    const res = await fetch('/api/auth/send-login-otp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ gmail, code })
+      body: JSON.stringify({ gmail })
     });
     const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'ផ្ញើ OTP មិនជោគជ័យ');
 
-    if (!data.success) throw new Error(data.error);
+    STATE.pendingLoginEmail = gmail;
+    STATE.pendingLoginOtp = data.previewCode || null;
 
-    if (STATE.currentUser) {
-      STATE.currentUser.gmailVerified = true;
-      try {
-        localStorage.setItem('studyai_user_session', JSON.stringify(STATE.currentUser));
-      } catch (err) {}
+    // Toggle form to verify OTP form
+    const emailForm = document.getElementById('emailOtpLoginForm');
+    const verifyForm = document.getElementById('verifyLoginOtpForm');
+    if (emailForm) emailForm.classList.add('hidden');
+    if (verifyForm) verifyForm.classList.remove('hidden');
+
+    const hintBox = document.getElementById('loginOtpPreviewHint');
+    const previewVal = document.getElementById('loginOtpPreviewVal');
+    if (hintBox && previewVal) {
+      if (data.previewCode) {
+        hintBox.classList.remove('hidden');
+        previewVal.textContent = data.previewCode;
+        const otpInput = document.getElementById('loginOtpCodeInput');
+        if (otpInput) otpInput.value = data.previewCode;
+      } else {
+        hintBox.classList.add('hidden');
+      }
     }
 
-    closeModal('verifyEmailModal');
-    showToast('🎉 ' + data.message, 'success');
-    updateUserInterface();
+    showToast(`✅ ${data.message || 'បានផ្ញើលេខកូដ OTP ទៅ Gmail!'}`, 'success');
+  } catch (err) {
+    showToast(err.message, 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = origText;
+    }
+  }
+}
+
+async function handleVerifyLoginOtp(e) {
+  if (e) e.preventDefault();
+  const gmail = STATE.pendingLoginEmail || document.getElementById('loginGmailInput')?.value?.trim();
+  const code = (document.getElementById('loginOtpCodeInput')?.value || '').trim();
+
+  if (!gmail) return showToast('❌ មិនមានអាសយដ្ឋាន Gmail ទេ!', 'error');
+  if (!code || code.length !== 6) return showToast('❌ សូមបញ្ចូលលេខកូដ OTP ៦ ខ្ទង់!', 'error');
+
+  try {
+    showToast('⏳ កំពុងផ្ទៀងផ្ទាត់ OTP...', 'info');
+    const deviceId = getOrCreateDeviceId();
+    const res = await fetch('/api/auth/verify-login-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ gmail, code, deviceId, userAgent: navigator.userAgent })
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'ការផ្ទៀងផ្ទាត់មិនត្រឹមត្រូវ');
+
+    setCurrentUser(data.user, data.sessionToken, data.deviceId);
+    closeModal('loginModal');
+    resetEmailLoginForm();
+    showToast(`🎉 ${data.message || 'ចូលគណនីជោគជ័យ!'}`, 'success');
     refreshUserProfile();
   } catch (err) {
     showToast(err.message, 'error');
   }
 }
 
-async function handleResendVerifyCode() {
-  const gmail = STATE.pendingVerifyEmail || STATE.currentUser?.gmail;
-  if (!gmail) return showToast('មិនមាន Gmail សម្រាប់ផ្ញើឡើងវិញទេ!', 'error');
+function resetEmailLoginForm() {
+  const emailForm = document.getElementById('emailOtpLoginForm');
+  const verifyForm = document.getElementById('verifyLoginOtpForm');
+  if (emailForm) emailForm.classList.remove('hidden');
+  if (verifyForm) verifyForm.classList.add('hidden');
+  const codeInput = document.getElementById('loginOtpCodeInput');
+  if (codeInput) codeInput.value = '';
+}
+
+function togglePasswordLogin() {
+  const form = document.getElementById('standardLoginForm');
+  if (form) form.classList.toggle('hidden');
+}
+
+// ------------------------------------------
+// TELEGRAM AUTHENTICATION & SYNC
+// ------------------------------------------
+
+async function startTelegramOneClickLogin() {
+  try {
+    showToast('⏳ កំពុងបង្កើតតំណភ្ជាប់ Telegram...', 'info');
+    const res = await fetch('/api/auth/telegram-web-token', { method: 'POST' });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'បង្កើតតំណមិនបាន');
+
+    window.open(data.botUrl, '_blank');
+    showToast('🤖 សូមចុច START លើ Telegram Bot ដើម្បី Login ស្វ័យប្រវត្ត...', 'info');
+
+    // Poll for login status
+    const token = data.token;
+    const startTime = Date.now();
+    const pollInterval = setInterval(async () => {
+      if (Date.now() - startTime > 120000 || STATE.currentUser) {
+        clearInterval(pollInterval);
+        return;
+      }
+      try {
+        const pollRes = await fetch(`/api/auth/telegram-web-token/status?token=${encodeURIComponent(token)}&deviceId=${encodeURIComponent(getOrCreateDeviceId())}`);
+        const pollData = await pollRes.json();
+        if (pollData.verified && pollData.user) {
+          clearInterval(pollInterval);
+          setCurrentUser(pollData.user, pollData.sessionToken, pollData.deviceId);
+          closeModal('loginModal');
+          showToast(`🎉 ស្វាគមន៍ ${pollData.user.name}! ចូលគណនីជោគជ័យ`, 'success');
+          refreshUserProfile();
+        }
+      } catch (e) {}
+    }, 2500);
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+function handleTelegramEnrollClick() {
+  showToast('🤖 កំពុងបើក Telegram Bot ដើម្បីចុះឈ្មោះស្វ័យប្រវត្ត...', 'info');
+}
+
+async function handleSyncCodeLogin(e) {
+  e.preventDefault();
+  const code = document.getElementById('loginSyncCode').value.trim();
 
   try {
-    showToast('⏳ កំពុងបង្កើតលេខកូដថ្មី...', 'info');
-    const res = await fetch('/api/auth/resend-email-code', {
+    showToast('⏳ កំពុងផ្ទៀងផ្ទាត់លេខកូដ Telegram...', 'info');
+    const deviceId = getOrCreateDeviceId();
+    const res = await fetch('/api/auth/sync-code', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ gmail })
+      body: JSON.stringify({ code, deviceId, userAgent: navigator.userAgent })
     });
     const data = await res.json();
+
+    if (!data.success) throw new Error(data.error || 'លេខកូដមិនត្រឹមត្រូវ');
+
+    setCurrentUser(data.user, data.sessionToken, data.deviceId);
+    closeModal('loginModal');
+    showToast(data.message, 'success');
+    refreshUserProfile();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+async function handleStandardLogin(e) {
+  e.preventDefault();
+  const username = document.getElementById('loginUsername').value.trim();
+  const password = document.getElementById('loginPassword').value;
+
+  try {
+    showToast('⏳ កំពុងផ្ទៀងផ្ទាត់...', 'info');
+    const deviceId = getOrCreateDeviceId();
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password, deviceId, userAgent: navigator.userAgent })
+    });
+    const data = await res.json();
+
     if (!data.success) throw new Error(data.error);
 
-    showToast('✅ លេខកូដផ្ទៀងផ្ទាត់ថ្មីត្រូវបានបង្កើត!', 'success');
-    if (data.verificationCode) {
-      const hint = document.getElementById('verifyCodeDemoHint');
-      if (hint) hint.classList.remove('hidden');
-      const val = document.getElementById('verifyCodeDemoVal');
-      if (val) val.textContent = data.verificationCode;
-      STATE.pendingVerifyCode = data.verificationCode;
-    }
+    setCurrentUser(data.user, data.sessionToken, data.deviceId);
+    closeModal('loginModal');
+    showToast(`🎉 ស្វាគមន៍ ${data.user.name}! ចូលគណនីជោគជ័យ`, 'success');
+    refreshUserProfile();
   } catch (err) {
     showToast(err.message, 'error');
   }

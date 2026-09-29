@@ -386,6 +386,77 @@ body {
   color: #fff;
 }
 
+.btn-google {
+  background: #ffffff !important;
+  color: #1f2937 !important;
+  font-weight: 700 !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
+}
+.btn-google:hover {
+  background: #f8fafc !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22) !important;
+  transform: translateY(-1px);
+}
+.google-icon-svg {
+  width: 22px;
+  height: 22px;
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+.google-auth-btn-wrap {
+  margin-bottom: 16px;
+}
+.device-item-card {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  text-align: left;
+}
+.device-item-card.current {
+  border-color: rgba(6, 182, 212, 0.4);
+  background: rgba(6, 182, 212, 0.08);
+}
+.device-info-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.device-name-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #f1f5f9;
+}
+.device-meta-sub {
+  font-size: 11px;
+  color: #94a3b8;
+}
+.device-current-tag {
+  display: inline-block;
+  background: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+  margin-left: 6px;
+}
+
 /* ==========================================================================
    MAIN CONTENT & TABS
    ========================================================================== */

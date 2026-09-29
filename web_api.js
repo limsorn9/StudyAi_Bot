@@ -568,6 +568,94 @@ Student Question: ${userText}`;
   });
 
   /**
+   * Google Sign-In / Register Endpoint (Firebase Auth Google Provider)
+   */
+  router.post('/auth/google', async (req, res) => {
+    try {
+      const { email, name, photoUrl, googleId, deviceId, userAgent } = req.body;
+      if (!email) {
+        return res.status(400).json({ error: 'សូមបញ្ចូលព័ត៌មាន Email ពីគណនី Google!' });
+      }
+
+      const cleanGmail = email.trim().toLowerCase();
+      const cleanName = (name || cleanGmail.split('@')[0] || 'Student').trim();
+      const emailKey = cleanGmail.replace(/[\.\#\$\[\]]/g, '_');
+
+      if (!db) return res.status(500).json({ error: 'ប្រព័ន្ធទិន្នន័យមិនទាន់ភ្ជាប់!' });
+
+      let userId = null;
+      const emailMapSnap = await db.ref(`users_by_email/${emailKey}`).once('value');
+      if (emailMapSnap.exists()) {
+        userId = emailMapSnap.val();
+      } else {
+        const emailPrefix = cleanGmail.split('@')[0].replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || 'student';
+        userId = `web_${emailPrefix}_${Math.random().toString(36).substring(2, 6)}`;
+        await db.ref(`users_by_email/${emailKey}`).set(userId);
+      }
+
+      // Save user profile in Firebase with verified Gmail status
+      await db.ref(`users/${userId}/profile`).update({
+        name: cleanName,
+        gmail: cleanGmail,
+        gmailVerified: true,
+        photoUrl: photoUrl || '',
+        googleId: googleId || '',
+        lastWebLogin: Date.now(),
+        isWebUser: true,
+        authProvider: 'google'
+      });
+
+      const isVIP = checkVIP ? await checkVIP(userId) : false;
+      const yearly = checkYearlyVIP ? await checkYearlyVIP(userId) : { eligible: false };
+      const session = await createDeviceSession(userId, deviceId, userAgent || req.headers['user-agent'], req.ip);
+
+      return res.json({
+        success: true,
+        message: '🎉 ចូលគណនីតាម Google (Gmail) ជោគជ័យ!',
+        user: {
+          id: userId,
+          name: cleanName,
+          gmail: cleanGmail,
+          gmailVerified: true,
+          photoUrl: photoUrl || '',
+          isVIP,
+          yearlyEligible: yearly.eligible,
+          vipDetails: yearly
+        },
+        deviceId: session.deviceId,
+        sessionToken: session.sessionToken
+      });
+    } catch (err) {
+      console.error('Google auth error:', err);
+      res.status(500).json({ error: 'មានបញ្ហាក្នុងការផ្ទៀងផ្ទាត់គណនី Google' });
+    }
+  });
+
+  /**
+   * Public Firebase Auth Config for Web Client
+   */
+  router.get('/auth/firebase-config', (req, res) => {
+    try {
+      let projectId = process.env.FIREBASE_PROJECT_ID || 'studyai-bot';
+      if (process.env.FIREBASE_CREDENTIALS) {
+        try {
+          const creds = JSON.parse(process.env.FIREBASE_CREDENTIALS);
+          if (creds && creds.project_id) projectId = creds.project_id;
+        } catch (e) {}
+      }
+      return res.json({
+        success: true,
+        projectId,
+        authDomain: `${projectId}.firebaseapp.com`,
+        databaseURL: process.env.FIREBASE_DB_URL || `https://${projectId}-default-rtdb.firebaseio.com`,
+        apiKey: process.env.FIREBASE_API_KEY || ''
+      });
+    } catch (e) {
+      return res.json({ success: false });
+    }
+  });
+
+  /**
    * Validate Session & Device Status
    * If device is revoked, browser will be instructed to forget account and logout!
    */

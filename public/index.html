@@ -8,6 +8,10 @@
   <!-- Telegram WebApp SDK -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
+  <!-- Firebase Web SDK for Google Sign-in -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -628,12 +632,22 @@
         </form>
       </div>
 
-      <!-- Option 2: Login via Gmail (OTP / Password) -->
+      <!-- Option 2: Login via Gmail (Google 1-Click / OTP / Password) -->
       <div id="loginSectionEmail" class="hidden">
-        <div class="gmail-notice-box">
-          <span class="g-icon">✉️</span>
-          <span>បញ្ចូល Gmail របស់អ្នកដើម្បីទទួលលេខកូដ OTP ៦ ខ្ទង់ ផ្ញើចូលប្រអប់សំបុត្រ Gmail ដោយផ្ទាល់!</span>
+        <!-- 1-Click Google Sign-in Button -->
+        <div class="google-auth-btn-wrap">
+          <button type="button" class="btn btn-google btn-block btn-lg" onclick="handleGoogleSignIn()">
+            <svg class="google-icon-svg" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.15z"/>
+              <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
+              <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
+              <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+            </svg>
+            <span>ចូលដោយប្រើ Google (Gmail 1-Click)</span>
+          </button>
         </div>
+
+        <div class="divider-text"><span>ឬផ្ញើកូដ OTP ទៅកាន់ Gmail</span></div>
 
         <form id="emailOtpLoginForm" onsubmit="handleSendLoginOtp(event)">
           <div class="form-group">
@@ -702,12 +716,22 @@
         <button class="tab-btn" id="regTabTg" onclick="switchRegTab('telegram')">📱 ចុះឈ្មោះតាម Telegram</button>
       </div>
 
-      <!-- Option A: Register via Gmail (Name + Gmail -> OTP to Gmail) -->
+      <!-- Option A: Register via Gmail (Google 1-Click OR Name + Gmail -> OTP to Gmail) -->
       <div id="regSectionGmail">
-        <div class="gmail-notice-box">
-          <span class="g-icon">📧</span>
-          <span>បំពេញឈ្មោះ និង Gmail របស់អ្នក។ ប្រព័ន្ធនឹងផ្ញើលេខកូដ OTP ៦ ខ្ទង់ទៅកាន់ Gmail របស់អ្នកដើម្បីបញ្ជាក់ថាជា Gmail របស់អ្នកពិតប្រាកដ (មិនមែនយកពី Telegram ទេ)។</span>
+        <!-- 1-Click Google Registration Button -->
+        <div class="google-auth-btn-wrap">
+          <button type="button" class="btn btn-google btn-block btn-lg" onclick="handleGoogleSignIn()">
+            <svg class="google-icon-svg" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.15z"/>
+              <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
+              <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
+              <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+            </svg>
+            <span>ចុះឈ្មោះដោយប្រើ Google (Gmail 1-Click)</span>
+          </button>
         </div>
+
+        <div class="divider-text"><span>ឬបំពេញឈ្មោះ & Gmail ខាងក្រោម</span></div>
 
         <form id="gmailRegisterForm" onsubmit="handleSendRegisterOtp(event)">
           <div class="form-group">
