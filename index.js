@@ -131,27 +131,23 @@ try {
       console.error("❌ ERROR: Webhook Failed (តើ WebHook_URL ត្រឹមត្រូវទេ?):", e.message);
     });
 
-    // Set Telegram Menu Commands
-    bot.telegram.setMyCommands([
-      { command: 'start', description: '📚 ចាប់ផ្តើមរៀន (Start Learning)' },
-      { command: 'app', description: '🌐 បើក Mini Web App' },
-      { command: 'link', description: '🔗 យកលេខកូដភ្ជាប់ Web App (Sync)' },
-      { command: 'verbs', description: '📝 កិរិយាសព្ទប្រែប្រួល (Irregular Verbs)' },
-      { command: 'scores', description: '📊 ពិន្ទុប្រឡងរបស់ខ្ញុំ (My Quiz Scores)' },
-      { command: 'history', description: '🕰️ ប្រវត្តិមេរៀន (Learning History)' },
-      { command: 'help', description: '❓ ជំនួយ (Help)' }
-    ]);
+    // Delete bot command list so no command popup menu appears
+    bot.telegram.deleteMyCommands().then(() => {
+      console.log('✅ Telegram bot commands menu removed successfully.');
+    }).catch(e => {
+      console.warn('⚠️ deleteMyCommands note:', e.message);
+    });
 
-    // Set Menu Button at bottom-left of Telegram chat to open Mini Web App!
-    const defaultWebUrl = process.env.WEBAPP_URL || process.env.RENDER_EXTERNAL_URL || 'https://studyai-bot.onrender.com';
+    // Set Menu Button at bottom-left of Telegram chat to ONLY launch the Web App directly!
+    const defaultWebUrl = process.env.WEBAPP_URL || process.env.RENDER_EXTERNAL_URL || 'https://studyai-bot-wmha.onrender.com/';
     bot.telegram.setChatMenuButton({
       menu_button: {
         type: 'web_app',
-        text: '🌐 រៀន Online',
+        text: '🌐 បើក Web App',
         web_app: { url: defaultWebUrl }
       }
     }).then(() => {
-      console.log('✅ Telegram Chat Menu Button (Mini Web App) set successfully:', defaultWebUrl);
+      console.log('✅ Telegram Chat Menu Button set to Web App:', defaultWebUrl);
     }).catch(e => {
       console.warn('⚠️ setChatMenuButton note:', e.message);
     });
@@ -468,7 +464,7 @@ bot.action(/tg_auth_allow_(.+)/, async (ctx) => {
     }
   }
 
-  const webUrl = process.env.WEBAPP_URL || process.env.RENDER_EXTERNAL_URL || process.env.WebHook_URL || 'https://studyai-bot.onrender.com';
+  const webUrl = process.env.WEBAPP_URL || process.env.RENDER_EXTERNAL_URL || process.env.WebHook_URL || 'https://studyai-bot-wmha.onrender.com/';
   return ctx.editMessageText(
     `✅ *ការភ្ជាប់គណនី TELEGRAM ជោគជ័យ!* 🎉\n\n` +
     `សួស្តី *${username}*! អ្នកបានយល់ព្រមភ្ជាប់គណនី Telegram ជាមួយ Browser រួចរាល់ហើយ។\n\n` +
@@ -519,7 +515,7 @@ bot.start(async (ctx) => {
   // Handle Telegram Security Confirmation for Web Login / Enroll: e.g. /start auth_tg_12345
   if (payload && payload.startsWith('auth_')) {
     const token = payload.replace('auth_', '');
-    const webUrl = process.env.WEBAPP_URL || process.env.RENDER_EXTERNAL_URL || process.env.WebHook_URL || 'https://studyai-bot.onrender.com';
+    const webUrl = process.env.WEBAPP_URL || process.env.RENDER_EXTERNAL_URL || process.env.WebHook_URL || 'https://studyai-bot-wmha.onrender.com/';
 
     return ctx.reply(
       `🛡️ *ប្រព័ន្ធសុវត្ថិភាព TELEGRAM (SECURITY CONFIRMATION)* 🛡️\n` +
@@ -562,7 +558,7 @@ bot.start(async (ctx) => {
       });
     }
 
-    const webUrl = process.env.WEBAPP_URL || process.env.RENDER_EXTERNAL_URL || process.env.WebHook_URL || 'https://studyai-bot.onrender.com';
+    const webUrl = process.env.WEBAPP_URL || process.env.RENDER_EXTERNAL_URL || process.env.WebHook_URL || 'https://studyai-bot-wmha.onrender.com/';
     return ctx.reply(
       `🎉 *ចុះឈ្មោះចូលរៀនជោគជ័យ!*\n\n` +
       `សួស្តី *${username}*! គណនី Telegram របស់អ្នកត្រូវបានចុះឈ្មោះចូលរៀនជាមួយ *Teacher SSOnline English Academy* រួចរាល់ដោយស្វ័យប្រវត្ត!\n\n` +
@@ -3439,7 +3435,7 @@ bot.on('text', async (ctx) => {
 bot.on('voice', async (ctx) => {
   const userId = ctx.from.id.toString();
   const username = ctx.from.first_name || 'ប្អូន';
-  const webUrl = process.env.WEBAPP_URL || process.env.RENDER_EXTERNAL_URL || 'https://studyai-bot.onrender.com';
+  const webUrl = process.env.WEBAPP_URL || process.env.RENDER_EXTERNAL_URL || 'https://studyai-bot-wmha.onrender.com/';
 
   return ctx.reply(
     `💡 *សួស្តី ${username}! សូមវាយជាអក្សរដើម្បីសន្សំកូតា និងទទួលបានចម្លើយលឿនបំផុត!* ✍️\n\n` +
@@ -3797,7 +3793,7 @@ bot.action(/verbs_(.+)/, (ctx) => {
 // TELEGRAM BOT WEB APP & SYNC CODE COMMANDS
 // ==========================================
 
-const WEBAPP_DEFAULT_URL = process.env.WEBAPP_URL || process.env.RENDER_EXTERNAL_URL || 'https://studyai-bot.onrender.com';
+const WEBAPP_DEFAULT_URL = process.env.WEBAPP_URL || process.env.RENDER_EXTERNAL_URL || 'https://studyai-bot-wmha.onrender.com/';
 
 // Open Web App Command
 bot.command(['app', 'webapp', 'web', 'online'], async (ctx) => {

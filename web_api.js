@@ -1216,7 +1216,7 @@ Provide practical English pronunciation coaching:
       if (!db) return res.status(500).json({ error: 'ប្រព័ន្ធទិន្នន័យមិនទាន់ភ្ជាប់!' });
 
       const token = 'gm_auth_' + crypto.randomBytes(16).toString('hex');
-      const baseUrl = process.env.RENDER_EXTERNAL_URL || process.env.WEBAPP_URL || process.env.WebHook_URL || 'https://studyai-bot.onrender.com';
+      const baseUrl = process.env.RENDER_EXTERNAL_URL || process.env.WEBAPP_URL || process.env.WebHook_URL || 'https://studyai-bot-wmha.onrender.com/';
       const confirmUrl = `${baseUrl}/api/auth/confirm-email?token=${token}`;
 
       await db.ref(`gmail_web_confirmations/${token}`).set({
@@ -1311,7 +1311,7 @@ Provide practical English pronunciation coaching:
         verifiedAt: Date.now()
       });
 
-      const webUrl = process.env.WEBAPP_URL || process.env.RENDER_EXTERNAL_URL || 'https://studyai-bot.onrender.com';
+      const webUrl = process.env.WEBAPP_URL || process.env.RENDER_EXTERNAL_URL || 'https://studyai-bot-wmha.onrender.com/';
 
       const successHtml = `
 <!DOCTYPE html>
