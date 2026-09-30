@@ -44,6 +44,20 @@ const quizState = {};
 const curriculum = JSON.parse(fs.readFileSync('./curriculum.json', 'utf8'));
 const beginnerCourse = require('./beginner_curriculum.js');
 
+// In-memory cache for user's latest response/lesson text for TTS fallback
+const userLatestResponseCache = new Map();
+function setLatestResponse(userId, text, tutor = 'piseth') {
+  if (!userId) return;
+  const uid = userId.toString();
+  userLatestResponseCache.set(uid, { text, tutor });
+  if (db) {
+    try {
+      db.ref(`users/${uid}/latestResponse`).set(text).catch(e => console.warn('DB latestResponse warning:', e.message));
+      db.ref(`users/${uid}/currentTutor`).set(tutor).catch(e => console.warn('DB currentTutor warning:', e.message));
+    } catch (e) {}
+  }
+}
+
 // Initialize Firebase Admin
 let firebaseCreds;
 try {
@@ -1443,19 +1457,12 @@ bot.action(/beginner_lesson_(.+)_(.+)/, async (ctx) => {
 
   // Store the lesson text for TTS & set current tutor to Teacher Piseth (Female Voice)
   if (userId) {
-    try {
-      await db.ref(`users/${userId}/latestResponse`).set(lesson.content);
-      await db.ref(`users/${userId}/currentTutor`).set('piseth');
-    } catch (e) {
-      console.warn("DB write warning:", e.message);
-    }
+    setLatestResponse(userId, lesson.content, 'piseth');
   }
-
-  const isVIP = userId ? await checkVIP(userId) : false;
 
   const keyboardRows = [];
   // 1. Audio TTS button
-  keyboardRows.push([Markup.button.callback(isVIP ? '🔊 ស្តាប់អ្នកគ្រូអាន (TTS)' : '🔒 🔊 ស្តាប់អ្នកគ្រូអាន (VIP)', `tts_${userId}`)]);
+  keyboardRows.push([Markup.button.callback('🔊 ស្តាប់អ្នកគ្រូអាន (Teacher Piseth)', `tts_${userId}`)]);
 
   // 2. Adjacent Previous and Next Lesson navigation buttons
   const navRow = [];
@@ -1523,8 +1530,7 @@ async function displayLessonContent(ctx, monthId, weekId, lessonId, userId) {
   await setUserState(userId, `learning_${monthId}_${weekId}_${lessonId}`);
 
   // Store the lesson text for TTS & set current tutor to Teacher Sorn (Male Voice)
-  await db.ref(`users/${userId}/latestResponse`).set(lessonData.content);
-  await db.ref(`users/${userId}/currentTutor`).set('sorn');
+  setLatestResponse(userId, lessonData.content, 'sorn');
 
   // Record History
   await db.ref(`users/${userId}/history/${monthId}_${weekId}_${lessonId}`).set({
@@ -3197,7 +3203,7 @@ After the grade, provide helpful feedback in Khmer explaining why they got this 
 
     await saveHistory(userId, 'user', userText); // Saved after fetching history
     await saveHistory(userId, 'ai', aiResponse);
-    await db.ref(`users/${userId}/latestResponse`).set(aiResponse);
+    setLatestResponse(userId, aiResponse, 'sorn');
     
     // Delete waiting message
     try {
@@ -3455,10 +3461,34 @@ bot.action(/tts_(.+)/, async (ctx) => {
   const userId = ctx.match[1];
   if (ctx.from.id.toString() !== userId) return ctx.answerCbQuery("អ្នកមិនអាចស្តាប់សម្លេងនេះបានទេ។");
 
-  const isVIP = await checkVIP(userId);
+  const isAdmin = SUPER_ADMIN_IDS.includes(userId.toString());
+  const isVIP = isAdmin || (await checkVIP(userId));
 
-  // 💎 VIP Gate - Free account cannot use TTS
-  if (!isVIP) {
+  // Retrieve cached or DB text and tutor info
+  let text = null;
+  let tutor = null;
+
+  const cached = userLatestResponseCache.get(userId.toString());
+  if (cached) {
+    text = cached.text;
+    tutor = cached.tutor;
+  }
+
+  if (!text && db) {
+    try {
+      const snap = await db.ref(`users/${userId}/latestResponse`).once('value');
+      text = snap.val();
+      const tutorSnap = await db.ref(`users/${userId}/currentTutor`).once('value');
+      tutor = tutorSnap.val();
+    } catch (e) {
+      console.warn("DB read error in TTS:", e.message);
+    }
+  }
+
+  const isPiseth = tutor === 'piseth' || (text && (text.includes('អ្នកគ្រូពិសិដ្ឋ') || text.includes('Teacher Piseth') || text.includes('ថ្នាក់ដំបូង')));
+
+  // VIP Gate: Admins and Beginner Course (Teacher Piseth) are free to listen!
+  if (!isVIP && !isPiseth && !isAdmin) {
     await ctx.answerCbQuery('🔒 VIP ប៉ុណ្ណោះ!');
     return ctx.reply(
       `🔊 *មុខងារអានជាសំឡេង (TTS) សម្រាប់ VIP ប៉ុណ្ណោះ!*\n\n` +
@@ -3478,39 +3508,43 @@ bot.action(/tts_(.+)/, async (ctx) => {
     );
   }
 
-  // ⏱️ Rate limit check (VIP only gets here)
-  const limitCheck = checkTTSLimit(userId, isVIP);
-  if (!limitCheck.allowed) {
-    await ctx.answerCbQuery('⛔ ប្រើប្រាស់ច្រើន!');
-    return ctx.reply(limitCheck.message, { parse_mode: 'Markdown' });
+  // Rate limit check (skipped for admin)
+  if (!isAdmin) {
+    const limitCheck = checkTTSLimit(userId, isVIP || isPiseth);
+    if (!limitCheck.allowed) {
+      await ctx.answerCbQuery('⛔ ប្រើប្រាស់ច្រើន!');
+      return ctx.reply(limitCheck.message, { parse_mode: 'Markdown' });
+    }
   }
 
-  ctx.answerCbQuery("កំពុងបង្កើតសម្លេង...");
+  await ctx.answerCbQuery("កំពុងបង្កើតសម្លេង...");
   ctx.sendChatAction('record_voice');
   recordTTSStart(userId);
 
   try {
-    const snap = await db.ref(`users/${userId}/latestResponse`).once('value');
-    let text = snap.val();
-
     if (!text) {
-      return ctx.reply("រកមិនឃើញអត្ថបទដើម្បីអានទេ។");
+      return ctx.reply("❌ រកមិនឃើញអត្ថបទដើម្បីអានទេ។ សូមចុចបើកមេរៀនជាថ្មី!");
     }
 
-    // Clean text to avoid TTS reading emojis heavily
-    text = text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '');
+    // Clean text to avoid TTS reading emojis and markdown formatting symbols
+    let cleanText = text
+      .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')
+      .replace(/[═─*#_~`•>]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
 
     const { MsEdgeTTS, OUTPUT_FORMAT } = require("msedge-tts");
-    const tutorSnap = await db.ref(`users/${userId}/currentTutor`).once('value');
-    const isPiseth = tutorSnap.val() === 'piseth' || text.includes('អ្នកគ្រូពិសិដ្ឋ') || text.includes('Teacher Piseth') || text.includes('ថ្នាក់ដំបូង');
-    const hasKhmer = /[\u1780-\u17FF]/.test(text);
+    const edgeTts = new MsEdgeTTS();
+
+    const hasKhmer = /[\u1780-\u17FF]/.test(cleanText);
     const selectedVoice = isPiseth 
       ? (hasKhmer ? "km-KH-SreymomNeural" : "en-US-JennyNeural")
       : (hasKhmer ? "km-KH-PisethNeural" : "en-US-GuyNeural");
+
     await edgeTts.setMetadata(selectedVoice, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
     
     // Generate Audio Stream
-    const { audioStream } = edgeTts.toStream(text.substring(0, 4000));
+    const { audioStream } = edgeTts.toStream(cleanText.substring(0, 4000));
     const chunks = [];
     
     await new Promise((resolve, reject) => {
@@ -3520,18 +3554,13 @@ bot.action(/tts_(.+)/, async (ctx) => {
     });
 
     const buffer = Buffer.concat(chunks);
-    await ctx.replyWithVoice({ source: buffer });
-
-    // Show remaining TTS count warning for free users
-    if (!isVIP) {
-      const stats = getTTSStats(userId, false);
-      if (stats.remaining <= 3 && stats.remaining > 0) {
-        await ctx.reply(`📊 *សល់ TTS: ${stats.remaining}/${stats.limit} ដង* ថ្ងៃនេះ (Free)\n💎 Upgrade VIP ដើម្បីទទួលបាន 50 ដង/ថ្ងៃ!`, { parse_mode: 'Markdown' });
-      }
-    }
+    await ctx.replyWithVoice(
+      { source: buffer },
+      { caption: isPiseth ? '👩‍🏫 សំឡេងអ្នកគ្រូ ពិសិដ្ឋ (Teacher Piseth AI)' : '👨‍🏫 សំឡេងគ្រូសន (Teacher Sorn AI)' }
+    );
   } catch (error) {
     console.error("TTS Error:", error);
-    ctx.reply("មិនអាចបង្កើតសម្លេងបានទេពេលនេះ។");
+    ctx.reply("❌ មិនអាចបង្កើតសម្លេងបានទេពេលនេះ។ សូមព្យាយាមម្តងទៀត!");
   } finally {
     recordTTSDone();
   }
