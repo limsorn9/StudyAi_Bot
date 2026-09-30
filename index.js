@@ -1356,62 +1356,129 @@ bot.action('back_to_months', async (ctx) => {
   await ctx.editMessageText("សូមជ្រើសរើសថ្នាក់ដែលអ្នកចង់រៀន៖", getMonthsKeyboard());
 });
 
-// Beginner Course (Teacher Piseth) Actions
+// Helper: Flatten all 26 beginner lessons A-Z
+function getAllBeginnerLessons() {
+  const list = [];
+  if (beginnerCourse && beginnerCourse.weeks) {
+    beginnerCourse.weeks.forEach(w => {
+      (w.lessons || []).forEach(l => {
+        list.push({ weekId: w.id, lesson: l });
+      });
+    });
+  }
+  return list;
+}
+
+// Generate Keyboard for Beginner Course (A-Z Lessons in 2 columns)
+function getBeginnerKeyboard() {
+  const allLessons = getAllBeginnerLessons();
+  const rows = [];
+  for (let i = 0; i < allLessons.length; i += 2) {
+    const row = [];
+    const item1 = allLessons[i];
+    row.push(Markup.button.callback(
+      `Day ${item1.lesson.day}: ${item1.lesson.letter} • ${item1.lesson.word}`,
+      `beginner_lesson_${item1.weekId}_${item1.lesson.id}`
+    ));
+    if (i + 1 < allLessons.length) {
+      const item2 = allLessons[i + 1];
+      row.push(Markup.button.callback(
+        `Day ${item2.lesson.day}: ${item2.lesson.letter} • ${item2.lesson.word}`,
+        `beginner_lesson_${item2.weekId}_${item2.lesson.id}`
+      ));
+    }
+    rows.push(row);
+  }
+  rows.push([Markup.button.callback('🔙 ថ្នាក់ទូទៅ ១២ ខែ (គ្រូសន)', 'back_to_months')]);
+  return Markup.inlineKeyboard(rows);
+}
+
+// Beginner Course (Teacher Piseth) Actions - Direct A-Z Lessons List
 bot.action('beginner_menu', async (ctx) => {
   const teacher = beginnerCourse.teacher;
-  const buttons = beginnerCourse.weeks.map(w => [Markup.button.callback(w.title.split('៖')[0] || w.title, `beginner_week_${w.id}`)]);
-  buttons.push([Markup.button.callback('🔙 ថ្នាក់ទូទៅ ១២ ខែ (គ្រូសន)', 'back_to_months')]);
-
-  await ctx.editMessageText(
+  const msg = 
     `👩‍🏫 *${teacher.name} (${teacher.englishName})*\n` +
     `_${teacher.role}_\n\n` +
-    `🌟 *កម្មវិធីសិក្សាថ្នាក់ដំបូង (Beginner Level)*\n` +
-    `សូមជ្រើសរើសសប្តាហ៍សិក្សាខាងក្រោម៖`,
-    {
+    `🌟 *បញ្ជីមេរៀនថ្នាក់ដំបូង A - Z (English for Children)*\n` +
+    `📚 រៀន ១ ថ្ងៃ៖ ១ តួអក្សរ • ១ ពាក្យ • ១ ល្បះគំរូ (២៦ ថ្ងៃ)\n` +
+    `👇 សូមជ្រើសរើសមេរៀនដើម្បីចាប់ផ្តើមរៀន៖`;
+
+  try {
+    await ctx.editMessageText(msg, {
       parse_mode: 'Markdown',
-      ...Markup.inlineKeyboard(buttons)
-    }
-  );
+      ...getBeginnerKeyboard()
+    });
+  } catch (err) {
+    await ctx.reply(msg, {
+      parse_mode: 'Markdown',
+      ...getBeginnerKeyboard()
+    });
+  }
 });
 
 bot.action(/beginner_week_(.+)/, async (ctx) => {
-  const weekId = ctx.match[1];
-  const week = beginnerCourse.weeks.find(w => w.id === weekId);
-  if (!week) return ctx.answerCbQuery("រកមិនឃើញទិន្នន័យ");
+  const teacher = beginnerCourse.teacher;
+  const msg = 
+    `👩‍🏫 *${teacher.name} (${teacher.englishName})*\n` +
+    `_${teacher.role}_\n\n` +
+    `🌟 *បញ្ជីមេរៀនថ្នាក់ដំបូង A - Z (English for Children)*\n` +
+    `📚 រៀន ១ ថ្ងៃ៖ ១ តួអក្សរ • ១ ពាក្យ • ១ ល្បះគំរូ (២៦ ថ្ងៃ)\n` +
+    `👇 សូមជ្រើសរើសមេរៀនដើម្បីចាប់ផ្តើមរៀន៖`;
 
-  const buttons = week.lessons.map(l => [Markup.button.callback(l.title.split('៖')[0] || l.title, `beginner_lesson_${weekId}_${l.id}`)]);
-  buttons.push([Markup.button.callback('🔙 ថ្នាក់ដំបូង (Beginner Menu)', 'beginner_menu')]);
-
-  await ctx.editMessageText(
-    `👩‍🏫 *${week.title}*\n${week.description || ''}\n\nសូមជ្រើសរើសមេរៀន៖`,
-    {
-      parse_mode: 'Markdown',
-      ...Markup.inlineKeyboard(buttons)
-    }
-  );
+  await ctx.editMessageText(msg, {
+    parse_mode: 'Markdown',
+    ...getBeginnerKeyboard()
+  });
 });
 
 bot.action(/beginner_lesson_(.+)_(.+)/, async (ctx) => {
-  const weekId = ctx.match[1];
+  const userId = ctx.from?.id;
   const lessonId = ctx.match[2];
-  const week = beginnerCourse.weeks.find(w => w.id === weekId);
-  const lesson = week?.lessons.find(l => l.id === lessonId);
-  if (!lesson) return ctx.answerCbQuery("រកមិនឃើញមេរៀន");
+  
+  const allLessons = getAllBeginnerLessons();
+  const currIdx = allLessons.findIndex(item => item.lesson.id === lessonId);
+  if (currIdx === -1) return ctx.answerCbQuery("រកមិនឃើញមេរៀន");
 
-  const text = `👩‍🏫 *${beginnerCourse.teacher.name}* • ថ្នាក់ដំបូង\n` +
+  const { lesson, weekId } = allLessons[currIdx];
+
+  const text = `👩‍🏫 *${beginnerCourse.teacher.name}* • ថ្នាក់ដំបូង (A - Z)\n` +
     `📖 *${lesson.title}*\n\n` +
     lesson.content;
 
   // Store the lesson text for TTS & set current tutor to Teacher Piseth (Female Voice)
-  await db.ref(`users/${userId}/latestResponse`).set(lesson.content);
-  await db.ref(`users/${userId}/currentTutor`).set('piseth');
+  if (userId) {
+    try {
+      await db.ref(`users/${userId}/latestResponse`).set(lesson.content);
+      await db.ref(`users/${userId}/currentTutor`).set('piseth');
+    } catch (e) {
+      console.warn("DB write warning:", e.message);
+    }
+  }
 
-  const isVIP = await checkVIP(userId);
-  const keyboard = [
-    [Markup.button.callback(isVIP ? '🔊 ស្តាប់អ្នកគ្រូអាន (TTS)' : '🔒 🔊 ស្តាប់អ្នកគ្រូអាន (VIP)', `tts_${userId}`)],
-    [Markup.button.callback('🔙 សប្តាហ៍នេះ', `beginner_week_${weekId}`)],
-    [Markup.button.callback('👩‍🏫 បញ្ជីថ្នាក់ដំបូង', 'beginner_menu')]
-  ];
+  const isVIP = userId ? await checkVIP(userId) : false;
+
+  const keyboardRows = [];
+  // 1. Audio TTS button
+  keyboardRows.push([Markup.button.callback(isVIP ? '🔊 ស្តាប់អ្នកគ្រូអាន (TTS)' : '🔒 🔊 ស្តាប់អ្នកគ្រូអាន (VIP)', `tts_${userId}`)]);
+
+  // 2. Adjacent Previous and Next Lesson navigation buttons
+  const navRow = [];
+  if (currIdx > 0) {
+    const prev = allLessons[currIdx - 1];
+    navRow.push(Markup.button.callback(`◀ Day ${prev.lesson.day}: ${prev.lesson.letter}`, `beginner_lesson_${prev.weekId}_${prev.lesson.id}`));
+  }
+  if (currIdx < allLessons.length - 1) {
+    const next = allLessons[currIdx + 1];
+    navRow.push(Markup.button.callback(`Day ${next.lesson.day}: ${next.lesson.letter} ▶`, `beginner_lesson_${next.weekId}_${next.lesson.id}`));
+  }
+  if (navRow.length > 0) {
+    keyboardRows.push(navRow);
+  }
+
+  // 3. Return to Beginner Lessons A-Z list directly
+  keyboardRows.push([Markup.button.callback('👩‍🏫 បញ្ជីមេរៀន A - Z (ថ្នាក់ដំបូង)', 'beginner_menu')]);
+  // 4. Return to 12 Months
+  keyboardRows.push([Markup.button.callback('🔙 ថ្នាក់ទូទៅ ១២ ខែ (គ្រូសន)', 'back_to_months')]);
 
   const maxLen = 3900;
   if (text.length > maxLen) {
@@ -1420,12 +1487,12 @@ bot.action(/beginner_lesson_(.+)_(.+)/, async (ctx) => {
     await ctx.reply(part1, { parse_mode: 'Markdown' });
     await ctx.reply(part2, {
       parse_mode: 'Markdown',
-      ...Markup.inlineKeyboard(keyboard)
+      ...Markup.inlineKeyboard(keyboardRows)
     });
   } else {
     await ctx.reply(text, {
       parse_mode: 'Markdown',
-      ...Markup.inlineKeyboard(keyboard)
+      ...Markup.inlineKeyboard(keyboardRows)
     });
   }
 });
@@ -1435,19 +1502,13 @@ bot.command(['piseth', 'beginner', 'foundation'], async (ctx) => {
   const msg = `👩‍🏫 *${teacher.name} (${teacher.englishName})*\n` +
     `_${teacher.role}_\n\n` +
     `${teacher.welcomeGreeting}\n\n` +
-    `📚 *កម្មវិធីសិក្សាថ្នាក់ដំបូង (Beginner Foundation Course)៖*\n` +
-    `• សប្តាហ៍ទី ១៖ ព្យញ្ជនៈ ស្រៈ និងសូរសព្ទ Phonics (A-Z)\n` +
-    `• សប្តាហ៍ទី ២៖ ការរាប់លេខ ១-១០០ ពណ៌ និងរូបរាង\n` +
-    `• សប្តាហ៍ទី ៣៖ ការស្វាគមន៍ ការណែនាំខ្លួន និងគ្រួសារ\n` +
-    `• សប្តាហ៍ទី ៤៖ សម្ភារៈសិក្សា និងប្រយោគបញ្ជាគ្រឹះ\n\n` +
-    `👉 *សរុប ២៤ មេរៀនគ្រឹះ* ជាមួយការពន្យល់ងាយៗ សំឡេងអាន និងប្រឡង Quiz!`;
+    `📚 *កម្មវិធីសិក្សាថ្នាក់ដំបូង (English for Children: A - Z)៖*\n` +
+    `• រៀន ១ ថ្ងៃ៖ ១ តួអក្សរ • ១ ពាក្យ • ១ ល្បះគំរូ (២៦ ថ្ងៃ)\n` +
+    `• ពីអក្សរ A ដល់ Z រៀនងាយស្រួល ច្បាស់លាស់ និងសប្បាយរីករាយ!`;
 
   await ctx.reply(msg, {
     parse_mode: 'Markdown',
-    ...Markup.inlineKeyboard([
-      [Markup.button.callback('🌟 មើលមេរៀនថ្នាក់ដំបូង (Beginner Lessons)', 'beginner_menu')],
-      [Markup.button.callback('📚 ថ្នាក់ទូទៅ ១២ ខែ (គ្រូសន)', 'back_to_months')]
-    ])
+    ...getBeginnerKeyboard()
   });
 });
 
