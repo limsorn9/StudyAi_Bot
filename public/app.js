@@ -354,7 +354,11 @@ function navigateTo(tabName) {
 
   // Tab-specific hooks
   if (tabName === 'curriculum') {
-    renderCurriculumWeeks();
+    if (STATE.courseLevel === 'beginner') {
+      renderBeginnerWeeks();
+    } else {
+      renderCurriculumWeeks();
+    }
   } else if (tabName === 'ai-tutor') {
     initAIStudioTab();
   } else if (tabName === 'annual-exams') {
@@ -364,6 +368,20 @@ function navigateTo(tabName) {
   } else if (tabName === 'verbs') {
     renderVerbsTable();
   }
+}
+
+function returnToLessonList() {
+  if (STATE.currentLesson?.monthId === 'beginner') {
+    switchCourseLevel('beginner');
+  } else if (STATE.currentLesson?.monthId) {
+    STATE.selectedMonthId = STATE.currentLesson.monthId;
+    if (STATE.courseLevel === 'beginner') {
+      switchCourseLevel('standard');
+    } else {
+      switchCourseLevel(STATE.courseLevel || 'standard');
+    }
+  }
+  navigateTo('curriculum');
 }
 
 // ==========================================
@@ -1369,6 +1387,21 @@ function renderProfessionalLessonHTML(rawText) {
 
 async function openLesson(monthId, weekId, lessonId) {
   try {
+    // Ensure course curriculum or beginner curriculum is loaded in STATE
+    if (monthId === 'beginner' && (!STATE.beginnerCourse || !STATE.beginnerCourse.weeks)) {
+      try {
+        const cRes = await fetch('/api/curriculum');
+        const cData = await cRes.json();
+        if (cData.success && cData.beginner) STATE.beginnerCourse = cData.beginner;
+      } catch (e) {}
+    } else if (monthId !== 'beginner' && (!STATE.curriculum || !STATE.curriculum.length)) {
+      try {
+        const cRes = await fetch('/api/curriculum');
+        const cData = await cRes.json();
+        if (cData.success && cData.months) STATE.curriculum = cData.months;
+      } catch (e) {}
+    }
+
     const res = await fetch(`/api/lesson/${monthId}/${weekId}/${lessonId}`);
     const data = await res.json();
     if (!data.success) throw new Error('Lesson not found');
@@ -1407,6 +1440,9 @@ async function openLesson(monthId, weekId, lessonId) {
 
     // Reset Audio player
     resetAudioPlayer();
+
+    // Update Navigation Buttons (Previous / Next)
+    updateLessonNavButtons();
 
     // Toggle Admin Video controls & Load YouTube Video
     const isUserAdmin = !!(STATE.currentUser?.isAdmin || STATE.currentUser?.id === '240224709' || STATE.currentUser?.telegramId === 240224709);
@@ -1447,63 +1483,164 @@ async function openLesson(monthId, weekId, lessonId) {
   }
 }
 
-function goToNextLesson() {
-  if (!STATE.currentLesson) return;
+function getLessonNavInfo() {
+  if (!STATE.currentLesson) return { hasPrev: false, hasNext: false, nextLocked: false };
   const { monthId, weekId, lessonId } = STATE.currentLesson;
+  const isAdmin = !!(STATE.currentUser?.isAdmin || STATE.currentUser?.id === '240224709' || STATE.currentUser?.telegramId === 240224709);
 
-  // Handle Beginner Class navigation
   if (monthId === 'beginner') {
     const course = STATE.beginnerCourse;
-    if (!course || !course.weeks) return;
-    const wIdx = course.weeks.findIndex(w => w.id === weekId);
-    if (wIdx === -1) return;
-    const week = course.weeks[wIdx];
-    const lIdx = week.lessons.findIndex(l => l.id === lessonId);
-    if (lIdx === -1) return;
+    if (!course || !course.weeks) return { hasPrev: false, hasNext: false, nextLocked: false };
+    const flat = [];
+    course.weeks.forEach(w => {
+      (w.lessons || []).forEach(l => {
+        flat.push({
+          monthId: 'beginner',
+          weekId: w.id,
+          lessonId: l.id,
+          lessonNum: parseInt(l.id.replace('bl', ''))
+        });
+      });
+    });
+    const idx = flat.findIndex(x => x.lessonId === lessonId);
+    if (idx === -1) return { hasPrev: false, hasNext: false, nextLocked: false };
 
-    if (lIdx + 1 < week.lessons.length) {
-      openLesson('beginner', weekId, week.lessons[lIdx + 1].id);
-      return;
+    const prevItem = idx > 0 ? flat[idx - 1] : null;
+    const nextItem = idx < flat.length - 1 ? flat[idx + 1] : null;
+    let nextLocked = false;
+    let nextLessonNum = null;
+
+    if (nextItem) {
+      nextLessonNum = nextItem.lessonNum;
+      if (!isAdmin && nextLessonNum > 1) {
+        const passed = new Set(STATE.beginnerStatus?.passedLessons || []);
+        nextLocked = !passed.has(`bl${nextLessonNum - 1}`);
+      }
     }
-    if (wIdx + 1 < course.weeks.length) {
-      const nextW = course.weeks[wIdx + 1];
-      openLesson('beginner', nextW.id, nextW.lessons[0].id);
-      return;
+
+    return {
+      hasPrev: !!prevItem,
+      hasNext: !!nextItem,
+      prevItem,
+      nextItem,
+      nextLocked,
+      nextLessonNum,
+      isFirst: idx === 0,
+      isLast: idx === flat.length - 1
+    };
+  }
+
+  // Standard 12-Month Curriculum
+  if (!STATE.curriculum) return { hasPrev: false, hasNext: false, nextLocked: false };
+  const flat = [];
+  STATE.curriculum.forEach(m => {
+    (m.weeks || []).forEach(w => {
+      (w.lessons || []).forEach(l => {
+        flat.push({
+          monthId: m.id,
+          weekId: w.id,
+          lessonId: l.id,
+          key: `${m.id}-${w.id}-${l.id}`
+        });
+      });
+    });
+  });
+
+  const currentKey = `${monthId}-${weekId}-${lessonId}`;
+  const idx = flat.findIndex(x => x.key === currentKey);
+  if (idx === -1) return { hasPrev: false, hasNext: false, nextLocked: false };
+
+  const prevItem = idx > 0 ? flat[idx - 1] : null;
+  const nextItem = idx < flat.length - 1 ? flat[idx + 1] : null;
+  let nextLocked = false;
+
+  if (nextItem && !isAdmin) {
+    const prevKey = flat[idx].key;
+    const completed = STATE.currentUser?.completedLessons || {};
+    nextLocked = !completed[prevKey];
+  }
+
+  return {
+    hasPrev: !!prevItem,
+    hasNext: !!nextItem,
+    prevItem,
+    nextItem,
+    nextLocked,
+    isFirst: idx === 0,
+    isLast: idx === flat.length - 1
+  };
+}
+
+function updateLessonNavButtons() {
+  const info = getLessonNavInfo();
+
+  const prevBtns = [document.getElementById('btnPrevLessonTop'), document.getElementById('btnPrevLessonBottom')];
+  prevBtns.forEach(btn => {
+    if (!btn) return;
+    if (!info.hasPrev) {
+      btn.disabled = true;
+      btn.style.opacity = '0.35';
+      btn.style.cursor = 'not-allowed';
+      btn.title = 'នេះជាមេរៀនដំបូងគេបង្អស់';
+    } else {
+      btn.disabled = false;
+      btn.style.opacity = '1';
+      btn.style.cursor = 'pointer';
+      btn.title = 'ត្រឡប់ទៅមេរៀនមុន';
     }
-    showToast('🎉 អបអរសាទរកូន! កូនបានរៀនចប់កម្មវិធីថ្នាក់ដំបូងហើយ!', 'success');
+  });
+
+  const nextBtns = [document.getElementById('btnNextLessonTop'), document.getElementById('nextLessonBtn')];
+  nextBtns.forEach(btn => {
+    if (!btn) return;
+    if (!info.hasNext) {
+      btn.disabled = true;
+      btn.style.opacity = '0.35';
+      btn.style.cursor = 'not-allowed';
+      btn.title = 'នេះជាមេរៀនចុងក្រោយ';
+      btn.innerHTML = `<span>🏁 មេរៀនចុងក្រោយ</span>`;
+    } else if (info.nextLocked) {
+      btn.disabled = false;
+      btn.style.opacity = '0.8';
+      btn.style.cursor = 'pointer';
+      btn.title = 'មេរៀនបន្ទាប់ជាប់សោរ (ចុចដើម្បីដឹងព័ត៌មាន)';
+      btn.innerHTML = `<span>🔒 មេរៀនបន្ទាប់ ▶</span>`;
+    } else {
+      btn.disabled = false;
+      btn.style.opacity = '1';
+      btn.style.cursor = 'pointer';
+      btn.title = 'ទៅកាន់មេរៀនបន្ទាប់';
+      btn.innerHTML = `<span>មេរៀនបន្ទាប់ ▶</span>`;
+    }
+  });
+}
+
+function goToPrevLesson() {
+  const info = getLessonNavInfo();
+  if (!info.hasPrev || !info.prevItem) {
+    showToast('ℹ️ នេះជាមេរៀនដំបូងគេបង្អស់ហើយ!', 'info');
+    return;
+  }
+  openLesson(info.prevItem.monthId, info.prevItem.weekId, info.prevItem.lessonId);
+}
+
+function goToNextLesson() {
+  const info = getLessonNavInfo();
+  if (!info.hasNext || !info.nextItem) {
+    showToast('🎉 អបអរសាទរ! អ្នកបានរៀនដល់មេរៀនចុងក្រោយនៃកម្មវិធីសិក្សាហើយ!', 'success');
     return;
   }
 
-  const mIdx = STATE.curriculum.findIndex(m => m.id === monthId);
-  if (mIdx === -1) return;
-  const month = STATE.curriculum[mIdx];
-
-  const wIdx = month.weeks.findIndex(w => w.id === weekId);
-  if (wIdx === -1) return;
-  const week = month.weeks[wIdx];
-
-  const lIdx = week.lessons.findIndex(l => l.id === lessonId);
-  if (lIdx === -1) return;
-
-  // Next in same week
-  if (lIdx + 1 < week.lessons.length) {
-    openLesson(monthId, weekId, week.lessons[lIdx + 1].id);
-    return;
-  }
-  // Next week
-  if (wIdx + 1 < month.weeks.length) {
-    const nextW = month.weeks[wIdx + 1];
-    openLesson(monthId, nextW.id, nextW.lessons[0].id);
-    return;
-  }
-  // Next month
-  if (mIdx + 1 < STATE.curriculum.length) {
-    const nextM = STATE.curriculum[mIdx + 1];
-    openLesson(nextM.id, nextM.weeks[0].id, nextM.weeks[0].lessons[0].id);
+  if (info.nextLocked) {
+    if (info.nextLessonNum) {
+      showToast(`🔒 មេរៀនបន្ទាប់ត្រូវបានចាក់សោរ! សូមប្រឡងជាប់មេរៀនទី ${info.nextLessonNum - 1} សិន`, 'warning');
+    } else {
+      showToast('🔒 មេរៀនបន្ទាប់ត្រូវបានចាក់សោរ! ត្រូវប្រឡងជាប់មេរៀនមុនសិន', 'warning');
+    }
     return;
   }
 
-  showToast('🎉 អបអរសាទរ! អ្នកបានរៀនដល់មេរៀនចុងក្រោយនៃកម្មវិធីសិក្សាហើយ!', 'success');
+  openLesson(info.nextItem.monthId, info.nextItem.weekId, info.nextItem.lessonId);
 }
 
 // ==========================================
@@ -2957,14 +3094,21 @@ function showQuizResultModal(result) {
       // Daily lesson passed (1/1) - no certificate!
       feedback.innerHTML = `✅ <strong>ល្អណាស់!</strong> អ្នកបានប្រឡងជាប់មេរៀនថ្ងៃនេះ! <br>(<strong>ចំណាំ:</strong> ការប្រឡងប្រចាំថ្ងៃ មិនទទួលបានវិញ្ញាបនបត្រឡើយ — ប្រឡងបញ្ចប់ ២៦ ថ្ងៃ ទើបបានវិញ្ញាបនបត្រ!)`;
       actions.innerHTML = `
-        <button class="btn btn-primary" onclick="closeModal('quizResultModal'); navigateTo('curriculum'); refreshUserProfile();">
-          <span>📚 បន្តរៀនមេរៀនបន្ទាប់</span>
+        <button class="btn btn-primary" onclick="closeModal('quizResultModal'); goToNextLesson();">
+          <span>មេរៀនបន្ទាប់ ▶</span>
+        </button>
+        <button class="btn btn-glass" onclick="closeModal('quizResultModal'); returnToLessonList();">
+          <span>🔙 ត្រឡប់ទៅបញ្ជីមេរៀន</span>
         </button>
         <button class="btn btn-outline" onclick="closeModal('quizResultModal');">
-          <span>📖 អានមេរៀនទៀត</span>
+          <span>📖 អានមេរៀននេះទៀត</span>
         </button>
       `;
-      refreshUserProfile();
+      refreshUserProfile().then(() => {
+        loadBeginnerStatus().then(() => {
+          updateLessonNavButtons();
+        });
+      });
     } else if (result.certId) {
       // Annual exam or standard lesson with cert
       feedback.innerHTML = `🎉 <strong>អបអរសាទរយ៉ាងក្រៃលែង!</strong> អ្នកបានប្រឡងជាប់និទ្ទេស <strong>${result.grade}</strong> ហើយទទួលបានវិញ្ញាបនបត្រផ្លូវការទម្រង់ A4 ផ្តេក!`;
