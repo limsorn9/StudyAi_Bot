@@ -401,29 +401,78 @@ const groupAdminGuard = async (ctx, next) => {
 };
 
 
+// Robust TTS Synthesizer with intelligent chunking
+const synthesizeSpeechBuffer = async (rawText, voiceName = "km-KH-PisethNeural") => {
+  if (!rawText) return null;
+
+  // Clean text to avoid TTS reading emojis and markdown formatting symbols
+  let cleanText = rawText
+    .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')
+    .replace(/[═─*#_~`•>]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!cleanText) return null;
+
+  // Chunk text safely (max 450 chars per request to prevent Edge TTS connection drop)
+  const chunks = [];
+  let cur = cleanText.substring(0, 1400).trim(); // Cap to ~1400 chars
+  while (cur.length > 0) {
+    if (cur.length <= 450) {
+      chunks.push(cur);
+      break;
+    }
+    let splitIdx = cur.lastIndexOf('។', 450);
+    if (splitIdx === -1) splitIdx = cur.lastIndexOf('\n', 450);
+    if (splitIdx === -1) splitIdx = cur.lastIndexOf('.', 450);
+    if (splitIdx === -1) splitIdx = cur.lastIndexOf('!', 450);
+    if (splitIdx === -1) splitIdx = cur.lastIndexOf('?', 450);
+    if (splitIdx === -1) splitIdx = cur.lastIndexOf(' ', 450);
+    if (splitIdx === -1 || splitIdx < 150) splitIdx = 450;
+    chunks.push(cur.substring(0, splitIdx + 1).trim());
+    cur = cur.substring(splitIdx + 1).trim();
+  }
+
+  const textChunks = chunks.filter(c => c.length > 0).slice(0, 3);
+  if (textChunks.length === 0) return null;
+
+  const { MsEdgeTTS, OUTPUT_FORMAT } = require("msedge-tts");
+  const edgeTts = new MsEdgeTTS();
+  await edgeTts.setMetadata(voiceName, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
+
+  const audioBuffers = [];
+  for (const chunk of textChunks) {
+    try {
+      const { audioStream } = edgeTts.toStream(chunk);
+      const chunkBufs = [];
+      await new Promise((resolve) => {
+        audioStream.on('data', (d) => chunkBufs.push(d));
+        audioStream.on('end', resolve);
+        audioStream.on('error', (err) => {
+          console.warn('[Edge TTS Stream Warning]', err.message);
+          resolve(); // Resolve gracefully so already received audio frames are kept
+        });
+      });
+      if (chunkBufs.length > 0) {
+        audioBuffers.push(Buffer.concat(chunkBufs));
+      }
+    } catch (err) {
+      console.warn('[Edge TTS Chunk Error]', err.message);
+    }
+  }
+
+  if (audioBuffers.length === 0) return null;
+  return Buffer.concat(audioBuffers);
+};
+
 const generateAndSendTTS = async (ctx, text) => {
   if (!text) return;
   try {
     ctx.sendChatAction('record_voice');
-    // Clean text to avoid TTS reading emojis heavily and markdown symbols
-    let cleanText = text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '');
-    cleanText = cleanText.replace(/[*_#]/g, ''); 
-    
-    const { MsEdgeTTS, OUTPUT_FORMAT } = require("msedge-tts");
-    const edgeTts = new MsEdgeTTS();
-    await edgeTts.setMetadata("km-KH-SreymomNeural", OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
-    
-    const { audioStream } = edgeTts.toStream(cleanText.substring(0, 4000));
-    const chunks = [];
-    
-    await new Promise((resolve, reject) => {
-      audioStream.on('data', (chunk) => chunks.push(chunk));
-      audioStream.on('end', resolve);
-      audioStream.on('error', reject);
-    });
-
-    const buffer = Buffer.concat(chunks);
-    await ctx.replyWithVoice({ source: buffer });
+    const buffer = await synthesizeSpeechBuffer(text, "km-KH-SreymomNeural");
+    if (buffer) {
+      await ctx.replyWithVoice({ source: buffer });
+    }
   } catch (error) {
     console.error("Auto TTS Error:", error);
   }
@@ -3288,8 +3337,69 @@ After the grade, provide helpful feedback in Khmer explaining why they got this 
   }
 }
 
+// Sync Code Generation Handler (/link, /sync)
+const generateAndSendSyncCode = async (ctx) => {
+  const userId = ctx.from.id.toString();
+  const userName = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ') || `User ${userId}`;
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+
+  if (db) {
+    try {
+      await db.ref(`sync_codes/${code}`).set({
+        telegramId: userId,
+        name: userName,
+        username: ctx.from.username || '',
+        createdAt: Date.now(),
+        expiresAt: Date.now() + 15 * 60 * 1000 // 15 mins validity
+      });
+    } catch (err) {
+      console.error('Error creating sync code:', err);
+    }
+  }
+
+  const webUrl = WEBAPP_DEFAULT_URL;
+
+  return ctx.reply(
+    `╔════════════════════════════════════════════╗\n` +
+    `   🔗 *លេខកូដភ្ជាប់គណនី WEB APP (SYNC CODE)* 🔗\n` +
+    `╚════════════════════════════════════════════╝\n\n` +
+    `🔑 លេខកូដសម្គាល់របស់អ្នក៖\n` +
+    `👉 \`${code}\` 👈\n\n` +
+    `⏱️ សុពលភាព៖ *១៥ នាទី*\n\n` +
+    `🌐 *របៀបប្រើប្រាស់លើ Google Chrome / Safari៖*\n` +
+    `១. បើកវេបសាយ៖ [ចុចទីនេះដើម្បីបើក](${webUrl})\n` +
+    `២. ចុចប៊ូតុង *«🔑 ចូលគណនី»* រួចរើសយក *«📱 កូដ Telegram (Sync)»* (ឬពេលចុះឈ្មោះ)\n` +
+    `៣. បញ្ចូលលេខកូដសម្គាល់៖ \`${code}\`\n\n` +
+    `✨ _នោះប្រព័ន្ធនឹង Sync រាល់មេរៀនដែលបានរៀន, ពិន្ទុ, វិញ្ញាបនបត្រ និងគណនី VIP របស់អ្នករវាង Telegram និង Chrome ជាមួយគ្នាដោយស្វ័យប្រវត្តិ!_`,
+    {
+      parse_mode: 'Markdown',
+      reply_markup: Markup.inlineKeyboard([
+        [Markup.button.webApp('🌐 បើក Web App ឥឡូវនេះ', webUrl)],
+        [Markup.button.url('🌐 បើកលើ Browser', webUrl)]
+      ]).reply_markup
+    }
+  );
+};
+
+bot.command(['link', 'sync', 'syncweb', 'webcode'], generateAndSendSyncCode);
+bot.hears('🔗 យកកូដភ្ជាប់ Web (Link)', generateAndSendSyncCode);
+bot.action('get_sync_code', async (ctx) => {
+  await ctx.answerCbQuery();
+  await generateAndSendSyncCode(ctx);
+});
+
+bot.hears('🌐 បើក Web App (Study Online)', async (ctx) => {
+  const webUrl = WEBAPP_DEFAULT_URL;
+  return ctx.reply('👇 សូមចុចប៊ូតុងខាងក្រោមដើម្បីបើក Web App សិក្សា៖', {
+    reply_markup: Markup.inlineKeyboard([
+      [Markup.button.webApp('🌐 បើក Web App (Study Online)', webUrl)],
+      [Markup.button.callback('🔗 យកកូដភ្ជាប់ Web App (Sync Code)', 'get_sync_code')]
+    ]).reply_markup
+  });
+});
+
 // AI Chat Handling
-bot.on('text', async (ctx) => {
+bot.on('text', async (ctx, next) => {
   const userId = ctx.from.id.toString();
   const userText = ctx.message.text ? ctx.message.text.trim() : '';
 
@@ -3305,7 +3415,7 @@ bot.on('text', async (ctx) => {
     '❓ ជំនួយ (Help)',
     '💎 គណនី VIP (Upgrade)'
   ];
-  if (menuOptions.includes(userText)) return;
+  if (menuOptions.includes(userText)) return next ? next() : undefined;
 
   // 🔑 Intercept License Key input (from "enter_license_key" button or auto-detect STUDY-XXXX-XXXX-XXXX)
   const userState = await getUserState(userId);
@@ -3561,34 +3671,16 @@ bot.action(/tts_(.+)/, async (ctx) => {
       return ctx.reply("❌ រកមិនឃើញអត្ថបទដើម្បីអានទេ។ សូមចុចបើកមេរៀនជាថ្មី!");
     }
 
-    // Clean text to avoid TTS reading emojis and markdown formatting symbols
-    let cleanText = text
-      .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')
-      .replace(/[═─*#_~`•>]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-
-    const { MsEdgeTTS, OUTPUT_FORMAT } = require("msedge-tts");
-    const edgeTts = new MsEdgeTTS();
-
-    const hasKhmer = /[\u1780-\u17FF]/.test(cleanText);
+    const hasKhmer = /[\u1780-\u17FF]/.test(text);
     const selectedVoice = isPiseth 
       ? (hasKhmer ? "km-KH-SreymomNeural" : "en-US-JennyNeural")
       : (hasKhmer ? "km-KH-PisethNeural" : "en-US-GuyNeural");
 
-    await edgeTts.setMetadata(selectedVoice, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
-    
-    // Generate Audio Stream
-    const { audioStream } = edgeTts.toStream(cleanText.substring(0, 4000));
-    const chunks = [];
-    
-    await new Promise((resolve, reject) => {
-      audioStream.on('data', (chunk) => chunks.push(chunk));
-      audioStream.on('end', resolve);
-      audioStream.on('error', reject);
-    });
+    const buffer = await synthesizeSpeechBuffer(text, selectedVoice);
+    if (!buffer) {
+      throw new Error("Unable to synthesize audio from the text");
+    }
 
-    const buffer = Buffer.concat(chunks);
     await ctx.replyWithVoice(
       { source: buffer },
       { caption: isPiseth ? '👩‍🏫 សំឡេងអ្នកគ្រូ ពិសិដ្ឋ (Teacher Piseth AI)' : '👨‍🏫 សំឡេងគ្រូសន (Teacher Sorn AI)' }
@@ -3887,64 +3979,5 @@ bot.command(['app', 'webapp', 'web', 'online', 'miniweb', 'miniapp'], async (ctx
   );
 });
 
-// Sync Code Generation Handler (/link, /sync)
-const generateAndSendSyncCode = async (ctx) => {
-  const userId = ctx.from.id.toString();
-  const userName = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ') || `User ${userId}`;
-  const code = Math.floor(100000 + Math.random() * 900000).toString();
 
-  if (db) {
-    try {
-      await db.ref(`sync_codes/${code}`).set({
-        telegramId: userId,
-        name: userName,
-        username: ctx.from.username || '',
-        createdAt: Date.now(),
-        expiresAt: Date.now() + 15 * 60 * 1000 // 15 mins validity
-      });
-    } catch (err) {
-      console.error('Error creating sync code:', err);
-    }
-  }
-
-  const webUrl = WEBAPP_DEFAULT_URL;
-
-  return ctx.reply(
-    `╔════════════════════════════════════════════╗\n` +
-    `   🔗 *លេខកូដភ្ជាប់គណនី WEB APP (SYNC CODE)* 🔗\n` +
-    `╚════════════════════════════════════════════╝\n\n` +
-    `🔑 លេខកូដសម្គាល់របស់អ្នក៖\n` +
-    `👉 \`${code}\` 👈\n\n` +
-    `⏱️ សុពលភាព៖ *១៥ នាទី*\n\n` +
-    `🌐 *របៀបប្រើប្រាស់លើ Google Chrome / Safari៖*\n` +
-    `១. បើកវេបសាយ៖ [ចុចទីនេះដើម្បីបើក](${webUrl})\n` +
-    `២. ចុចប៊ូតុង *«🔑 ចូលគណនី»* រួចរើសយក *«📱 កូដ Telegram (Sync)»* (ឬពេលចុះឈ្មោះ)\n` +
-    `៣. បញ្ចូលលេខកូដសម្គាល់៖ \`${code}\`\n\n` +
-    `✨ _នោះប្រព័ន្ធនឹង Sync រាល់មេរៀនដែលបានរៀន, ពិន្ទុ, វិញ្ញាបនបត្រ និងគណនី VIP របស់អ្នករវាង Telegram និង Chrome ជាមួយគ្នាដោយស្វ័យប្រវត្តិ!_`,
-    {
-      parse_mode: 'Markdown',
-      reply_markup: Markup.inlineKeyboard([
-        [Markup.button.webApp('🌐 បើក Web App ឥឡូវនេះ', webUrl)],
-        [Markup.button.url('🌐 បើកលើ Browser', webUrl)]
-      ]).reply_markup
-    }
-  );
-};
-
-bot.command(['link', 'sync', 'syncweb', 'webcode'], generateAndSendSyncCode);
-bot.hears('🔗 យកកូដភ្ជាប់ Web (Link)', generateAndSendSyncCode);
-bot.action('get_sync_code', async (ctx) => {
-  await ctx.answerCbQuery();
-  await generateAndSendSyncCode(ctx);
-});
-
-bot.hears('🌐 បើក Web App (Study Online)', async (ctx) => {
-  const webUrl = WEBAPP_DEFAULT_URL;
-  return ctx.reply('👇 សូមចុចប៊ូតុងខាងក្រោមដើម្បីបើក Web App សិក្សា៖', {
-    reply_markup: Markup.inlineKeyboard([
-      [Markup.button.webApp('🌐 បើក Web App (Study Online)', webUrl)],
-      [Markup.button.callback('🔗 យកកូដភ្ជាប់ Web App (Sync Code)', 'get_sync_code')]
-    ]).reply_markup
-  });
-});
 
