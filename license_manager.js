@@ -139,10 +139,26 @@ async function createLicenseKey(db, adminId, durationInput, note = '') {
   };
 }
 
+// In-memory anti-brute-force store to prevent license guessing
+const failedRedeemAttempts = new Map(); // userId => { count, lockUntil }
+
 /**
  * User: Redeem a License Key
  */
 async function redeemLicenseKey(db, userId, rawKey) {
+  const uid = userId ? userId.toString() : 'anonymous';
+  const now = Date.now();
+  const attempt = failedRedeemAttempts.get(uid);
+
+  // Check if user is temporarily locked out
+  if (attempt && attempt.lockUntil && attempt.lockUntil > now) {
+    const remainingMin = Math.ceil((attempt.lockUntil - now) / 60000);
+    return {
+      success: false,
+      message: `⛔ អ្នកបានបញ្ចូល Key ខុសច្រើនដងពេក! ប្រព័ន្ធបានចាក់សោសុវត្ថិភាពរយៈពេល ${remainingMin} នាទីទៀតសិន។`
+    };
+  }
+
   if (!rawKey) {
     return { success: false, message: '❌ សូមបញ្ជាក់ License Key ដែលត្រូវបញ្ចូល!' };
   }
@@ -152,8 +168,24 @@ async function redeemLicenseKey(db, userId, rawKey) {
   const license = snap.val();
 
   if (!license) {
-    return { success: false, message: '❌ រកមិនឃើញ License Key នេះទេ! សូមពិនិត្យមើលអក្សរឡើងវិញ។' };
+    const currentCount = (attempt ? attempt.count : 0) + 1;
+    if (currentCount >= 5) {
+      failedRedeemAttempts.set(uid, { count: currentCount, lockUntil: now + 10 * 60 * 1000 });
+      return {
+        success: false,
+        message: `⛔ អ្នកបានបញ្ចូល Key ខុសចំនួន ៥ ដង! ប្រព័ន្ធបានចាក់សោសុវត្ថិភាពរយៈពេល ១០ នាទីដើម្បីការពារការ Hack។`
+      };
+    } else {
+      failedRedeemAttempts.set(uid, { count: currentCount, lockUntil: 0 });
+      return {
+        success: false,
+        message: `❌ រកមិនឃើញ License Key នេះទេ! សូមពិនិត្យមើលអក្សរឡើងវិញ (ខុស ${currentCount}/5 ដង)។`
+      };
+    }
   }
+
+  // Clear failed attempts counter on valid key
+  failedRedeemAttempts.delete(uid);
 
   if (license.status === 'used') {
     const usedDate = formatCambodiaTime(license.usedAt);
