@@ -2287,7 +2287,15 @@ async function openLesson(monthId, weekId, lessonId) {
     };
 
     // Render Lesson View
-    document.getElementById('lessonBreadcrumbs').textContent = `${data.month.title} > ${data.week.title} > ${data.lesson.title}`;
+    const bcElem = document.getElementById('lessonBreadcrumbs');
+    if (bcElem) bcElem.textContent = `${data.month.title} > ${data.week.title} > ${data.lesson.title}`;
+    
+    const shortPill = document.getElementById('lessonBreadcrumbShort');
+    if (shortPill) {
+      const t = data.lesson.title || '';
+      shortPill.textContent = t.length > 20 ? t.slice(0, 18) + '…' : t;
+    }
+    
     document.getElementById('lessonTitleDisplay').textContent = data.lesson.title;
     
     // Render Professional Bilingual UI
@@ -2490,45 +2498,73 @@ function getLessonNavInfo() {
 function updateLessonNavButtons() {
   const info = getLessonNavInfo();
 
-  const prevBtns = [document.getElementById('btnPrevLessonTop'), document.getElementById('btnPrevLessonBottom')];
-  prevBtns.forEach(btn => {
-    if (!btn) return;
-    if (!info.hasPrev) {
-      btn.disabled = true;
-      btn.style.opacity = '0.35';
-      btn.style.cursor = 'not-allowed';
-      btn.title = 'នេះជាមេរៀនដំបូងគេបង្អស់';
-    } else {
-      btn.disabled = false;
-      btn.style.opacity = '1';
-      btn.style.cursor = 'pointer';
-      btn.title = 'ត្រឡប់ទៅមេរៀនមុន';
-    }
-  });
+  // Top previous button (mobile arrow)
+  const prevTop = document.getElementById('btnPrevLessonTop');
+  if (prevTop) {
+    prevTop.disabled = !info.hasPrev;
+    prevTop.style.opacity = info.hasPrev ? '1' : '0.3';
+    prevTop.style.cursor = info.hasPrev ? 'pointer' : 'not-allowed';
+    prevTop.title = info.hasPrev ? 'ត្រឡប់ទៅមេរៀនមុន' : 'នេះជាមេរៀនដំបូងគេបង្អស់';
+    prevTop.innerHTML = '<span>‹</span>';
+  }
 
-  const nextBtns = [document.getElementById('btnNextLessonTop'), document.getElementById('nextLessonBtn')];
-  nextBtns.forEach(btn => {
-    if (!btn) return;
+  // Bottom previous button
+  const prevBottom = document.getElementById('btnPrevLessonBottom');
+  if (prevBottom) {
+    prevBottom.disabled = !info.hasPrev;
+    prevBottom.style.opacity = info.hasPrev ? '1' : '0.35';
+    prevBottom.style.cursor = info.hasPrev ? 'pointer' : 'not-allowed';
+    prevBottom.title = info.hasPrev ? 'ត្រឡប់ទៅមេរៀនមុន' : 'នេះជាមេរៀនដំបូងគេបង្អស់';
+    prevBottom.innerHTML = '<span>◀ ត្រឡប់ទៅមេរៀនមុន</span>';
+  }
+
+  // Top next button (mobile arrow or lock)
+  const nextTop = document.getElementById('btnNextLessonTop');
+  if (nextTop) {
     if (!info.hasNext) {
-      btn.disabled = true;
-      btn.style.opacity = '0.35';
-      btn.style.cursor = 'not-allowed';
-      btn.title = 'នេះជាមេរៀនចុងក្រោយ';
-      btn.innerHTML = `<span>🏁 មេរៀនចុងក្រោយ</span>`;
+      nextTop.disabled = true;
+      nextTop.style.opacity = '0.3';
+      nextTop.style.cursor = 'not-allowed';
+      nextTop.title = 'នេះជាមេរៀនចុងក្រោយ';
+      nextTop.innerHTML = '<span>🏁</span>';
     } else if (info.nextLocked) {
-      btn.disabled = false;
-      btn.style.opacity = '0.8';
-      btn.style.cursor = 'pointer';
-      btn.title = 'មេរៀនបន្ទាប់ជាប់សោរ (ចុចដើម្បីដឹងព័ត៌មាន)';
-      btn.innerHTML = `<span>🔒 មេរៀនបន្ទាប់ ▶</span>`;
+      nextTop.disabled = false;
+      nextTop.style.opacity = '0.85';
+      nextTop.style.cursor = 'pointer';
+      nextTop.title = 'មេរៀនបន្ទាប់ជាប់សោរ (ចុចដើម្បីដឹងព័ត៌មាន)';
+      nextTop.innerHTML = '<span>🔒</span>';
     } else {
-      btn.disabled = false;
-      btn.style.opacity = '1';
-      btn.style.cursor = 'pointer';
-      btn.title = 'ទៅកាន់មេរៀនបន្ទាប់';
-      btn.innerHTML = `<span>មេរៀនបន្ទាប់ ▶</span>`;
+      nextTop.disabled = false;
+      nextTop.style.opacity = '1';
+      nextTop.style.cursor = 'pointer';
+      nextTop.title = 'ទៅកាន់មេរៀនបន្ទាប់';
+      nextTop.innerHTML = '<span>›</span>';
     }
-  });
+  }
+
+  // Bottom next button
+  const nextBottom = document.getElementById('nextLessonBtn');
+  if (nextBottom) {
+    if (!info.hasNext) {
+      nextBottom.disabled = true;
+      nextBottom.style.opacity = '0.35';
+      nextBottom.style.cursor = 'not-allowed';
+      nextBottom.title = 'នេះជាមេរៀនចុងក្រោយ';
+      nextBottom.innerHTML = `<span>🏁 មេរៀនចុងក្រោយ</span>`;
+    } else if (info.nextLocked) {
+      nextBottom.disabled = false;
+      nextBottom.style.opacity = '0.85';
+      nextBottom.style.cursor = 'pointer';
+      nextBottom.title = 'មេរៀនបន្ទាប់ជាប់សោរ (ចុចដើម្បីដឹងព័ត៌មាន)';
+      nextBottom.innerHTML = `<span>🔒 មេរៀនបន្ទាប់ ▶</span>`;
+    } else {
+      nextBottom.disabled = false;
+      nextBottom.style.opacity = '1';
+      nextBottom.style.cursor = 'pointer';
+      nextBottom.title = 'ទៅកាន់មេរៀនបន្ទាប់';
+      nextBottom.innerHTML = `<span>មេរៀនបន្ទាប់ ▶</span>`;
+    }
+  }
 }
 
 function goToPrevLesson() {

@@ -377,26 +377,35 @@
       </section>
 
       <!-- ==============================================
-           3. LESSON DETAIL & STUDY TAB
+           3. LESSON DETAIL & STUDY TAB (MOBILE-FIRST)
       ============================================== -->
       <section id="tab-lesson" class="tab-pane">
-        <div class="lesson-header-bar">
-          <div class="lesson-nav-actions">
-            <button class="btn btn-glass btn-sm" onclick="returnToLessonList()" title="ត្រឡប់ទៅកាន់បញ្ជីមេរៀន">
-              <span>🔙 ត្រឡប់ទៅបញ្ជីមេរៀន</span>
+        
+        <!-- Mobile-First Lesson Top Navigation Bar -->
+        <div class="lesson-mobile-header">
+          <button class="btn-lesson-back" onclick="returnToLessonList()" title="ត្រឡប់ទៅកាន់បញ្ជីមេរៀន">
+            <span class="back-arrow">‹</span>
+            <span class="back-text">មេរៀន</span>
+          </button>
+          
+          <div class="lesson-header-pill" id="lessonHeaderPill">
+            <span class="pill-pulse-dot"></span>
+            <span id="lessonBreadcrumbShort" class="pill-lesson-name">មេរៀន</span>
+          </div>
+
+          <div class="lesson-nav-arrow-group">
+            <button id="btnPrevLessonTop" class="btn-lesson-nav-arrow" onclick="goToPrevLesson()" title="ត្រឡប់ទៅមេរៀនមុន">
+              <span>‹</span>
             </button>
-            <div class="lesson-prev-next-group">
-              <button id="btnPrevLessonTop" class="btn btn-glass btn-sm" onclick="goToPrevLesson()" title="ត្រឡប់ទៅមេរៀនមុន">
-                <span>◀ ត្រឡប់ទៅមេរៀនមុន</span>
-              </button>
-              <button id="btnNextLessonTop" class="btn btn-primary btn-sm" onclick="goToNextLesson()" title="ទៅកាន់មេរៀនបន្ទាប់">
-                <span>មេរៀនបន្ទាប់ ▶</span>
-              </button>
-            </div>
+            <button id="btnNextLessonTop" class="btn-lesson-nav-arrow next" onclick="goToNextLesson()" title="ទៅកាន់មេរៀនបន្ទាប់">
+              <span>›</span>
+            </button>
           </div>
-          <div class="lesson-breadcrumbs" id="lessonBreadcrumbs">
-            Month 1 > Week 1 > Lesson 1
-          </div>
+        </div>
+
+        <!-- Clean Full Breadcrumb Indicator -->
+        <div class="lesson-breadcrumbs" id="lessonBreadcrumbs">
+          Month 1 > Week 1 > Lesson 1
         </div>
 
         <div class="lesson-layout">
@@ -488,18 +497,20 @@
 
             <!-- Lesson Footer Action Buttons -->
             <div class="lesson-actions-bar">
-              <button id="btnPrevLessonBottom" class="btn btn-outline btn-lg" onclick="goToPrevLesson()">
-                <span>◀ ត្រឡប់ទៅមេរៀនមុន</span>
-              </button>
-              <button class="btn btn-gold btn-lg" onclick="startCurrentLessonQuiz()">
-                <span>📝 ប្រឡង Quiz មេរៀននេះ</span>
+              <button class="btn btn-gold btn-lg btn-action-quiz" onclick="startCurrentLessonQuiz()">
+                <span>📝 ចូលប្រឡង Quiz មេរៀននេះ</span>
               </button>
               <button id="lessonCertBtn" class="btn btn-cyan btn-lg hidden" onclick="refreshCurrentLessonCert()">
                 <span>📜 ទទួល/Refresh វិញ្ញាបនបត្រ</span>
               </button>
-              <button id="nextLessonBtn" class="btn btn-primary btn-lg" onclick="goToNextLesson()">
-                <span>មេរៀនបន្ទាប់ ▶</span>
-              </button>
+              <div class="lesson-actions-nav-row">
+                <button id="btnPrevLessonBottom" class="btn btn-outline" onclick="goToPrevLesson()">
+                  <span>◀ ត្រឡប់ទៅមេរៀនមុន</span>
+                </button>
+                <button id="nextLessonBtn" class="btn btn-primary" onclick="goToNextLesson()">
+                  <span>មេរៀនបន្ទាប់ ▶</span>
+                </button>
+              </div>
             </div>
           </div>
 
