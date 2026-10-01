@@ -607,6 +607,197 @@ function handleGlobalSearch(query) {
   `).join('');
 }
 
+// ==========================================
+// AI TUTOR SAMPLE PROMPTS & QUICK MODAL
+// ==========================================
+
+const AI_SAMPLE_PROMPTS = {
+  vocab: {
+    id: 'vocab',
+    icon: '📖',
+    title: "Explain 'Vocabulary'",
+    category: "១. ការពន្យល់ពាក្យ និងវេយ្យាករណ៍ (Vocabulary & Grammar)",
+    sub: "សុំ prompt: ពន្យល់ពាក្យ 'Vocabulary'",
+    en: "Explain the difference between 'present perfect' and 'past simple' with examples.",
+    kh: "ពន្យល់ពីភាពខុសគ្នារវាង 'present perfect' និង 'past simple' ព្រមទាំងផ្តល់ឧទាហរណ៍ឱ្យបានច្រើន。"
+  },
+  grammar: {
+    id: 'grammar',
+    icon: '✒️',
+    title: "Correct my grammar",
+    category: "៣. កែសម្រួល និងកែលម្អការសរសេរ (Writing & Correction)",
+    sub: "សុំ prompt: កែលម្អប្រយោគរបស់ខ្ញុំ",
+    en: "Correct the grammar and structure in this paragraph: '[Insert your text here]' and explain why.",
+    kh: "កែតម្រូវវេយ្យាករណ៍ និងរចនាសម្ព័ន្ធនៅក្នុងកថាខណ្ឌនេះ៖ '[បញ្ចូលអត្ថបទរបស់អ្នកនៅទីនេះ]' ហើយពន្យល់ពីមូលហេតុ。"
+  },
+  speaking: {
+    id: 'speaking',
+    icon: '🎙️',
+    title: "Practice speaking",
+    category: "២. ហ្វឹកហាត់ការសន្ទនា (Conversation Practice)",
+    sub: "សុំ prompt: ហ្វឹកហាត់សន្ទនា",
+    en: "Let's practice a conversation about 'ordering food at a restaurant'. Act as the waiter and correct my mistakes.",
+    kh: "តោះហ្វឹកហាត់សន្ទនាពី 'ការកុម្ម៉ង់អាហារនៅភោជនីយដ្ឋាន'។ ដើរតួជាអ្នកបម្រើ ហើយកែតម្រូវរាល់កំហុសរបស់ខ្ញុំ。"
+  },
+  test: {
+    id: 'test',
+    icon: '❓',
+    title: "Test my level",
+    category: "៤. តេស្តកម្រិត និងការរៀន (Placement Test & Learning Tips)",
+    sub: "សុំ prompt: តេស្តកម្រិតរបស់ខ្ញុំ",
+    en: "Ask me 5 intermediate (B2) grammar multiple-choice questions to test my knowledge.",
+    kh: "សួរខ្ញុំនូវសំណួរពហុជ្រើសរើសវេយ្យាករណ៍កម្រិតមធ្យម (B2) ចំនួន ៥ ដើម្បីសាកល្បងចំណេះដឹងរបស់ខ្ញុំ。"
+  }
+};
+
+function openPromptPicker(key) {
+  const p = AI_SAMPLE_PROMPTS[key];
+  if (!p) return;
+
+  const modal = document.getElementById('promptPickerModal');
+  const title = document.getElementById('promptPickerModalTitle');
+  const body = document.getElementById('promptPickerModalBody');
+  if (!modal || !body) return;
+
+  if (title) title.innerHTML = `${p.icon} ${p.title} <span class="text-xs text-slate-400 block font-normal">${p.category}</span>`;
+
+  body.innerHTML = `
+    <!-- English Version -->
+    <div class="prompt-version-box">
+      <div class="prompt-version-header">
+        <span class="prompt-version-tag tag-en">🇬🇧 English Prompt</span>
+      </div>
+      <div class="prompt-text-display font-medium text-sm" id="promptTextEn">${escapeHtml(p.en)}</div>
+      <div class="prompt-action-btns">
+        <button class="btn btn-primary btn-sm flex-1" onclick="sendSamplePrompt('${key}', 'en')">
+          <span>🚀 ផ្ញើទៅកាន់ AI</span>
+        </button>
+        <button class="btn btn-glass btn-sm" onclick="insertPromptToInput('${key}', 'en')">
+          <span>✏️ កែសម្រួល</span>
+        </button>
+        <button class="btn btn-glass btn-sm" onclick="copyPromptText('${key}', 'en', this)">
+          <span>📋</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Khmer Version -->
+    <div class="prompt-version-box">
+      <div class="prompt-version-header">
+        <span class="prompt-version-tag tag-kh">🇰🇭 Khmer Prompt</span>
+      </div>
+      <div class="prompt-text-display font-medium text-sm" id="promptTextKh">${escapeHtml(p.kh)}</div>
+      <div class="prompt-action-btns">
+        <button class="btn btn-emerald btn-sm flex-1" onclick="sendSamplePrompt('${key}', 'kh')">
+          <span>🚀 ផ្ញើទៅកាន់ AI</span>
+        </button>
+        <button class="btn btn-glass btn-sm" onclick="insertPromptToInput('${key}', 'kh')">
+          <span>✏️ កែសម្រួល</span>
+        </button>
+        <button class="btn btn-glass btn-sm" onclick="copyPromptText('${key}', 'kh', this)">
+          <span>📋</span>
+        </button>
+      </div>
+    </div>
+  `;
+
+  modal.classList.remove('hidden');
+}
+
+function sendSamplePrompt(key, lang) {
+  const p = AI_SAMPLE_PROMPTS[key];
+  if (!p) return;
+  const promptText = lang === 'en' ? p.en : p.kh;
+  closeModal('promptPickerModal');
+  const input = document.getElementById('studioChatInput');
+  if (input) {
+    input.value = promptText;
+    sendStudioChatMessage();
+  }
+}
+
+function insertPromptToInput(key, lang) {
+  const p = AI_SAMPLE_PROMPTS[key];
+  if (!p) return;
+  const promptText = lang === 'en' ? p.en : p.kh;
+  closeModal('promptPickerModal');
+  const input = document.getElementById('studioChatInput');
+  if (input) {
+    input.value = promptText;
+    input.focus();
+    showToast('✏️ បានបញ្ចូល Prompt ទៅក្នុងប្រអប់សារ! អ្នកអាចកែសម្រួលមុនផ្ញើ', 'info');
+  }
+}
+
+function copyPromptText(key, lang, btn) {
+  const p = AI_SAMPLE_PROMPTS[key];
+  if (!p) return;
+  const promptText = lang === 'en' ? p.en : p.kh;
+  navigator.clipboard.writeText(promptText).then(() => {
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<span>✓ ចម្លងរួច</span>';
+    setTimeout(() => { btn.innerHTML = orig; }, 2000);
+    showToast('📋 បានចម្លង Prompt ទៅ Clipboard!', 'success');
+  });
+}
+
+// ==========================================
+// COURSES SCREEN SEARCH, FILTERS & ACCORDION
+// ==========================================
+
+STATE.coursesFilter = 'all';
+
+function toggleCoursesSearch() {
+  const bar = document.getElementById('coursesSearchBar');
+  const input = document.getElementById('coursesSearchInput');
+  if (!bar) return;
+  if (bar.style.display === 'none' || getComputedStyle(bar).display === 'none') {
+    bar.style.display = 'flex';
+    if (input) input.focus();
+  } else {
+    bar.style.display = 'none';
+  }
+}
+
+function clearCoursesSearch() {
+  const input = document.getElementById('coursesSearchInput');
+  if (input) {
+    input.value = '';
+    handleCoursesFilter();
+  }
+}
+
+function setCoursesFilter(filter) {
+  STATE.coursesFilter = filter;
+  document.querySelectorAll('.course-filter-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.filter === filter);
+  });
+  if (STATE.courseLevel === 'beginner') {
+    renderBeginnerWeeks();
+  } else if (STATE.courseLevel === 'elementary') {
+    renderElementaryWeeks();
+  } else {
+    renderCurriculumWeeks();
+  }
+}
+
+function handleCoursesFilter() {
+  if (STATE.courseLevel === 'beginner') {
+    renderBeginnerWeeks();
+  } else if (STATE.courseLevel === 'elementary') {
+    renderElementaryWeeks();
+  } else {
+    renderCurriculumWeeks();
+  }
+}
+
+function toggleUnitAccordion(unitId) {
+  const el = document.getElementById(unitId);
+  if (el) {
+    el.classList.toggle('collapsed');
+  }
+}
+
 function returnToLessonList() {
   if (STATE.currentLesson?.monthId === 'beginner') {
     switchCourseLevel('beginner');
@@ -868,41 +1059,103 @@ function renderBeginnerWeeks() {
     </div>
   `;
 
-  const weeksHTML = course.weeks.map(w => {
-    const lessonsHTML = w.lessons.map((l, wLessonIdx) => {
+  // Update progress card
+  const progressRatio = document.getElementById('coursesProgressRatio');
+  const progressBarFill = document.getElementById('coursesProgressBarFill');
+  if (progressRatio) progressRatio.textContent = `${passedCount}/26 Lessons`;
+  if (progressBarFill) progressBarFill.style.width = `${finalPct}%`;
+
+  const searchInput = document.getElementById('coursesSearchInput');
+  const searchQ = (searchInput?.value || '').trim().toLowerCase();
+  const filter = STATE.coursesFilter || 'all';
+
+  const weeksHTML = course.weeks.map((w, wIdx) => {
+    let filteredLessons = w.lessons.filter(l => {
       const dbKey = `beginner-${w.id}-${l.id}`;
       const isComp = !!completed[dbKey] || passedLessons.has(l.id);
-      const grade = isComp ? (completed[dbKey]?.grade || 'A') : null;
-
-      // Sequential lock: lesson N requires lesson N-1 passed
-      // bl1 is always unlocked; bl2 requires bl1, etc.
-      // ADMIN BYPASS: Admin sees all lessons unlocked
       const lessonNum = parseInt((l.id || '').replace('bl', ''));
       const isUnlocked = isAdmin || lessonNum <= 1 || passedLessons.has(`bl${lessonNum - 1}`);
       const isLocked = !isUnlocked;
 
+      // Filter by status tab
+      if (filter === 'completed' && !isComp) return false;
+      if (filter === 'ongoing' && (isComp || isLocked)) return false;
+      if (filter === 'locked' && !isLocked) return false;
+
+      // Filter by search query
+      if (searchQ) {
+        const text = `${l.title} ${l.titleKhmer || ''} ${l.letter || ''} ${l.vocabulary || ''}`.toLowerCase();
+        if (!text.includes(searchQ)) return false;
+      }
+      return true;
+    });
+
+    if (filteredLessons.length === 0 && (filter !== 'all' || searchQ)) {
+      return '';
+    }
+
+    const lessonsHTML = filteredLessons.map(l => {
+      const dbKey = `beginner-${w.id}-${l.id}`;
+      const isComp = !!completed[dbKey] || passedLessons.has(l.id);
+      const grade = isComp ? (completed[dbKey]?.grade || 'A') : null;
+
+      const lessonNum = parseInt((l.id || '').replace('bl', ''));
+      const isUnlocked = isAdmin || lessonNum <= 1 || passedLessons.has(`bl${lessonNum - 1}`);
+      const isLocked = !isUnlocked;
+      const isCurrent = !isComp && isUnlocked;
+
+      const thumbIcon = l.letter ? `🔤` : '📘';
+      const duration = '⏱️ 10 mins';
+      const desc = l.vocabulary ? `ពាក្យ: ${l.vocabulary} • ${l.sampleSentence || ''}` : (l.grammarRule || 'មេរៀនគ្រឹះភាសាអង់គ្លេស');
+
+      let badgeHTML = '';
+      if (isComp) {
+        badgeHTML = `<span class="lesson-badge-completed">✓ Completed</span>`;
+      } else if (isCurrent) {
+        badgeHTML = `<span class="lesson-btn-inprogress">▶ In Progress</span>`;
+      } else if (isLocked) {
+        badgeHTML = `<span class="lesson-badge-locked">🔒 Locked</span>`;
+      } else {
+        badgeHTML = `<span class="lesson-badge-ongoing">Ongoing</span>`;
+      }
+
       return `
-        <div class="lesson-item-card beginner-lesson-item ${isComp ? 'completed' : ''} ${isLocked ? 'lesson-locked' : ''}" 
+        <div class="mobile-lesson-card ${isComp ? 'completed' : ''} ${isLocked ? 'locked' : ''}" 
              onclick="${isLocked ? `showToast('🔒 ត្រូវប្រឡងជាប់ថ្ងៃទី${lessonNum - 1} ជាមុន!', 'warning')` : `openLesson('beginner', '${w.id}', '${l.id}')`}">
-          <div class="l-info">
-            <div class="l-title">${isLocked ? '🔒 ' : (isAdmin && !isComp ? '🛡️ ' : '')}${l.title}</div>
-            <div class="l-status">${isComp ? `✅ ជាប់និទ្ទេស ${grade}` : (isLocked ? '🔒 ចាំប្រឡងថ្ងៃកន្លងទៅ' : (isAdmin ? '🛡️ Admin • ចូលបានភ្លាម' : '📖 ១ ថ្ងៃ ១ អក្សរ ១ ពាក្យ ១ ល្បះ'))}</div>
+          <div class="lesson-card-thumb">
+            <span class="lesson-thumb-emoji">${thumbIcon}</span>
           </div>
-          <div class="l-icon">${isComp ? '🏆' : (isLocked ? '🔒' : (isAdmin ? '🛡️' : '➡️'))}</div>
+          <div class="lesson-card-body">
+            <div class="lesson-card-title">${isLocked ? '🔒 ' : ''}${l.title}</div>
+            <div class="lesson-card-meta">${duration}</div>
+            <div class="lesson-card-desc">${escapeHtml(desc)}</div>
+          </div>
+          <div class="lesson-card-right">
+            ${badgeHTML}
+          </div>
         </div>
       `;
     }).join('');
 
+    const isCollapsed = wIdx > 0 && filter === 'all' && !searchQ;
+
     return `
-      <div class="week-card glass-panel beginner-week-card">
-        <div class="week-header">
-          <div class="week-title-wrap">
-            <div class="week-title">📅 ${w.title} (${w.lessons.length} ថ្ងៃ)</div>
-            ${w.description ? `<div class="week-desc text-xs text-slate-400 mt-0.5">${w.description}</div>` : ''}
+      <div class="unit-accordion-item ${isCollapsed ? 'collapsed' : ''}" id="unit-${w.id}">
+        <button class="unit-header-btn" onclick="toggleUnitAccordion('unit-${w.id}')">
+          <div class="unit-header-left">
+            <span class="unit-header-icon">📁</span>
+            <div class="unit-header-title-box">
+              <span class="unit-header-title">${w.title}</span>
+              <span class="unit-header-sub">${w.description || `${w.lessons.length} ថ្ងៃ (Lessons)`}</span>
+            </div>
           </div>
-          <span class="badge ${isAdmin ? 'badge-amber' : 'badge-emerald'}">${isAdmin ? '🛡️ Admin View' : '👩‍🏫 អ្នកគ្រូ ពិសិដ្ឋ AI'}</span>
+          <div class="unit-header-right">
+            <span class="unit-chevron">▾</span>
+          </div>
+        </button>
+        <div class="unit-lessons-body">
+          ${lessonsHTML || '<p class="text-xs text-muted p-2">មិនមានមេរៀនត្រូវនឹងការស្វែងរកទេ</p>'}
         </div>
-        <div class="lessons-grid">${lessonsHTML}</div>
       </div>
     `;
   }).join('');
@@ -1047,39 +1300,93 @@ function renderElementaryWeeks() {
     </div>
   `;
 
-  const weeksHTML = currentMonth.weeks.map(w => {
-    const lessonsHTML = w.lessons.map(l => {
+  // Update progress card
+  const progressRatio = document.getElementById('coursesProgressRatio');
+  const progressBarFill = document.getElementById('coursesProgressBarFill');
+  if (progressRatio) progressRatio.textContent = `${passedInMonth}/24 Lessons (ខែទី ${monthNum})`;
+  if (progressBarFill) progressBarFill.style.width = `${monthPct}%`;
+
+  const searchInput = document.getElementById('coursesSearchInput');
+  const searchQ = (searchInput?.value || '').trim().toLowerCase();
+  const filter = STATE.coursesFilter || 'all';
+
+  const weeksHTML = currentMonth.weeks.map((w, wIdx) => {
+    let filteredLessons = w.lessons.filter(l => {
       const lessonNum = parseInt((l.id || '').replace('el', ''));
       const isComp = passedLessons.has(l.id) || !!completed[`elementary-${w.id}-${l.id}`] || !!completed[`${currentMonth.id}-${w.id}-${l.id}`];
-      const grade = isComp ? (completed[`elementary-${w.id}-${l.id}`]?.grade || completed[`${currentMonth.id}-${w.id}-${l.id}`]?.grade || 'A') : null;
-
-      // Sequential lock: lesson N requires lesson N-1 passed
-      // el1 is always unlocked; el2 requires el1, etc.
       const isUnlocked = isAdmin || lessonNum <= 1 || passedLessons.has(`el${lessonNum - 1}`);
       const isLocked = !isUnlocked;
 
+      if (filter === 'completed' && !isComp) return false;
+      if (filter === 'ongoing' && (isComp || isLocked)) return false;
+      if (filter === 'locked' && !isLocked) return false;
+
+      if (searchQ) {
+        const text = `${l.title} ${l.titleKhmer || ''} ${l.topic || ''}`.toLowerCase();
+        if (!text.includes(searchQ)) return false;
+      }
+      return true;
+    });
+
+    if (filteredLessons.length === 0 && (filter !== 'all' || searchQ)) {
+      return '';
+    }
+
+    const lessonsHTML = filteredLessons.map(l => {
+      const lessonNum = parseInt((l.id || '').replace('el', ''));
+      const isComp = passedLessons.has(l.id) || !!completed[`elementary-${w.id}-${l.id}`] || !!completed[`${currentMonth.id}-${w.id}-${l.id}`];
+      const isUnlocked = isAdmin || lessonNum <= 1 || passedLessons.has(`el${lessonNum - 1}`);
+      const isLocked = !isUnlocked;
+      const isCurrent = !isComp && isUnlocked;
+
+      let badgeHTML = '';
+      if (isComp) {
+        badgeHTML = `<span class="lesson-badge-completed">✓ Completed</span>`;
+      } else if (isCurrent) {
+        badgeHTML = `<span class="lesson-btn-inprogress">▶ In Progress</span>`;
+      } else if (isLocked) {
+        badgeHTML = `<span class="lesson-badge-locked">🔒 Locked</span>`;
+      } else {
+        badgeHTML = `<span class="lesson-badge-ongoing">Ongoing</span>`;
+      }
+
       return `
-        <div class="lesson-item-card beginner-lesson-item ${isComp ? 'completed' : ''} ${isLocked ? 'lesson-locked' : ''}" 
+        <div class="mobile-lesson-card ${isComp ? 'completed' : ''} ${isLocked ? 'locked' : ''}" 
              onclick="${isLocked ? `showToast('🔒 ត្រូវប្រឡងជាប់ថ្ងៃទី${lessonNum - 1} ជាមុន!', 'warning')` : `openLesson('${currentMonth.id}', '${w.id}', '${l.id}')`}">
-          <div class="l-info">
-            <div class="l-title">${isLocked ? '🔒 ' : (isAdmin && !isComp ? '🛡️ ' : '')}${l.title}</div>
-            <div class="l-status">${isComp ? `✅ ជាប់និទ្ទេស ${grade}` : (isLocked ? '🔒 ចាំប្រឡងថ្ងៃកន្លងទៅ' : (isAdmin ? '🛡️ Admin • ចូលបានភ្លាម' : `📖 ${l.content?.grammar?.title || 'វេយ្យាករណ៍ & វាក្យសព្ទ'}`))}</div>
+          <div class="lesson-card-thumb">
+            <span class="lesson-thumb-emoji">🏫</span>
           </div>
-          <div class="l-icon">${isComp ? '🏆' : (isLocked ? '🔒' : (isAdmin ? '🛡️' : '➡️'))}</div>
+          <div class="lesson-card-body">
+            <div class="lesson-card-title">${isLocked ? '🔒 ' : ''}${l.title}</div>
+            <div class="lesson-card-meta">⏱️ 15 mins</div>
+            <div class="lesson-card-desc">${escapeHtml(l.titleKhmer || l.topic || 'ថ្នាក់បឋមសិក្សា')}</div>
+          </div>
+          <div class="lesson-card-right">
+            ${badgeHTML}
+          </div>
         </div>
       `;
     }).join('');
 
+    const isCollapsed = wIdx > 0 && filter === 'all' && !searchQ;
+
     return `
-      <div class="week-card glass-panel beginner-week-card">
-        <div class="week-header">
-          <div class="week-title-wrap">
-            <div class="week-title">📅 ${w.title} (${w.lessons.length} ថ្ងៃ)</div>
-            ${w.description ? `<div class="week-desc text-xs text-slate-400 mt-0.5">${w.description}</div>` : ''}
+      <div class="unit-accordion-item ${isCollapsed ? 'collapsed' : ''}" id="unit-el-${w.id}">
+        <button class="unit-header-btn" onclick="toggleUnitAccordion('unit-el-${w.id}')">
+          <div class="unit-header-left">
+            <span class="unit-header-icon">📁</span>
+            <div class="unit-header-title-box">
+              <span class="unit-header-title">${w.title}</span>
+              <span class="unit-header-sub">${w.lessons.length} ថ្ងៃ (Lessons)</span>
+            </div>
           </div>
-          <span class="badge ${isAdmin ? 'badge-amber' : 'badge-emerald'}">${isAdmin ? '🛡️ Admin View' : '👩‍🏫 អ្នកគ្រូ ពិសិដ្ឋ AI'}</span>
+          <div class="unit-header-right">
+            <span class="unit-chevron">▾</span>
+          </div>
+        </button>
+        <div class="unit-lessons-body">
+          ${lessonsHTML || '<p class="text-xs text-muted p-2">មិនមានមេរៀនត្រូវនឹងការស្វែងរកទេ</p>'}
         </div>
-        <div class="lessons-grid">${lessonsHTML}</div>
       </div>
     `;
   }).join('');
@@ -1160,44 +1467,121 @@ function renderCurriculumWeeks() {
     });
   });
 
-  container.innerHTML = currentMonth.weeks.map(w => `
-    <div class="week-card glass-panel">
-      <div class="week-header">
-        <div class="week-title">📅 ${w.title} (${w.lessons.length} មេរៀន)</div>
-        ${isAdmin ? '<span class="badge badge-amber">🛡️ Admin View</span>' : ''}
-      </div>
-      <div class="lessons-grid">
-        ${w.lessons.map(l => {
-          const key = `${currentMonth.id}-${w.id}-${l.id}`;
-          const isComp = !!completed[key];
-          const grade = isComp ? completed[key].grade || 'A' : null;
+  const searchInput = document.getElementById('coursesSearchInput');
+  const searchQ = (searchInput?.value || '').trim().toLowerCase();
+  const filter = STATE.coursesFilter || 'all';
 
-          // Admin bypasses all locks
-          let isLocked = false;
-          if (!isAdmin) {
-            const globalIdx = globalOrder.indexOf(key);
-            if (globalIdx > 0) {
-              const prevKey = globalOrder[globalIdx - 1];
-              isLocked = !completed[prevKey];
-            }
-          }
+  // Count progress
+  let totalLessonsInCourse = 0;
+  let passedLessonsInCourse = 0;
+  currentMonth.weeks.forEach(w => {
+    (w.lessons || []).forEach(l => {
+      totalLessonsInCourse++;
+      const key = `${currentMonth.id}-${w.id}-${l.id}`;
+      if (completed[key]) passedLessonsInCourse++;
+    });
+  });
 
-          return `
-            <div class="lesson-item-card ${isComp ? 'completed' : ''} ${isLocked ? 'lesson-locked' : ''}"
-                 onclick="${isLocked
-                   ? `showToast('🔒 ត្រូវប្រឡងជាប់មេរៀនមុនសិន ទើបអាចរៀននេះបាន!', 'warning')`
-                   : `openLesson('${currentMonth.id}', '${w.id}', '${l.id}')`}">
-              <div class="l-info">
-                <div class="l-title">${isLocked ? '🔒 ' : (isAdmin && !isComp ? '🛡️ ' : '')}${l.title}</div>
-                <div class="l-status">${isComp ? `✅ ជាប់និទ្ទេស ${grade}` : (isLocked ? '🔒 ចាំប្រឡងជាប់មេរៀនមុន' : (isAdmin ? '🛡️ Admin • ចូលបានភ្លាម' : '📖 ចុចដើម្បីរៀន'))}</div>
-              </div>
-              <div class="l-icon">${isComp ? '🏆' : (isLocked ? '🔒' : (isAdmin ? '🛡️' : '➡️'))}</div>
+  const progressRatio = document.getElementById('coursesProgressRatio');
+  const progressBarFill = document.getElementById('coursesProgressBarFill');
+  const curPct = totalLessonsInCourse > 0 ? Math.round((passedLessonsInCourse / totalLessonsInCourse) * 100) : 0;
+  if (progressRatio) progressRatio.textContent = `${passedLessonsInCourse}/${totalLessonsInCourse} Lessons`;
+  if (progressBarFill) progressBarFill.style.width = `${curPct}%`;
+
+  container.innerHTML = currentMonth.weeks.map((w, wIdx) => {
+    let filteredLessons = (w.lessons || []).filter(l => {
+      const key = `${currentMonth.id}-${w.id}-${l.id}`;
+      const isComp = !!completed[key];
+      let isLocked = false;
+      if (!isAdmin) {
+        const globalIdx = globalOrder.indexOf(key);
+        if (globalIdx > 0) {
+          const prevKey = globalOrder[globalIdx - 1];
+          isLocked = !completed[prevKey];
+        }
+      }
+
+      if (filter === 'completed' && !isComp) return false;
+      if (filter === 'ongoing' && (isComp || isLocked)) return false;
+      if (filter === 'locked' && !isLocked) return false;
+
+      if (searchQ) {
+        const text = `${l.title} ${l.titleKhmer || ''} ${l.description || ''}`.toLowerCase();
+        if (!text.includes(searchQ)) return false;
+      }
+      return true;
+    });
+
+    if (filteredLessons.length === 0 && (filter !== 'all' || searchQ)) {
+      return '';
+    }
+
+    const lessonsHTML = filteredLessons.map(l => {
+      const key = `${currentMonth.id}-${w.id}-${l.id}`;
+      const isComp = !!completed[key];
+      let isLocked = false;
+      if (!isAdmin) {
+        const globalIdx = globalOrder.indexOf(key);
+        if (globalIdx > 0) {
+          const prevKey = globalOrder[globalIdx - 1];
+          isLocked = !completed[prevKey];
+        }
+      }
+      const isCurrent = !isComp && !isLocked;
+
+      let badgeHTML = '';
+      if (isComp) {
+        badgeHTML = `<span class="lesson-badge-completed">✓ Completed</span>`;
+      } else if (isCurrent) {
+        badgeHTML = `<span class="lesson-btn-inprogress">▶ In Progress</span>`;
+      } else if (isLocked) {
+        badgeHTML = `<span class="lesson-badge-locked">🔒 Locked</span>`;
+      } else {
+        badgeHTML = `<span class="lesson-badge-ongoing">Ongoing</span>`;
+      }
+
+      return `
+        <div class="mobile-lesson-card ${isComp ? 'completed' : ''} ${isLocked ? 'locked' : ''}"
+             onclick="${isLocked
+               ? `showToast('🔒 ត្រូវប្រឡងជាប់មេរៀនមុនសិន ទើបអាចរៀននេះបាន!', 'warning')`
+               : `openLesson('${currentMonth.id}', '${w.id}', '${l.id}')`}">
+          <div class="lesson-card-thumb">
+            <span class="lesson-thumb-emoji">📖</span>
+          </div>
+          <div class="lesson-card-body">
+            <div class="lesson-card-title">${isLocked ? '🔒 ' : ''}${l.title}</div>
+            <div class="lesson-card-meta">⏱️ 15 mins</div>
+            <div class="lesson-card-desc">${escapeHtml(l.titleKhmer || l.description || 'មេរៀនភាសាអង់គ្លេស')}</div>
+          </div>
+          <div class="lesson-card-right">
+            ${badgeHTML}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    const isCollapsed = wIdx > 0 && filter === 'all' && !searchQ;
+
+    return `
+      <div class="unit-accordion-item ${isCollapsed ? 'collapsed' : ''}" id="unit-${w.id}">
+        <button class="unit-header-btn" onclick="toggleUnitAccordion('unit-${w.id}')">
+          <div class="unit-header-left">
+            <span class="unit-header-icon">📁</span>
+            <div class="unit-header-title-box">
+              <span class="unit-header-title">${w.title}</span>
+              <span class="unit-header-sub">${w.lessons.length} Lessons</span>
             </div>
-          `;
-        }).join('')}
+          </div>
+          <div class="unit-header-right">
+            <span class="unit-chevron">▾</span>
+          </div>
+        </button>
+        <div class="unit-lessons-body">
+          ${lessonsHTML || '<p class="text-xs text-muted p-2">មិនមានមេរៀនត្រូវនឹងការស្វែងរកទេ</p>'}
+        </div>
       </div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 }
 
 
@@ -3019,10 +3403,55 @@ async function sendStudioChatMessage() {
 
   // Append user message
   const userBubble = document.createElement('div');
-  userBubble.className = 'chat-bubble user';
-  userBubble.textContent = msg;
+  userBubble.className = 'chat-bubble user mobile-user-prompt';
+  userBubble.innerHTML = `
+    <div class="user-bubble-row">
+      <span class="user-bubble-text">${escapeHtml(msg)}</span>
+      <img src="${STATE.currentUser?.photoUrl || '/teacher_limsorn.jpg'}" class="user-bubble-mini-avatar" alt="You" onerror="this.src='/director_signature.png'">
+    </div>
+  `;
   chatBox.appendChild(userBubble);
   chatBox.scrollTop = chatBox.scrollHeight;
+
+  const trimmed = msg.toLowerCase().trim();
+  if (trimmed === 'សុំ prompt' || trimmed === 'prompt' || trimmed === 'សុំprompt' || trimmed === 'prompts') {
+    const replyBubble = document.createElement('div');
+    replyBubble.className = 'chat-bubble ai mobile-ai-prompt-reply';
+    replyBubble.innerHTML = `
+      <div class="ai-bubble-header">
+        <span class="ai-bubble-author">🤖 AI Tutor</span>
+        <span class="ai-bubble-badge">Official AI</span>
+      </div>
+      <div class="ai-bubble-content">
+        សួស្តីប្អូន! តើប្អូនចង់បាន prompt សម្រាប់អ្វី? ខាងក្រោមនេះជាឧទាហរណ៍ខ្លះៗដែលប្អូនអាចសាកល្បង៖
+      </div>
+      <div class="ai-prompt-grid-2x2">
+        <div class="ai-prompt-card" onclick="openPromptPicker('vocab')">
+          <div class="prompt-card-icon">📖</div>
+          <div class="prompt-card-title">Explain 'Vocabulary'</div>
+          <div class="prompt-card-sub">សុំ prompt: ពន្យល់ពាក្យ 'Vocabulary'</div>
+        </div>
+        <div class="ai-prompt-card" onclick="openPromptPicker('grammar')">
+          <div class="prompt-card-icon">✒️</div>
+          <div class="prompt-card-title">Correct my grammar</div>
+          <div class="prompt-card-sub">សុំ prompt: កែលម្អប្រយោគរបស់ខ្ញុំ</div>
+        </div>
+        <div class="ai-prompt-card" onclick="openPromptPicker('speaking')">
+          <div class="prompt-card-icon">🎙️</div>
+          <div class="prompt-card-title">Practice speaking</div>
+          <div class="prompt-card-sub">សុំ prompt: ហ្វឹកហាត់សន្ទនា</div>
+        </div>
+        <div class="ai-prompt-card" onclick="openPromptPicker('test')">
+          <div class="prompt-card-icon">❓</div>
+          <div class="prompt-card-title">Test my level</div>
+          <div class="prompt-card-sub">សុំ prompt: តេស្តកម្រិតរបស់ខ្ញុំ</div>
+        </div>
+      </div>
+    `;
+    chatBox.appendChild(replyBubble);
+    chatBox.scrollTop = chatBox.scrollHeight;
+    return;
+  }
 
   // Append thinking bubble
   const isPiseth = (STATE.studioTutor || 'piseth') === 'piseth';

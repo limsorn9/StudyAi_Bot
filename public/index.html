@@ -281,68 +281,75 @@
       </section>
 
       <!-- ==============================================
-           2. CURRICULUM TAB (12 MONTHS)
+           2. CURRICULUM TAB (MOBILE-FIRST ENGLISH LESSONS)
       ============================================== -->
       <section id="tab-curriculum" class="tab-pane">
-        <div class="section-title">
-          <h2>📚 កម្រិតសិក្សា</h2>
-          <p>ជ្រើសរើសរៀនថ្នាក់ដំបូង (អ្នកគ្រូ ពិសិដ្ឋ) ឬថ្នាក់ទូទៅ ១២ ខែ (គ្រូសន)</p>
+        <!-- Mobile Top Nav Header -->
+        <div class="courses-mobile-header">
+          <button class="courses-back-btn" onclick="navigateTo('dashboard')" title="ត្រឡប់ក្រោយ">
+            <span class="back-arrow">‹</span>
+          </button>
+          <div class="courses-header-titles">
+            <h2 class="courses-main-title">English Lessons</h2>
+            <p class="courses-sub-title">មេរៀនភាសាអង់គ្លេស</p>
+          </div>
+          <button class="courses-search-toggle-btn" onclick="toggleCoursesSearch()" title="ស្វែងរក">
+            <span>🔍</span>
+          </button>
         </div>
 
-        <!-- Course Level Switcher: 5 Levels with lock states -->
-        <div class="course-level-switch-wrap mb-4">
+        <!-- Search Bar -->
+        <div class="courses-search-bar" id="coursesSearchBar">
+          <span class="courses-search-icon">🔍</span>
+          <input type="text" id="coursesSearchInput" placeholder="Search lessons..." oninput="handleCoursesFilter()">
+          <button class="courses-search-clear" onclick="clearCoursesSearch()">✕</button>
+        </div>
+
+        <!-- Filter Tabs: All, Completed, Ongoing, Locked -->
+        <div class="courses-filter-tabs">
+          <button class="course-filter-tab active" data-filter="all" onclick="setCoursesFilter('all')">All</button>
+          <button class="course-filter-tab" data-filter="completed" onclick="setCoursesFilter('completed')">Completed</button>
+          <button class="course-filter-tab" data-filter="ongoing" onclick="setCoursesFilter('ongoing')">Ongoing</button>
+          <button class="course-filter-tab" data-filter="locked" onclick="setCoursesFilter('locked')">Locked</button>
+        </div>
+
+        <!-- Course Level Switcher (Collapsible Dropdown / Pills) -->
+        <div class="course-level-switch-wrap mb-3">
           <div class="course-level-switcher-5 glass-panel">
-            <!-- Level 1: Beginner (unlocked) -->
             <button class="course-level-btn active" id="courseLevelBeginnerBtn" onclick="switchCourseLevel('beginner')">
               <span class="course-icon">👩‍🏫</span>
               <div class="course-btn-text">
-                <span class="course-badge">ថ្នាក់ដំបូង • English for Children</span>
-                <span class="course-title">ថ្នាក់ដំបូង (អ្នកគ្រូ ពិសិដ្ឋ AI)</span>
-                <span class="course-sub">A–Z • ២៦ ថ្ងៃ</span>
+                <span class="course-badge">ថ្នាក់ដំបូង • Starter</span>
+                <span class="course-title">ថ្នាក់ដំបូង (English for Children)</span>
               </div>
             </button>
-            <!-- Level 2: Elementary (locked until Beginner graduated) -->
             <button class="course-level-btn locked-level" id="courseLevelElementaryBtn" onclick="switchCourseLevel('elementary')">
-              <span class="course-icon">🔒</span>
+              <span class="course-icon">🏫</span>
               <div class="course-btn-text">
-                <span class="course-badge">កម្រិតបឋម • Elementary Level</span>
-                <span class="course-title">ថ្នាក់បឋមសិក្សា (អ្នកគ្រូ ពិសិដ្ឋ AI)</span>
-                <span class="course-sub lock-hint">៣ ខែ • ៧២ ថ្ងៃ (ប្រឡងបញ្ចប់ថ្នាក់ដំបូងជាមុន)</span>
+                <span class="course-badge">កម្រិតបឋម • Primary</span>
+                <span class="course-title">ថ្នាក់បឋមសិក្សា (Elementary)</span>
               </div>
             </button>
-            <!-- Level 3: Intermediate (locked) -->
             <button class="course-level-btn locked-level" id="courseLevelIntermediateBtn" onclick="switchCourseLevel('intermediate')">
-              <span class="course-icon">🔒</span>
+              <span class="course-icon">🎒</span>
               <div class="course-btn-text">
-                <span class="course-badge">កម្រិតមធ្យម • Intermediate</span>
-                <span class="course-title">កម្រិតមធ្យម</span>
-                <span class="course-sub lock-hint">ទូរស្ករ</span>
+                <span class="course-badge">កម្រិតមធ្យម • Secondary</span>
+                <span class="course-title">ថ្នាក់អនុវិទ្យាល័យ (Secondary)</span>
               </div>
             </button>
-            <!-- Level 4: Advanced (locked) -->
-            <button class="course-level-btn locked-level" id="courseLevelAdvancedBtn" onclick="switchCourseLevel('advanced')">
-              <span class="course-icon">🔒</span>
-              <div class="course-btn-text">
-                <span class="course-badge">កម្រិតឧត្តម • Advanced</span>
-                <span class="course-title">កម្រិតឧត្តម</span>
-                <span class="course-sub lock-hint">ទូរស្ករ</span>
-              </div>
-            </button>
-            <!-- Level 5: General 12 Months (unlocked for all) -->
             <button class="course-level-btn" id="courseLevelStandardBtn" onclick="switchCourseLevel('standard')">
-              <span class="course-icon">👨‍🏫</span>
+              <span class="course-icon">🎓</span>
               <div class="course-btn-text">
-                <span class="course-badge">ថ្នាក់ទូទៅ • ១២ ខែ</span>
+                <span class="course-badge">ថ្នាក់ទូទៅ • High School</span>
                 <span class="course-title">ថ្នាក់ទូទៅ ១២ ខែ (គ្រូសន AI)</span>
-                <span class="course-sub">288 មេរៀន</span>
               </div>
             </button>
           </div>
         </div>
 
         <!-- Instructor Banner Card -->
-        <div class="course-instructor-card glass-panel mb-4" id="curriculumInstructorCard">
-          <!-- Populated by JS: Shows Teacher Piseth or Teacher Sorn info -->
+        <div class="course-instructor-card glass-panel mb-3" id="curriculumInstructorCard">
+          <!-- Populated by JS -->
         </div>
 
         <!-- Month Navigation Pills (Only shown for 12 Months) -->
@@ -350,9 +357,22 @@
           <!-- Populated by JS -->
         </div>
 
-        <!-- Weeks & Lessons Container -->
-        <div id="curriculumWeeksContainer" class="weeks-container">
-          <!-- Populated by JS -->
+        <!-- Units & Lessons Container (Rendered into Accordion) -->
+        <div id="curriculumWeeksContainer" class="weeks-container courses-units-accordion">
+          <!-- Populated dynamically by JS -->
+        </div>
+
+        <!-- Sticky Bottom Progress Card -->
+        <div class="courses-bottom-progress-card" id="coursesBottomProgressCard">
+          <div class="courses-progress-left">
+            <div class="courses-progress-label">Your Progress: <span id="coursesProgressRatio">0/26 Lessons</span></div>
+            <div class="courses-progress-bar-track">
+              <div class="courses-progress-bar-fill" id="coursesProgressBarFill" style="width: 0%"></div>
+            </div>
+          </div>
+          <button class="courses-next-unit-btn" onclick="openRecommendedExercise()">
+            <span>See Next Unit ›</span>
+          </button>
         </div>
       </section>
 
@@ -521,122 +541,128 @@
            3.5 AI TUTOR CHAT & STUDY STUDIO TAB
       ============================================== -->
       <section id="tab-ai-tutor" class="tab-pane">
-        <div class="ai-studio-container">
-          <!-- Top Hero Card / Teacher Info & Engine Selector -->
-          <div class="ai-studio-header glass-panel">
-            <div class="ai-studio-profile">
-              <div class="ai-studio-avatar-ring">
-                <span class="ai-studio-avatar-emoji">👨‍🏫</span>
-                <span class="ai-studio-pulse-dot" title="Online"></span>
-              </div>
-              <div class="ai-studio-info">
-                <div class="ai-studio-name-row">
-                  <h2 class="ai-studio-name">គ្រូសន (Teacher Sorn AI)</h2>
-                  <span class="ai-badge-verified">✓ គ្រូជំនាញភាសាអង់គ្លេស</span>
-                </div>
-                <p class="ai-studio-sub">
-                  វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline • ជួយឆ្លើយចម្ងល់ ពន្យល់វេយ្យាករណ៍ បកប្រែ និងហាត់និយាយ
-                </p>
+        <div class="ai-studio-container mobile-ai-studio">
+          
+          <!-- Mobile Header with Back, School Logo & VIP Member Badge -->
+          <div class="ai-tutor-mobile-header">
+            <button class="ai-header-back-btn" onclick="navigateTo('dashboard')" title="ត្រឡប់ក្រោយ">
+              <span class="back-arrow">‹</span>
+            </button>
+            <div class="ai-header-center-info">
+              <img src="/school_logo.png" alt="SSOnline" class="ai-school-logo-mini">
+              <div class="ai-header-text">
+                <div class="ai-school-name">Teacher SSOnline</div>
+                <div class="ai-school-tag">English Automated Academy</div>
               </div>
             </div>
-
-            <div class="ai-studio-controls">
-              <!-- Teacher Selector (Teacher Piseth vs Teacher Sorn) -->
-              <div class="engine-selector-box">
-                <label for="aiTutorSelect" class="engine-label">គ្រូបង្រៀន (Teacher):</label>
-                <select id="aiTutorSelect" class="engine-select font-bold" onchange="handleStudioTutorChange()">
-                  <option value="piseth">👩‍🏫 អ្នកគ្រូ ពិសិដ្ឋ (ថ្នាក់ដំបូង & Phonics)</option>
-                  <option value="sorn">👨‍🏫 គ្រូសន (ថ្នាក់ទូទៅ ១២ ខែ)</option>
-                </select>
-              </div>
-
-              <!-- Engine Selector -->
-              <div class="engine-selector-box">
-                <label for="aiEngineSelect" class="engine-label">ម៉ាស៊ីន AI (Engine):</label>
-                <select id="aiEngineSelect" class="engine-select" onchange="handleEngineChange()">
-                  <option value="auto" selected>⚡ ស្វ័យប្រវត្ត (Auto - ល្អ & លឿនបំផុត)</option>
-                  <option value="groq">🦙 Groq LLaMA 3.3 (Fastest)</option>
-                  <option value="gemini">✨ Google Gemini 2026 (Smart)</option>
-                  <option value="openai">🧠 OpenAI GPT-4o (Accurate)</option>
-                </select>
-              </div>
-
-              <!-- Clear Chat Button -->
-              <button class="btn btn-outline-danger btn-sm" onclick="clearStudioChatHistory()" title="សម្អាតសារទាំងអស់">
-                <span>🗑️ សម្អាតសារ</span>
-              </button>
+            <div class="ai-header-vip-tag">
+              <span class="vip-diamond">💎</span> VIP Member
             </div>
           </div>
 
-          <!-- Quick Action Tools Bar -->
-          <div class="ai-tools-bar glass-panel">
-            <span class="ai-tools-label">🛠️ ឧបករណ៍ជំនួយរហ័ស (Quick Tools):</span>
-            <div class="ai-tools-list">
-              <button class="ai-tool-btn" onclick="triggerStudioTool('explain')">
-                <span class="tool-icon">💡</span>
-                <span class="tool-text">ពន្យល់មេរៀន</span>
-              </button>
-              <button class="ai-tool-btn" onclick="triggerStudioTool('grammar')">
-                <span class="tool-icon">✍️</span>
-                <span class="tool-text">កែកំហុសសំណេរ</span>
-              </button>
-              <button class="ai-tool-btn" onclick="triggerStudioTool('translate')">
-                <span class="tool-icon">🔄</span>
-                <span class="tool-text">បកប្រែខ្មែរ-អង់គ្លេស</span>
-              </button>
-              <button class="ai-tool-btn" onclick="triggerStudioTool('verb')">
-                <span class="tool-icon">⚡</span>
-                <span class="tool-text">សួរកិរិយាសព្ទប្រែប្រួល</span>
-              </button>
-              <button class="ai-tool-btn" onclick="triggerStudioTool('pronounce')">
-                <span class="tool-icon">🗣️</span>
-                <span class="tool-text">របៀបបញ្ចេញសំឡេង</span>
-              </button>
+          <!-- Banner -->
+          <div class="ai-tutor-chat-banner">
+            <span class="ai-banner-icon">🤖</span>
+            <span class="ai-banner-title">AI Tutor - Chat with AI Teacher Sorn</span>
+          </div>
+
+          <!-- Controls bar for teacher & engine -->
+          <div class="ai-studio-controls-bar glass-panel">
+            <div class="engine-selector-box-sm">
+              <span class="ctrl-icon">👩‍🏫</span>
+              <select id="aiTutorSelect" class="engine-select-sm" onchange="handleStudioTutorChange()">
+                <option value="piseth">អ្នកគ្រូ ពិសិដ្ឋ (ថ្នាក់ដំបូង)</option>
+                <option value="sorn" selected>គ្រូសន (ថ្នាក់ទូទៅ ១២ ខែ)</option>
+              </select>
             </div>
+            <div class="engine-selector-box-sm">
+              <span class="ctrl-icon">⚡</span>
+              <select id="aiEngineSelect" class="engine-select-sm" onchange="handleEngineChange()">
+                <option value="auto" selected>Auto Engine</option>
+                <option value="groq">Groq LLaMA 3.3</option>
+                <option value="gemini">Gemini 2026</option>
+                <option value="openai">OpenAI GPT-4o</option>
+              </select>
+            </div>
+            <button class="btn btn-outline-danger btn-xs" onclick="clearStudioChatHistory()" title="សម្អាតសារ">
+              <span>🗑️</span>
+            </button>
           </div>
 
           <!-- Main Chat Studio Card -->
           <div class="ai-studio-chat-card glass-panel">
             <!-- Messages Scroll Box -->
             <div class="ai-studio-messages" id="aiStudioMessagesBox">
-              <!-- Initial Welcome Message from Teacher Sorn -->
-              <div class="chat-bubble ai">
+              <!-- User message bubble: សុំ prompt -->
+              <div class="chat-bubble user mobile-user-prompt">
+                <div class="user-bubble-row">
+                  <span class="user-bubble-text">សុំ prompt</span>
+                  <img src="/teacher_limsorn.jpg" class="user-bubble-mini-avatar" alt="You" onerror="this.src='/director_signature.png'">
+                </div>
+              </div>
+
+              <!-- AI Tutor response bubble with 2x2 grid -->
+              <div class="chat-bubble ai mobile-ai-prompt-reply">
                 <div class="ai-bubble-header">
-                  <span class="ai-bubble-author">👨‍🏫 គ្រូសន (Teacher Sorn)</span>
+                  <span class="ai-bubble-author">🤖 AI Tutor</span>
                   <span class="ai-bubble-badge">Official AI</span>
                 </div>
                 <div class="ai-bubble-content">
-                  សួស្តីប្អូនៗទាំងអស់គ្នា! ខ្ញុំគឺគ្រូសន (Teacher Sorn) នៃវិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline។<br><br>
-                  តើប្អូនមានសំណួរ ឬចម្ងល់អ្វីទាក់ទងនឹងភាសាអង់គ្លេសទេ? ប្អូនអាច៖<br>
-                  • វាយប្រយោគអង់គ្លេសឱ្យគ្រូជួយកែកំហុសវេយ្យាករណ៍ (Grammar Check)<br>
-                  • សួរឱ្យគ្រូបកប្រែជាភាសាខ្មែរ ឬអង់គ្លេស (Translation)<br>
-                  • សួរពីកិរិយាសព្ទប្រែប្រួល (Irregular Verbs V1, V2, V3)<br>
-                  • ចុចប៊ូតុង <strong>🔊 ស្តាប់</strong> ដើម្បីឱ្យគ្រូអាន ឬពន្យល់ជាសំឡេងបានគ្រប់ពេលវេលា! 🌟
+                  សួស្តីប្អូន! តើប្អូនចង់បាន prompt សម្រាប់អ្វី? ខាងក្រោមនេះជាឧទាហរណ៍ខ្លះៗដែលប្អូនអាចសាកល្បង៖
                 </div>
+
+                <!-- 2x2 Quick Action Prompt Cards -->
+                <div class="ai-prompt-grid-2x2">
+                  <!-- Card 1: Explain 'Vocabulary' -->
+                  <div class="ai-prompt-card" onclick="openPromptPicker('vocab')">
+                    <div class="prompt-card-icon">📖</div>
+                    <div class="prompt-card-title">Explain 'Vocabulary'</div>
+                    <div class="prompt-card-sub">សុំ prompt: ពន្យល់ពាក្យ 'Vocabulary'</div>
+                  </div>
+
+                  <!-- Card 2: Correct my grammar -->
+                  <div class="ai-prompt-card" onclick="openPromptPicker('grammar')">
+                    <div class="prompt-card-icon">✒️</div>
+                    <div class="prompt-card-title">Correct my grammar</div>
+                    <div class="prompt-card-sub">សុំ prompt: កែលម្អប្រយោគរបស់ខ្ញុំ</div>
+                  </div>
+
+                  <!-- Card 3: Practice speaking -->
+                  <div class="ai-prompt-card" onclick="openPromptPicker('speaking')">
+                    <div class="prompt-card-icon">🎙️</div>
+                    <div class="prompt-card-title">Practice speaking</div>
+                    <div class="prompt-card-sub">សុំ prompt: ហ្វឹកហាត់សន្ទនា</div>
+                  </div>
+
+                  <!-- Card 4: Test my level -->
+                  <div class="ai-prompt-card" onclick="openPromptPicker('test')">
+                    <div class="prompt-card-icon">❓</div>
+                    <div class="prompt-card-title">Test my level</div>
+                    <div class="prompt-card-sub">សុំ prompt: តេស្តកម្រិតរបស់ខ្ញុំ</div>
+                  </div>
+                </div>
+
                 <div class="ai-bubble-actions">
-                  <button class="tts-btn" onclick="playTTS(this.parentElement.previousElementSibling.innerText, this)" title="ស្តាប់សំឡេង (Listen)">🔊 ស្តាប់</button>
+                  <button class="tts-btn" onclick="playTTS(this.parentElement.previousElementSibling.previousElementSibling.innerText, this)" title="ស្តាប់សំឡេង">🔊 ស្តាប់</button>
                   <button class="copy-btn" onclick="copyBubbleText(this)" title="ចម្លងអត្ថបទ">📋 ចម្លង</button>
                 </div>
               </div>
             </div>
 
-            <!-- Quick Suggestions Row -->
-            <div class="studio-quick-prompts">
-              <button class="pill-btn" onclick="sendStudioPrompt('សូមជួយពន្យល់ពីរបៀបប្រើ Present Simple Tense ឱ្យបានច្បាស់')">📚 Present Simple Tense</button>
-              <button class="pill-btn" onclick="sendStudioPrompt('តើ Do និង Make ខុសគ្នាយ៉ាងដូចម្តេច? សូមឧទាហរណ៍')">🔍 Do vs Make</button>
-              <button class="pill-btn" onclick="sendStudioPrompt('សូមជួយកែប្រយោគនេះ៖ I go to school yesterday with my friend.')">✍️ កែប្រយោគ</button>
-              <button class="pill-btn" onclick="sendStudioPrompt('សូមប្រាប់ពីរបៀបបញ្ចេញសំឡេងពាក្យ Comfortable និង Schedule')">🗣️ ការបញ្ចេញសំឡេង</button>
-              <button class="pill-btn" onclick="sendStudioPrompt('សូមណែនាំឃ្លាអង់គ្លេសសន្ទនាទូទៅ ៥ ឃ្លាដែលពេញនិយម')">💬 ៥ ឃ្លាសន្ទនាពេញនិយម</button>
-            </div>
-
-            <!-- Input Bar -->
-            <div class="ai-studio-input-bar">
-              <button class="btn btn-icon record-btn" onclick="triggerStudioTool('explain')" title="ជំនួយការសំណួរ (Quick Tool)">
-                <span class="mic-icon">💡</span>
+            <!-- Mobile Input Bar with Camera, Input, Mic, Gallery, Send -->
+            <div class="ai-mobile-input-bar">
+              <button class="btn-input-accessory" onclick="showToast('📷 មុខងារថតរូប/ស្កេនលំហាត់ នឹងដាក់ឱ្យប្រើក្នុងពេលឆាប់ៗ!', 'info')" title="ថតរូប / ភ្ជាប់ឯកសារ">
+                <span class="acc-icon">📷</span>
               </button>
-              <input type="text" id="studioChatInput" placeholder="វាយសំណួរ ឬប្រយោគឱ្យគ្រូសនជួយពន្យល់... (ចុច Enter ដើម្បីផ្ញើ)" onkeypress="handleStudioChatKeyPress(event)">
-              <button class="btn btn-primary btn-send" onclick="sendStudioChatMessage()">
-                <span>ផ្ញើសំណួរ 🚀</span>
+              <input type="text" id="studioChatInput" class="mobile-chat-input" placeholder="Message..." onkeypress="handleStudioChatKeyPress(event)">
+              <button id="studioRecordVoiceBtn" class="btn-input-accessory" onclick="toggleStudioVoiceRecord()" title="សំឡេង Voice">
+                <span class="acc-icon">🎙️</span>
+              </button>
+              <button class="btn-input-accessory" onclick="showToast('🖼️ មុខងារផ្ញើរូបភាពលំហាត់ នឹងដាក់ឱ្យប្រើក្នុងពេលឆាប់ៗ!', 'info')" title="រូបភាព">
+                <span class="acc-icon">🖼️</span>
+              </button>
+              <button class="btn-input-send" onclick="sendStudioChatMessage()" title="ផ្ញើសារ">
+                <span>➤</span>
               </button>
             </div>
           </div>
@@ -908,6 +934,19 @@
       </div>
       <div id="searchResultsList" class="search-results-box max-h-80 overflow-y-auto">
         <!-- Populated dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <!-- PROMPT PICKER MODAL (English & Khmer versions) -->
+  <div id="promptPickerModal" class="modal-overlay hidden">
+    <div class="modal-card glass-panel max-w-md prompt-picker-card">
+      <div class="modal-header">
+        <div class="modal-title" id="promptPickerModalTitle">💡 ជ្រើសរើស Prompt</div>
+        <button class="modal-close" onclick="closeModal('promptPickerModal')">✕</button>
+      </div>
+      <div class="p-4 space-y-3" id="promptPickerModalBody">
+        <!-- Dynamically injected with English and Khmer prompt boxes and actions -->
       </div>
     </div>
   </div>
