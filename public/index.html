@@ -36,68 +36,47 @@
   <!-- Main App Wrapper -->
   <div id="app" class="app-container">
 
-    <!-- Top Navigation Header -->
-    <header class="navbar">
+    <!-- Mobile-First App Header -->
+    <header class="navbar mobile-app-header">
       <div class="nav-brand" onclick="navigateTo('dashboard')">
         <div class="logo-badge school-logo-container">
           <img src="/school_logo.png" alt="Teacher SSOnline Logo" class="brand-logo-img">
         </div>
         <div class="brand-text">
-          <div class="brand-title">Teacher SSOnline</div>
-          <div class="brand-sub">English Automated Academy</div>
+          <div class="brand-title">SSOnline</div>
+          <div class="brand-sub">AI Teacher Sorn</div>
         </div>
       </div>
 
-      <div class="nav-links">
-        <button class="nav-item active" data-tab="dashboard" onclick="navigateTo('dashboard')">
-          <span class="icon">🏠</span> <span class="label">ទំព័រដើម</span>
+      <div class="header-right-actions">
+        <!-- Quick Search -->
+        <button class="header-action-icon-btn" onclick="openSearchModal()" title="ស្វែងរកមេរៀន">
+          <span class="action-icon">🔍</span>
         </button>
-        <button class="nav-item" data-tab="curriculum" onclick="navigateTo('curriculum')">
-          <span class="icon">📚</span> <span class="label">កម្រិតសិក្សា</span>
-        </button>
-        <button class="nav-item" data-tab="ai-tutor" onclick="navigateTo('ai-tutor')">
-          <span class="icon">🤖</span> <span class="label">គ្រូសន AI</span>
-        </button>
-        <button class="nav-item" data-tab="annual-exams" onclick="navigateTo('annual-exams')">
-          <span class="icon">🎓</span> <span class="label">ប្រឡងប្រចាំឆ្នាំ</span>
-        </button>
-        <button class="nav-item" data-tab="certificates" onclick="navigateTo('certificates')">
-          <span class="icon">📜</span> <span class="label">វិញ្ញាបនបត្រ</span>
-        </button>
-        <button class="nav-item" data-tab="verbs" onclick="navigateTo('verbs')">
-          <span class="icon">⚡</span> <span class="label">កិរិយាសព្ទ</span>
-        </button>
-        <button class="nav-item" data-tab="vip" onclick="navigateTo('vip')">
-          <span class="icon">💎</span> <span class="label">VIP</span>
-        </button>
-      </div>
 
-      <div class="nav-actions">
-        <!-- Night Mode Full Switcher -->
-        <button id="themeToggleBtn" class="theme-toggle-btn" onclick="toggleNightMode()" title="ប្តូររបៀបរាត្រី / ពន្លឺ (Night Mode Full)">
+        <!-- Theme / Night Mode Quick Toggle -->
+        <button id="themeToggleBtn" class="header-action-icon-btn" onclick="toggleNightMode()" title="ប្តូររបៀបរាត្រី / ពន្លឺ">
           <span class="theme-icon" id="themeIcon">🌙</span>
-          <span class="theme-label" id="themeLabel">Night Mode</span>
         </button>
 
-        <!-- User State / Login Buttons -->
-        <div id="authActions">
-          <button class="btn btn-outline btn-sm" onclick="openLoginModal()">
-            <span>🔑 ចូលគណនី</span>
-          </button>
-          <button class="btn btn-primary btn-sm" onclick="openRegisterModal()">
-            <span>📝 ចុះឈ្មោះ</span>
-          </button>
-        </div>
+        <!-- User Profile / Settings Trigger -->
+        <button class="header-action-icon-btn" onclick="handleProfileNavClick()" title="គណនី / ការកំណត់">
+          <span class="action-icon">⚙️</span>
+        </button>
 
-        <div id="userProfileBadge" class="user-badge hidden" onclick="openProfileModal()">
-          <div class="avatar-ring" id="userAvatarRing">
+        <!-- User Profile Avatar if logged in -->
+        <div id="userProfileBadge" class="user-badge-mini hidden" onclick="openProfileModal()">
+          <div class="avatar-ring-mini" id="userAvatarRing">
             <img id="userAvatarImg" class="hidden user-avatar-img" alt="Student Avatar">
             <span id="userAvatarChar">S</span>
           </div>
-          <div class="user-info-text">
-            <div id="userNameDisplay" class="user-name">សិស្ស</div>
-            <div id="userVipStatusBadge" class="user-tier-badge free">Free Account</div>
-          </div>
+        </div>
+
+        <!-- Auth Actions when logged out -->
+        <div id="authActions" class="auth-actions-mobile">
+          <button class="btn btn-primary btn-xs" onclick="openLoginModal()">
+            <span>🔑 Login</span>
+          </button>
         </div>
       </div>
     </header>
@@ -106,147 +85,199 @@
     <main class="main-content">
 
       <!-- ==============================================
-           1. DASHBOARD TAB
+           1. DASHBOARD TAB (MOBILE-FIRST REDESIGN)
       ============================================== -->
       <section id="tab-dashboard" class="tab-pane active">
-        <!-- Hero Banner -->
-        <div class="hero-card">
-          <div class="hero-content">
-            <div class="hero-badge">
-              <span class="pulse-dot"></span> ប្រព័ន្ធសិក្សាភាសាអង់គ្លេស ១២ ខែ និងប្រឡងទទួលវិញ្ញាបនបត្រ A4 ផ្តេក
-            </div>
-            <h1 class="hero-title">
-              រៀនភាសាអង់គ្លេសស្វ័យប្រវត្ត <br>
-              <span class="gradient-text">ជាមួយ AI Teacher Sorn & SSOnline</span>
-            </h1>
-            <p class="hero-desc">
-              កម្មវិធីសិក្សាខ្នាតស្តង់ដារ ១២ ខែ (២៨៨ មេរៀន), មានប្រឡង Quiz បញ្ជាក់សមត្ថភាព, ស្តាប់ការបញ្ចេញសំឡេងច្បាស់ល្អ, និងទទួលបានវិញ្ញាបនបត្រផ្លូវការទម្រង់ A4 ផ្តេក មាន QR Code Verified!
-            </p>
-            <div class="hero-actions">
-              <button class="btn btn-primary btn-lg" onclick="navigateTo('curriculum')">
-                <span>📚 ចាប់ផ្តើមរៀនឥឡូវនេះ</span>
-              </button>
-              <button class="btn btn-glass btn-lg" onclick="navigateTo('annual-exams')">
-                <span>🎓 ការប្រឡងបញ្ចប់មុខវិជ្ជា</span>
-              </button>
-              <button id="heroLinkTelegramBtn" class="btn btn-cyan btn-lg" onclick="startTelegramOneClickLogin()">
-                <span>📱 ភ្ជាប់ Telegram ស្វ័យប្រវត្ត (1-Click)</span>
-              </button>
-            </div>
-          </div>
-          <div class="hero-art">
-            <div class="art-card glass-panel text-center">
-              <div class="art-logo-wrap">
-                <img src="/school_logo.png" alt="វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline" class="hero-school-logo">
+        
+        <!-- 1. Hero Section: AI illustration + 'Start Learning' & 'AI Chatbot' -->
+        <div class="mobile-hero-section">
+          <div class="mobile-hero-card">
+            <div class="mobile-hero-left">
+              <h1 class="mobile-hero-title">រៀនភាសាអង់គ្លេសស្វ័យប្រវត្ត</h1>
+              <p class="mobile-hero-subtitle">ជាមួយ AI Teacher Sorn & SSOnline</p>
+              <div class="mobile-hero-actions">
+                <button class="btn-start-learning" onclick="navigateTo('curriculum')">
+                  <span class="btn-icon">🚀</span>
+                  <span>Start Learning</span>
+                </button>
+                <button class="btn-ai-chatbot" onclick="navigateTo('ai-tutor')">
+                  <span class="btn-icon">🤖</span>
+                  <span>Ai Chatbot</span>
+                </button>
               </div>
-              <div class="art-title mt-2">វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស</div>
-              <div class="art-sub">Teacher SSOnline</div>
-              <div class="art-director">👨‍💼 នាយកសាលា៖ លីម សន (Lim Sorn)</div>
-              <div class="art-seal">
-                <span>★ OFFICIAL VERIFIED ★</span>
+            </div>
+            <div class="mobile-hero-right">
+              <div class="hero-illustration-frame">
+                <img src="/hero_ai_tutor.jpg" alt="AI Robot & Student" class="hero-illustration-img">
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Sync Notice Banner -->
-        <div id="syncNoticeBanner" class="sync-banner glass-panel">
-          <div class="sync-icon">📱</div>
-          <div class="sync-text">
-            <div class="sync-title">💡 ភ្ជាប់គណនីជាមួយ Telegram Bot</div>
-            <div class="sync-sub">តើអ្នកមានគណនី Telegram Bot រួចហើយមែនទេ? ចុចទីនេះដើម្បីបើក Bot ហើយចុច «យល់ព្រមភ្ជាប់» នោះប្រព័ន្ធនឹង Sync ទិន្នន័យមេរៀន ពិន្ទុ និងវិញ្ញាបនបត្រស្វ័យប្រវត្ត (០-Typing)!</div>
+        <!-- 2. Course Categories: Horizontally Scrollable Carousel (Starter, Primary, Secondary, High School) -->
+        <div class="course-categories-section">
+          <div class="section-header-row">
+            <h3 class="section-title-sm">Course Categories</h3>
           </div>
-          <button class="btn btn-sm btn-cyan" onclick="startTelegramOneClickLogin()">
-            <span>🔗 ភ្ជាប់ Telegram (1-Click)</span>
-          </button>
+          <div class="categories-carousel-scroll">
+            <!-- Card 1: Starter / ថ្នាក់ដំបូង -->
+            <div class="category-card-item" onclick="switchCourseLevel('beginner'); navigateTo('curriculum');">
+              <div class="category-card-thumb">
+                <img src="/cat_starter.jpg" alt="ថ្នាក់ដំបូង" class="cat-img">
+                <div class="cat-play-badge">▶</div>
+                <div class="cat-school-logo"><img src="/school_logo.png" alt="Logo"></div>
+              </div>
+              <div class="category-card-info">
+                <div class="cat-title">ថ្នាក់ដំបូង</div>
+                <div class="cat-sub">វីដេអូបង្រៀន - មេរៀនទី ១</div>
+              </div>
+            </div>
+
+            <!-- Card 2: Primary / ថ្នាក់បឋម -->
+            <div class="category-card-item" onclick="switchCourseLevel('elementary'); navigateTo('curriculum');">
+              <div class="category-card-thumb">
+                <img src="/cat_primary.jpg" alt="ថ្នាក់បឋម" class="cat-img">
+                <div class="cat-play-badge">▶</div>
+                <div class="cat-school-logo"><img src="/school_logo.png" alt="Logo"></div>
+              </div>
+              <div class="category-card-info">
+                <div class="cat-title">ថ្នាក់បឋម</div>
+                <div class="cat-sub">វីដេអូបង្រៀន - មេរៀនទី ១</div>
+              </div>
+            </div>
+
+            <!-- Card 3: Secondary / ថ្នាក់អនុ -->
+            <div class="category-card-item" onclick="switchCourseLevel('intermediate'); navigateTo('curriculum');">
+              <div class="category-card-thumb">
+                <img src="/cat_secondary.jpg" alt="ថ្នាក់អនុ" class="cat-img">
+                <div class="cat-play-badge">▶</div>
+                <div class="cat-school-logo"><img src="/school_logo.png" alt="Logo"></div>
+              </div>
+              <div class="category-card-info">
+                <div class="cat-title">ថ្នាក់អនុ</div>
+                <div class="cat-sub">វីដេអូបង្រៀន - មេរៀនទី ៣</div>
+              </div>
+            </div>
+
+            <!-- Card 4: High School / ថ្នាក់ទូទៅ -->
+            <div class="category-card-item" onclick="switchCourseLevel('standard'); navigateTo('curriculum');">
+              <div class="category-card-thumb">
+                <img src="/cat_highschool.jpg" alt="ថ្នាក់ទូទៅ" class="cat-img">
+                <div class="cat-play-badge">▶</div>
+                <div class="cat-school-logo"><img src="/school_logo.png" alt="Logo"></div>
+              </div>
+              <div class="category-card-info">
+                <div class="cat-title">ថ្នាក់ទូទៅ</div>
+                <div class="cat-sub">វីដេអូបង្រៀន - មេរៀនទី ១</div>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <!-- Progress Overview Stats -->
-        <div class="stats-grid">
-          <div class="stat-card glass-panel">
-            <div class="stat-header">
-              <span class="stat-label">មេរៀនបានបញ្ចប់</span>
-              <span class="stat-icon">📚</span>
+        <!-- 3. Learning Dashboard: Compact 2x2 Grid (Lessons Complete, Total Quiz Points, Certificate Status, VIP Member Status) -->
+        <div class="learning-dashboard-section">
+          <div class="section-header-row">
+            <h3 class="section-title-sm">Learning Dashboard</h3>
+          </div>
+          <div class="dashboard-compact-2x2-grid">
+            <!-- Item 1: Lessons Complete -->
+            <div class="dash-stat-compact-card" onclick="navigateTo('curriculum')">
+              <div class="stat-ring-wrap ring-cyan">
+                <svg class="stat-svg-ring" viewBox="0 0 36 36">
+                  <path class="ring-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                  <path class="ring-fill ring-fill-cyan" id="statCompletedLessonsRing" stroke-dasharray="15, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                </svg>
+                <div class="stat-ring-text" id="statCompletedLessonsText">0/12</div>
+              </div>
+              <div class="dash-stat-label">វគ្គសិក្សា</div>
+              <div class="dash-stat-sub">Lessons Complete (<span id="statCompletedLessons">0</span>)</div>
             </div>
-            <div class="stat-val" id="statCompletedLessons">0</div>
-            <div class="stat-sub">ពីសរុប ២៨៨ មេរៀន (12 ខែ)</div>
-            <div class="progress-bar">
-              <div class="progress-fill" id="statCompletedProgress" style="width: 0%;"></div>
+
+            <!-- Item 2: Total Quiz Points -->
+            <div class="dash-stat-compact-card" onclick="navigateTo('annual-exams')">
+              <div class="stat-ring-wrap ring-pink">
+                <svg class="stat-svg-ring" viewBox="0 0 36 36">
+                  <path class="ring-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                  <path class="ring-fill ring-fill-pink" id="statTotalScoreRing" stroke-dasharray="20, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                </svg>
+                <div class="stat-ring-text" id="statTotalScoreText">0 pt</div>
+              </div>
+              <div class="dash-stat-label">តេស្ត</div>
+              <div class="dash-stat-sub">Quiz Points (<span id="statTotalScore">0</span>)</div>
+            </div>
+
+            <!-- Item 3: Certificate Status -->
+            <div class="dash-stat-compact-card" onclick="navigateTo('certificates')">
+              <div class="stat-ring-wrap ring-green">
+                <svg class="stat-svg-ring" viewBox="0 0 36 36">
+                  <path class="ring-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                  <path class="ring-fill ring-fill-green" id="statCertificatesCountRing" stroke-dasharray="10, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                </svg>
+                <div class="stat-ring-text" id="statCertificatesCountText">0</div>
+              </div>
+              <div class="dash-stat-label">ប្រឡង</div>
+              <div class="dash-stat-sub">Certificates (<span id="statCertificatesCount">0</span>)</div>
+            </div>
+
+            <!-- Item 4: VIP Member Status -->
+            <div class="dash-stat-compact-card" onclick="navigateTo('vip')">
+              <div class="stat-ring-wrap ring-gold">
+                <div class="stat-ring-icon">💎</div>
+              </div>
+              <div class="dash-stat-label" id="statVipPlanBadge">Free</div>
+              <div class="dash-stat-sub" id="statVipPlan">VIP Member Status</div>
             </div>
           </div>
 
-          <div class="stat-card glass-panel">
-            <div class="stat-header">
-              <span class="stat-label">ពិន្ទុ Quiz សរុប</span>
-              <span class="stat-icon">🎯</span>
-            </div>
-            <div class="stat-val" id="statTotalScore">0</div>
-            <div class="stat-sub" id="statScoreSub">ការប្រឡងសរុប 0 ដង</div>
-            <div class="progress-bar">
-              <div class="progress-fill" id="statScoreProgress" style="width: 0%;"></div>
-            </div>
-          </div>
-
-          <div class="stat-card glass-panel">
-            <div class="stat-header">
-              <span class="stat-label">វិញ្ញាបនបត្រសម្រេចបាន</span>
-              <span class="stat-icon">📜</span>
-            </div>
-            <div class="stat-val" id="statCertificatesCount">0</div>
-            <div class="stat-sub">ទម្រង់ A4 ផ្តេក + QR Code</div>
-            <div class="progress-bar">
-              <div class="progress-fill fill-gold" id="statCertProgress" style="width: 0%;"></div>
-            </div>
-          </div>
-
-          <div class="stat-card glass-panel">
-            <div class="stat-header">
-              <span class="stat-label">ស្ថានភាពគណនី</span>
-              <span class="stat-icon">💎</span>
-            </div>
-            <div class="stat-val" id="statVipPlan">Free</div>
-            <div class="stat-sub" id="statVipDays">មិនទាន់ជា VIP</div>
-            <button class="btn btn-xs btn-outline-gold mt-2" onclick="navigateTo('vip')">
-              <span>💎 Upgrade VIP</span>
+          <!-- Accompanying Action Pills -->
+          <div class="dash-pills-row">
+            <button class="dash-action-pill pill-blue" onclick="openRecommendedExercise()">
+              <span class="pill-title">Recommended Exercise</span>
+              <span class="pill-arrow">›</span>
+            </button>
+            <button class="dash-action-pill pill-purple" onclick="navigateTo('annual-exams')">
+              <span class="pill-icon">👾</span>
+              <span class="pill-title">តេស្ត AI ប្រចាំថ្ងៃ</span>
             </button>
           </div>
         </div>
 
-        <!-- Quick Categories Grid -->
-        <div class="section-title">
-          <h2>🚀 មុខងារចម្បងៗ</h2>
-          <p>ជ្រើសរើសផ្នែកដែលអ្នកចង់សិក្សា ឬប្រឡង</p>
-        </div>
-
-        <div class="features-grid">
-          <div class="feature-card glass-panel" onclick="navigateTo('curriculum')">
-            <div class="f-icon">📚</div>
-            <div class="f-title">កម្រិតសិក្សា</div>
-            <div class="f-desc">រៀនវេយ្យាករណ៍, សន្ទនា, វាក្យសព្ទ, កិរិយាសព្ទ, គុណនាម និងការបង្កើតល្បះ។</div>
-            <div class="f-action">ចូលរៀន ➡️</div>
+        <!-- 4. Quick AI Chat Bar (as in mockup) -->
+        <div class="quick-ai-chat-section">
+          <div class="section-header-row">
+            <h3 class="section-title-sm">AI Chat</h3>
+            <span class="ai-glow-badge">🧠 AI</span>
           </div>
-
-          <div class="feature-card glass-panel" onclick="navigateTo('annual-exams')">
-            <div class="f-icon">🎓</div>
-            <div class="f-title">ការប្រឡងប្រចាំឆ្នាំ (៧ មុខវិជ្ជា)</div>
-            <div class="f-desc">វិញ្ញាសា ២០ សំណួរ, ប្រឡងជាប់ទទួលបានវិញ្ញាបនបត្រ A4 ផ្តេក នាយកសាលា លីម សន ចុះហត្ថលេខា។</div>
-            <div class="f-action">ចូលប្រឡង ➡️</div>
-          </div>
-
-          <div class="feature-card glass-panel" onclick="navigateTo('certificates')">
-            <div class="f-icon">📜</div>
-            <div class="f-title">វិញ្ញាបនបត្ររបស់ខ្ញុំ & Refresh</div>
-            <div class="f-desc">មើលវិញ្ញាបនបត្រទាំងអស់, បោះពុម្ព A4 ផ្តេក, និង Refresh អាប់ដេតឈ្មោះថ្មីគ្រប់ពេល។</div>
-            <div class="f-action">ពិនិត្យមើល ➡️</div>
-          </div>
-
-          <div class="feature-card glass-panel" onclick="navigateTo('verbs')">
-            <div class="f-icon">⚡</div>
-            <div class="f-title">តារាងកិរិយាសព្ទប្រែប្រួល</div>
-            <div class="f-desc">ស្វែងរក Irregular Verbs (V1, V2, V3) ជាមួយអត្ថន័យជាភាសាខ្មែរយ៉ាងរហ័ស។</div>
-            <div class="f-action">មើលតារាង ➡️</div>
+          <div class="quick-ai-input-card">
+            <input type="text" id="quickAiChatInput" class="quick-ai-input" placeholder="សួរ AI របស់ប្អូន (ឧទាហរណ៍៖ តើ Past Simple ប្រើរបៀបណា?)..." onkeydown="if(event.key === 'Enter') handleQuickAiSubmit()">
+            <button class="quick-ai-send-btn" onclick="handleQuickAiSubmit()" title="ផ្ញើសំណួរ">
+              <span>➤</span>
+            </button>
           </div>
         </div>
+
+        <!-- 5. 'Your Teacher' Card at bottom above navigation bar -->
+        <div class="your-teacher-card-wrap">
+          <div class="your-teacher-card">
+            <div class="teacher-avatar-col">
+              <img src="/teacher_limsorn.jpg" alt="Director Lim Sorn" class="teacher-card-avatar" onerror="this.src='/director_signature.png'">
+              <span class="teacher-online-dot"></span>
+            </div>
+            <div class="teacher-details-col">
+              <div class="teacher-school-name">Language School SSOnline</div>
+              <div class="teacher-name-sub">Teacher: Lim Sorn (នាយកសាលា)</div>
+              <div class="teacher-quick-actions">
+                <button class="btn-teacher-action btn-contact" onclick="window.open('https://t.me/limsorn', '_blank')">
+                  <span>ទាក់ទងមកខ្ញុំ</span>
+                </button>
+                <button class="btn-teacher-action btn-ai-task" onclick="navigateTo('ai-tutor')">
+                  <span>ដាក់ការងារឱ្យ AI</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </section>
 
       <!-- ==============================================
@@ -833,27 +864,29 @@
 
     </main>
 
-    <!-- Bottom Mobile Nav Bar -->
-    <nav class="mobile-nav">
+    <!-- Fixed Bottom Navigation Bar (Home, Courses, AI, Quiz, Profile) -->
+    <nav class="mobile-bottom-nav">
       <button class="m-nav-item active" data-tab="dashboard" onclick="navigateTo('dashboard')">
         <span class="m-icon">🏠</span>
         <span class="m-label">ទំព័រដើម</span>
       </button>
       <button class="m-nav-item" data-tab="curriculum" onclick="navigateTo('curriculum')">
         <span class="m-icon">📚</span>
-        <span class="m-label">កម្រិតសិក្សា</span>
+        <span class="m-label">មេរៀន</span>
+      </button>
+      <button class="m-nav-item m-nav-ai" data-tab="ai-tutor" onclick="navigateTo('ai-tutor')">
+        <div class="m-ai-bubble">
+          <span class="m-ai-icon">🧠</span>
+        </div>
+        <span class="m-label">ភ្នាក់ងារ AI</span>
       </button>
       <button class="m-nav-item" data-tab="annual-exams" onclick="navigateTo('annual-exams')">
-        <span class="m-icon">🎓</span>
-        <span class="m-label">ប្រឡង</span>
+        <span class="m-icon">📝</span>
+        <span class="m-label">វិញ្ញាសា</span>
       </button>
-      <button class="m-nav-item" data-tab="certificates" onclick="navigateTo('certificates')">
-        <span class="m-icon">📜</span>
-        <span class="m-label">វិញ្ញាបនបត្រ</span>
-      </button>
-      <button class="m-nav-item" data-tab="vip" onclick="navigateTo('vip')">
-        <span class="m-icon">💎</span>
-        <span class="m-label">VIP</span>
+      <button class="m-nav-item" data-tab="profile" onclick="handleProfileNavClick()">
+        <span class="m-icon">👤</span>
+        <span class="m-label">ប្រវត្តិរូប</span>
       </button>
     </nav>
 
@@ -862,6 +895,22 @@
   <!-- ==============================================
        MODALS
   ============================================== -->
+
+  <!-- SEARCH MODAL -->
+  <div id="searchModal" class="modal-overlay hidden">
+    <div class="modal-card glass-panel max-w-md">
+      <div class="modal-header">
+        <div class="modal-title">🔍 ស្វែងរកមេរៀន & វាក្យសព្ទ</div>
+        <button class="modal-close" onclick="closeModal('searchModal')">✕</button>
+      </div>
+      <div class="p-3">
+        <input type="text" id="globalSearchInput" class="form-input text-sm font-medium" placeholder="វាយឈ្មោះមេរៀន ឬពាក្យគន្លឹះ..." oninput="handleGlobalSearch(this.value)">
+      </div>
+      <div id="searchResultsList" class="search-results-box max-h-80 overflow-y-auto">
+        <!-- Populated dynamically -->
+      </div>
+    </div>
+  </div>
 
   <!-- 1. LOGIN MODAL -->
   <!-- 1. LOGIN MODAL -->

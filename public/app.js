@@ -306,6 +306,42 @@ async function refreshUserProfile() {
       if (cScoreSub) cScoreSub.textContent = `ពិន្ទុសរុបលើការប្រឡង`;
       if (cCerts) cCerts.textContent = p.stats.certificatesCount || 0;
 
+      // Compact 2x2 Dashboard text and SVG ring updates
+      const cLessonsText = document.getElementById('statCompletedLessonsText');
+      const cLessonsRing = document.getElementById('statCompletedLessonsRing');
+      const cScoreText = document.getElementById('statTotalScoreText');
+      const cScoreRing = document.getElementById('statTotalScoreRing');
+      const cCertsText = document.getElementById('statCertificatesCountText');
+      const cCertsRing = document.getElementById('statCertificatesCountRing');
+      const cVipBadge = document.getElementById('statVipPlanBadge');
+
+      const completedCount = p.stats.completedLessonsCount || 0;
+      const totalScore = p.stats.totalScore || 0;
+      const certsCount = p.stats.certificatesCount || 0;
+
+      if (cLessonsText) cLessonsText.textContent = `${completedCount}/12`;
+      if (cLessonsRing) {
+        const ringPct = Math.min(100, Math.round((completedCount / 12) * 100));
+        cLessonsRing.setAttribute('stroke-dasharray', `${ringPct}, 100`);
+      }
+
+      if (cScoreText) cScoreText.textContent = `${totalScore} pt`;
+      if (cScoreRing) {
+        const ringPct = Math.min(100, Math.round((totalScore / 100) * 100));
+        cScoreRing.setAttribute('stroke-dasharray', `${ringPct}, 100`);
+      }
+
+      if (cCertsText) cCertsText.textContent = `${certsCount}`;
+      if (cCertsRing) {
+        const ringPct = Math.min(100, Math.round((certsCount / 7) * 100));
+        cCertsRing.setAttribute('stroke-dasharray', `${ringPct}, 100`);
+      }
+
+      if (cVipBadge) {
+        cVipBadge.textContent = p.isVIP ? 'VIP Pro' : 'Free';
+        cVipBadge.className = `dash-stat-label ${p.isVIP ? 'vip-gold' : ''}`;
+      }
+
       if (cProg) {
         const pct = Math.min(100, Math.round(((p.stats.completedLessonsCount || 0) / 288) * 100));
         cProg.style.width = `${pct}%`;
@@ -320,6 +356,7 @@ async function refreshUserProfile() {
       // Re-fetch beginner status after profile refresh to update locking/progress
       loadBeginnerStatus().then(() => {
         if (STATE.courseLevel === 'beginner') renderBeginnerWeeks();
+        else if (STATE.courseLevel === 'elementary') renderElementaryWeeks();
       });
     }
   } catch (e) {
@@ -362,6 +399,8 @@ function navigateTo(tabName) {
   if (tabName === 'curriculum') {
     if (STATE.courseLevel === 'beginner') {
       renderBeginnerWeeks();
+    } else if (STATE.courseLevel === 'elementary') {
+      renderElementaryWeeks();
     } else {
       renderCurriculumWeeks();
     }
@@ -374,6 +413,198 @@ function navigateTo(tabName) {
   } else if (tabName === 'verbs') {
     renderVerbsTable();
   }
+}
+
+// ==========================================
+// MOBILE APP HELPER FUNCTIONS
+// ==========================================
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]);
+}
+
+function handleProfileNavClick() {
+  if (STATE.currentUser) {
+    openProfileModal();
+  } else {
+    openLoginModal();
+  }
+}
+
+function handleQuickAiSubmit() {
+  const input = document.getElementById('quickAiChatInput');
+  if (!input) return;
+  const q = input.value.trim();
+  if (!q) return;
+  input.value = '';
+  navigateTo('ai-tutor');
+  setTimeout(() => {
+    const studioInput = document.getElementById('studioChatInput');
+    if (studioInput) {
+      studioInput.value = q;
+      sendStudioChatMessage();
+    }
+  }, 250);
+}
+
+function openRecommendedExercise() {
+  // If beginner course not yet completed, open next unpassed lesson in beginner
+  if (STATE.beginnerCourse?.weeks) {
+    const passed = new Set(STATE.beginnerStatus?.passedLessons || []);
+    for (const w of STATE.beginnerCourse.weeks) {
+      for (const l of (w.lessons || [])) {
+        if (!passed.has(l.id)) {
+          switchCourseLevel('beginner');
+          openLesson('beginner', w.id, l.id);
+          return;
+        }
+      }
+    }
+  }
+  // If beginner completed, check elementary
+  if (STATE.elementaryCourse?.months) {
+    const passed = new Set(STATE.elementaryStatus?.passedLessons || []);
+    for (const m of STATE.elementaryCourse.months) {
+      for (const w of (m.weeks || [])) {
+        for (const l of (w.lessons || [])) {
+          if (!passed.has(l.id)) {
+            switchCourseLevel('elementary');
+            openLesson(m.id, w.id, l.id);
+            return;
+          }
+        }
+      }
+    }
+  }
+  // Default to curriculum
+  navigateTo('curriculum');
+}
+
+function openSearchModal() {
+  const modal = document.getElementById('searchModal');
+  if (modal) {
+    modal.classList.remove('hidden');
+    const input = document.getElementById('globalSearchInput');
+    if (input) {
+      input.value = '';
+      input.focus();
+    }
+    handleGlobalSearch('');
+  }
+}
+
+function handleGlobalSearch(query) {
+  const container = document.getElementById('searchResultsList');
+  if (!container) return;
+
+  const q = (query || '').trim().toLowerCase();
+  if (!q) {
+    container.innerHTML = `
+      <div class="search-empty-state">
+        <div class="search-empty-icon">🔍</div>
+        <p>សូមវាយឈ្មោះមេរៀន, អក្សរ ឬពាក្យគន្លឹះដើម្បីស្វែងរក...</p>
+      </div>
+    `;
+    return;
+  }
+
+  const results = [];
+
+  // Search Beginner
+  if (STATE.beginnerCourse?.weeks) {
+    STATE.beginnerCourse.weeks.forEach(w => {
+      (w.lessons || []).forEach(l => {
+        const titleK = (l.titleKhmer || '').toLowerCase();
+        const titleE = (l.titleEnglish || '').toLowerCase();
+        const letter = (l.letter || '').toLowerCase();
+        const vocab = (l.vocabulary || '').toLowerCase();
+        if (titleK.includes(q) || titleE.includes(q) || letter.includes(q) || vocab.includes(q)) {
+          results.push({
+            course: 'ថ្នាក់ដំបូង (Beginner)',
+            badgeClass: 'badge-emerald',
+            title: `${l.titleKhmer || l.titleEnglish} (${l.letter || ''})`,
+            sub: l.vocabulary ? `ពាក្យ: ${l.vocabulary}` : (l.grammarRule || ''),
+            action: () => {
+              closeModal('searchModal');
+              switchCourseLevel('beginner');
+              openLesson('beginner', w.id, l.id);
+            }
+          });
+        }
+      });
+    });
+  }
+
+  // Search Elementary
+  if (STATE.elementaryCourse?.months) {
+    STATE.elementaryCourse.months.forEach(m => {
+      (m.weeks || []).forEach(w => {
+        (w.lessons || []).forEach(l => {
+          const titleK = (l.titleKhmer || '').toLowerCase();
+          const titleE = (l.titleEnglish || '').toLowerCase();
+          const topic = (l.topic || '').toLowerCase();
+          if (titleK.includes(q) || titleE.includes(q) || topic.includes(q)) {
+            results.push({
+              course: 'ថ្នាក់បឋម (Elementary)',
+              badgeClass: 'badge-blue',
+              title: l.titleKhmer || l.titleEnglish,
+              sub: l.topic ? `ប្រធានបទ: ${l.topic}` : '',
+              action: () => {
+                closeModal('searchModal');
+                switchCourseLevel('elementary');
+                openLesson(m.id, w.id, l.id);
+              }
+            });
+          }
+        });
+      });
+    });
+  }
+
+  // Search Standard Curriculum
+  if (STATE.curriculum && Array.isArray(STATE.curriculum)) {
+    STATE.curriculum.forEach(m => {
+      (m.weeks || []).forEach(w => {
+        (w.lessons || []).forEach(l => {
+          const titleK = (l.titleKhmer || '').toLowerCase();
+          const titleE = (l.title || l.titleEnglish || '').toLowerCase();
+          if (titleK.includes(q) || titleE.includes(q)) {
+            results.push({
+              course: 'ថ្នាក់ទូទៅ (Standard)',
+              badgeClass: 'badge-purple',
+              title: l.titleKhmer || l.title,
+              sub: l.title || '',
+              action: () => {
+                closeModal('searchModal');
+                switchCourseLevel('standard');
+                openLesson(m.id, w.id, l.id);
+              }
+            });
+          }
+        });
+      });
+    });
+  }
+
+  if (results.length === 0) {
+    container.innerHTML = `
+      <div class="search-empty-state">
+        <div class="search-empty-icon">📂</div>
+        <p>រកមិនឃើញមេរៀនដែលត្រូវនឹង "<strong>${escapeHtml(query)}</strong>" ទេ</p>
+      </div>
+    `;
+    return;
+  }
+
+  window._globalSearchResults = results;
+  container.innerHTML = results.slice(0, 20).map((r, idx) => `
+    <div class="search-result-item" onclick="window._globalSearchResults[${idx}].action()">
+      <div class="search-item-badge ${r.badgeClass}">${r.course}</div>
+      <div class="search-item-title">${escapeHtml(r.title)}</div>
+      ${r.sub ? `<div class="search-item-sub">${escapeHtml(r.sub)}</div>` : ''}
+    </div>
+  `).join('');
 }
 
 function returnToLessonList() {
