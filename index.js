@@ -1523,6 +1523,25 @@ function getAllBeginnerLessons() {
   return list;
 }
 
+// Helper: Check if lesson is one of the 3 free trial lessons for each course level
+function isLessonFree(monthId, weekId, lessonId) {
+  // 1. Beginner Level (bl1 to bl26)
+  if (monthId === 'beginner' || monthId === 'm0') {
+    const num = parseInt((lessonId || '').replace('bl', ''));
+    return num >= 1 && num <= 3;
+  }
+  // 2. Elementary Level (el1 to el72)
+  if (monthId === 'elementary' || (monthId && monthId.startsWith('em'))) {
+    const num = parseInt((lessonId || '').replace('el', ''));
+    return num >= 1 && num <= 3;
+  }
+  // 3. Standard / 12-Month Level
+  if (monthId === 'm1' && weekId === 'w1') {
+    return ['l1', 'l2', 'l3'].includes(lessonId);
+  }
+  return false;
+}
+
 // Generate Keyboard for Beginner Course (A-Z Lessons in 2 columns)
 function getBeginnerKeyboard() {
   const allLessons = getAllBeginnerLessons();
@@ -1530,14 +1549,16 @@ function getBeginnerKeyboard() {
   for (let i = 0; i < allLessons.length; i += 2) {
     const row = [];
     const item1 = allLessons[i];
+    const isFree1 = item1.lesson.day <= 3;
     row.push(Markup.button.callback(
-      `Day ${item1.lesson.day}: ${item1.lesson.letter} • ${item1.lesson.word}`,
+      `${isFree1 ? '' : '🔒 '}Day ${item1.lesson.day}: ${item1.lesson.letter} • ${item1.lesson.word}`,
       `beginner_lesson_${item1.weekId}_${item1.lesson.id}`
     ));
     if (i + 1 < allLessons.length) {
       const item2 = allLessons[i + 1];
+      const isFree2 = item2.lesson.day <= 3;
       row.push(Markup.button.callback(
-        `Day ${item2.lesson.day}: ${item2.lesson.letter} • ${item2.lesson.word}`,
+        `${isFree2 ? '' : '🔒 '}Day ${item2.lesson.day}: ${item2.lesson.letter} • ${item2.lesson.word}`,
         `beginner_lesson_${item2.weekId}_${item2.lesson.id}`
       ));
     }
@@ -1586,14 +1607,35 @@ bot.action(/beginner_week_(.+)/, async (ctx) => {
 });
 
 bot.action(/beginner_lesson_(.+)_(.+)/, async (ctx) => {
-  const userId = ctx.from?.id;
+  const userId = ctx.from?.id ? ctx.from.id.toString() : '';
+  const weekId = ctx.match[1];
   const lessonId = ctx.match[2];
   
   const allLessons = getAllBeginnerLessons();
   const currIdx = allLessons.findIndex(item => item.lesson.id === lessonId);
   if (currIdx === -1) return ctx.answerCbQuery("រកមិនឃើញមេរៀន");
 
-  const { lesson, weekId } = allLessons[currIdx];
+  const { lesson } = allLessons[currIdx];
+
+  // VIP Permission Check: Only first 3 lessons of Beginner level are free for non-VIP
+  const isFree = isLessonFree('beginner', weekId, lessonId);
+  const isVIP = await checkVIP(userId);
+  if (!isFree && !isVIP) {
+    return ctx.reply(
+      `🔒 *មេរៀនថ្នាក់ដំបូងនេះសម្រាប់តែសមាជិក VIP ប៉ុណ្ណោះ!* 💎\n\n` +
+      `💡 គណនី Free អាចរៀនសាកល្បងឥតគិតថ្លៃបាន ៣ មេរៀនដំបូង (Day 1, 2, 3) នៃកម្រិតនីមួយៗ។\n` +
+      `ដើម្បីបន្តរៀនមេរៀន Day ${lesson.day} ឡើងទៅ និងទទួលបានវិញ្ញាបនបត្រ សូមដំឡើងទៅកាន់ *VIP* 💎\n\n` +
+      `💎 *តម្លៃសមរម្យ៖ 3$/ខែ | 30$/ពេញមួយឆ្នាំ*`,
+      {
+        parse_mode: 'Markdown',
+        reply_markup: Markup.inlineKeyboard([
+          [Markup.button.callback('💎 Upgrade VIP ឥឡូវនេះ', 'vip_upgrade')],
+          [Markup.button.callback('🔑 បញ្ចូល License Key', 'enter_license_key')],
+          [Markup.button.callback('👩‍🏫 បញ្ជីមេរៀន A - Z (ថ្នាក់ដំបូង)', 'beginner_menu')]
+        ]).reply_markup
+      }
+    );
+  }
 
   const text = `👩‍🏫 *${beginnerCourse.teacher.name}* • ថ្នាក់ដំបូង (A - Z)\n` +
     `📖 *${lesson.title}*\n\n` +
@@ -1671,6 +1713,26 @@ async function displayLessonContent(ctx, monthId, weekId, lessonId, userId) {
   const lessonData = weekData.lessons.find(l => l.id === lessonId);
   if (!lessonData) return ctx.reply("❌ រកមិនឃើញមេរៀន!");
 
+  // VIP Permission Check: Only first 3 lessons of Standard level are free for non-VIP
+  const isVIP = await checkVIP(userId);
+  const isFree = isLessonFree(monthId, weekId, lessonId);
+  if (!isFree && !isVIP) {
+    return ctx.reply(
+      `🔒 *មេរៀននេះសម្រាប់តែសមាជិក VIP ប៉ុណ្ណោះ!* 💎\n\n` +
+      `💡 គណនី Free អាចរៀនសាកល្បងឥតគិតថ្លៃបាន ៣ មេរៀនដំបូងនៃកម្រិតនីមួយៗ។\n` +
+      `ដើម្បីបន្តរៀនមេរៀន ${lessonData.title} ឡើងទៅ និងទទួលបានវិញ្ញាបនបត្រ សូមដំឡើងទៅកាន់ *VIP* 💎\n\n` +
+      `💎 *តម្លៃសមរម្យ៖ 3$/ខែ | 30$/ពេញមួយឆ្នាំ*`,
+      {
+        parse_mode: 'Markdown',
+        reply_markup: Markup.inlineKeyboard([
+          [Markup.button.callback('💎 Upgrade VIP ឥឡូវនេះ', 'vip_upgrade')],
+          [Markup.button.callback('🔑 បញ្ចូល License Key', 'enter_license_key')],
+          [Markup.button.callback('🔙 ត្រឡប់ទៅបញ្ជីមេរៀន', `week_${monthId}-${weekId}`)]
+        ]).reply_markup
+      }
+    );
+  }
+
   await setUserState(userId, `learning_${monthId}_${weekId}_${lessonId}`);
 
   // Store the lesson text for TTS & set current tutor to Teacher Sorn (Male Voice)
@@ -1682,7 +1744,6 @@ async function displayLessonContent(ctx, monthId, weekId, lessonId, userId) {
     timestamp: Date.now()
   });
 
-  const isVIP = await checkVIP(userId);
   const lessonKey = `${monthId}-${weekId}-${lessonId}`;
   const compSnap = await db.ref(`users/${userId}/completed_lessons/${lessonKey}`).once('value');
   const isCompleted = !!compSnap.val();
@@ -1707,8 +1768,8 @@ async function displayLessonContent(ctx, monthId, weekId, lessonId, userId) {
     await ctx.reply(`💬 គ្រូ AI ជំនាញផ្នែក "${topicName}" នៅទីនេះហើយ! បើមានចម្ងល់សូមឆាតសួរ។`);
   } else {
     await ctx.reply(
-      `💡 *អ្នកកំពុងប្រើប្រាស់គណនី Free*\n` +
-      `• អាចអានមេរៀនបានធម្មតា ✅\n` +
+      `💡 *អ្នកកំពុងរៀនសាកល្បងឥតគិតថ្លៃ (Free Trial)*\n` +
+      `• អាចអានមេរៀនសាកល្បងបាន ✅\n` +
       `• ចង់ស្តាប់សំឡេង, សួរគ្រូ AI និងប្រឡង Quiz សូមដំឡើងទៅ *VIP* 💎`,
       { parse_mode: 'Markdown' }
     );
@@ -1734,11 +1795,13 @@ bot.action(/week_([^-]+)-(.+)/, async (ctx) => {
     completedMap = compSnap.val() || {};
   } catch (e) {}
 
+  const isVIP = await checkVIP(userId);
   const buttons = weekData.lessons.map(l => {
     const key = `${monthId}-${weekId}-${l.id}`;
     const comp = completedMap[key];
-    const prefix = comp ? '✅ ' : '';
-    const suffix = comp ? ` (ជាប់ ថ្នាក់ ${comp.grade})` : '';
+    const isFree = isLessonFree(monthId, weekId, l.id);
+    const prefix = comp ? '✅ ' : (!isFree && !isVIP ? '🔒 ' : '');
+    const suffix = comp ? ` (ជាប់ ថ្នាក់ ${comp.grade})` : (!isFree && !isVIP ? ' (VIP)' : '');
     return [Markup.button.callback(`${prefix}${l.title}${suffix}`, `lesson_${monthId}-${weekId}-${l.id}`)];
   });
   buttons.push([Markup.button.callback('🔙 ត្រឡប់ក្រោយ (Back)', `month_${monthId}`)]);

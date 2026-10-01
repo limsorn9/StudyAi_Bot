@@ -1026,6 +1026,34 @@ function switchCourseLevel(level) {
   }
 }
 
+// Helper: Check if lesson is one of the 3 free trial lessons for each course level
+function isLessonFree(monthId, weekId, lessonId) {
+  // 1. Beginner Level (bl1 to bl26)
+  if (monthId === 'beginner' || monthId === 'm0') {
+    const num = parseInt((lessonId || '').replace('bl', ''));
+    return num >= 1 && num <= 3;
+  }
+  // 2. Elementary Level (el1 to el72)
+  if (monthId === 'elementary' || (monthId && monthId.startsWith('em'))) {
+    const num = parseInt((lessonId || '').replace('el', ''));
+    return num >= 1 && num <= 3;
+  }
+  // 3. Standard / 12-Month Level (m1-w1-l1, l2, l3)
+  if (monthId === 'm1' && weekId === 'w1') {
+    return ['l1', 'l2', 'l3'].includes(lessonId);
+  }
+  return false;
+}
+
+function openVipLessonLockModal(lessonTitle = '', levelName = '') {
+  const titleEl = document.getElementById('vipLockLessonTitle');
+  if (titleEl) {
+    const levelStr = levelName ? ` • ${levelName}` : '';
+    titleEl.textContent = `${lessonTitle || 'មេរៀន'}${levelStr}`;
+  }
+  openModal('vipLessonLockModal');
+}
+
 function renderBeginnerWeeks() {
   const container = document.getElementById('curriculumWeeksContainer');
   if (!container) return;
@@ -1125,16 +1153,22 @@ function renderBeginnerWeeks() {
       const grade = isComp ? (completed[dbKey]?.grade || 'A') : null;
 
       const lessonNum = parseInt((l.id || '').replace('bl', ''));
+      const isFree = isLessonFree('beginner', w.id, l.id);
+      const isVipUser = !!(STATE.currentUser?.isVIP);
+      const isVipLocked = !isAdmin && !isVipUser && !isFree;
+
       const isUnlocked = isAdmin || lessonNum <= 1 || passedLessons.has(`bl${lessonNum - 1}`);
       const isLocked = !isUnlocked;
-      const isCurrent = !isComp && isUnlocked;
+      const isCurrent = !isComp && isUnlocked && !isVipLocked;
 
       const thumbIcon = l.letter ? `🔤` : '📘';
       const duration = '⏱️ 10 mins';
       const desc = l.vocabulary ? `ពាក្យ: ${l.vocabulary} • ${l.sampleSentence || ''}` : (l.grammarRule || 'មេរៀនគ្រឹះភាសាអង់គ្លេស');
 
       let badgeHTML = '';
-      if (isComp) {
+      if (isVipLocked) {
+        badgeHTML = `<span class="lesson-badge-vip-lock">🔒 VIP</span>`;
+      } else if (isComp) {
         badgeHTML = `<span class="lesson-badge-completed">✓ Completed</span>`;
       } else if (isCurrent) {
         badgeHTML = `<span class="lesson-btn-inprogress">▶ In Progress</span>`;
@@ -1144,15 +1178,22 @@ function renderBeginnerWeeks() {
         badgeHTML = `<span class="lesson-badge-ongoing">Ongoing</span>`;
       }
 
+      const escapedTitle = (l.title || '').replace(/'/g, "\\'");
+      const clickAction = isVipLocked
+        ? `openVipLessonLockModal('${escapedTitle}', 'ថ្នាក់ដំបូង Beginner')`
+        : (isLocked
+            ? `showToast('🔒 ត្រូវប្រឡងជាប់ថ្ងៃទី${lessonNum - 1} ជាមុន!', 'warning')`
+            : `openLesson('beginner', '${w.id}', '${l.id}')`);
+
       return `
-        <div class="mobile-lesson-card ${isComp ? 'completed' : ''} ${isLocked ? 'locked' : ''}" 
-             onclick="${isLocked ? `showToast('🔒 ត្រូវប្រឡងជាប់ថ្ងៃទី${lessonNum - 1} ជាមុន!', 'warning')` : `openLesson('beginner', '${w.id}', '${l.id}')`}">
+        <div class="mobile-lesson-card ${isComp ? 'completed' : ''} ${isVipLocked ? 'vip-locked' : (isLocked ? 'locked' : '')}" 
+             onclick="${clickAction}">
           <div class="lesson-card-thumb">
             <span class="lesson-thumb-emoji">${thumbIcon}</span>
           </div>
           <div class="lesson-card-body">
-            <div class="lesson-card-title">${isLocked ? '🔒 ' : ''}${l.title}</div>
-            <div class="lesson-card-meta">${duration}</div>
+            <div class="lesson-card-title">${isVipLocked ? '🔒 ' : (isLocked ? '🔒 ' : '')}${l.title}</div>
+            <div class="lesson-card-meta">${duration} ${isFree ? '<span class="text-emerald-400 font-semibold text-[10px] ml-1">● Free Trial</span>' : ''}</div>
             <div class="lesson-card-desc">${escapeHtml(desc)}</div>
           </div>
           <div class="lesson-card-right">
@@ -1360,12 +1401,18 @@ function renderElementaryWeeks() {
     const lessonsHTML = filteredLessons.map(l => {
       const lessonNum = parseInt((l.id || '').replace('el', ''));
       const isComp = passedLessons.has(l.id) || !!completed[`elementary-${w.id}-${l.id}`] || !!completed[`${currentMonth.id}-${w.id}-${l.id}`];
+      const isFree = isLessonFree(currentMonth.id, w.id, l.id);
+      const isVipUser = !!(STATE.currentUser?.isVIP);
+      const isVipLocked = !isAdmin && !isVipUser && !isFree;
+
       const isUnlocked = isAdmin || lessonNum <= 1 || passedLessons.has(`el${lessonNum - 1}`);
       const isLocked = !isUnlocked;
-      const isCurrent = !isComp && isUnlocked;
+      const isCurrent = !isComp && isUnlocked && !isVipLocked;
 
       let badgeHTML = '';
-      if (isComp) {
+      if (isVipLocked) {
+        badgeHTML = `<span class="lesson-badge-vip-lock">🔒 VIP</span>`;
+      } else if (isComp) {
         badgeHTML = `<span class="lesson-badge-completed">✓ Completed</span>`;
       } else if (isCurrent) {
         badgeHTML = `<span class="lesson-btn-inprogress">▶ In Progress</span>`;
@@ -1375,15 +1422,22 @@ function renderElementaryWeeks() {
         badgeHTML = `<span class="lesson-badge-ongoing">Ongoing</span>`;
       }
 
+      const escapedTitle = (l.title || '').replace(/'/g, "\\'");
+      const clickAction = isVipLocked
+        ? `openVipLessonLockModal('${escapedTitle}', 'ថ្នាក់បឋមសិក្សា Elementary')`
+        : (isLocked
+            ? `showToast('🔒 ត្រូវប្រឡងជាប់ថ្ងៃទី${lessonNum - 1} ជាមុន!', 'warning')`
+            : `openLesson('${currentMonth.id}', '${w.id}', '${l.id}')`);
+
       return `
-        <div class="mobile-lesson-card ${isComp ? 'completed' : ''} ${isLocked ? 'locked' : ''}" 
-             onclick="${isLocked ? `showToast('🔒 ត្រូវប្រឡងជាប់ថ្ងៃទី${lessonNum - 1} ជាមុន!', 'warning')` : `openLesson('${currentMonth.id}', '${w.id}', '${l.id}')`}">
+        <div class="mobile-lesson-card ${isComp ? 'completed' : ''} ${isVipLocked ? 'vip-locked' : (isLocked ? 'locked' : '')}" 
+             onclick="${clickAction}">
           <div class="lesson-card-thumb">
             <span class="lesson-thumb-emoji">🏫</span>
           </div>
           <div class="lesson-card-body">
-            <div class="lesson-card-title">${isLocked ? '🔒 ' : ''}${l.title}</div>
-            <div class="lesson-card-meta">⏱️ 15 mins</div>
+            <div class="lesson-card-title">${isVipLocked ? '🔒 ' : (isLocked ? '🔒 ' : '')}${l.title}</div>
+            <div class="lesson-card-meta">⏱️ 15 mins ${isFree ? '<span class="text-emerald-400 font-semibold text-[10px] ml-1">● Free Trial</span>' : ''}</div>
             <div class="lesson-card-desc">${escapeHtml(l.titleKhmer || l.topic || 'ថ្នាក់បឋមសិក្សា')}</div>
           </div>
           <div class="lesson-card-right">
@@ -1544,6 +1598,10 @@ function renderCurriculumWeeks() {
     const lessonsHTML = filteredLessons.map(l => {
       const key = `${currentMonth.id}-${w.id}-${l.id}`;
       const isComp = !!completed[key];
+      const isFree = isLessonFree(currentMonth.id, w.id, l.id);
+      const isVipUser = !!(STATE.currentUser?.isVIP);
+      const isVipLocked = !isAdmin && !isVipUser && !isFree;
+
       let isLocked = false;
       if (!isAdmin) {
         const globalIdx = globalOrder.indexOf(key);
@@ -1552,10 +1610,12 @@ function renderCurriculumWeeks() {
           isLocked = !completed[prevKey];
         }
       }
-      const isCurrent = !isComp && !isLocked;
+      const isCurrent = !isComp && !isLocked && !isVipLocked;
 
       let badgeHTML = '';
-      if (isComp) {
+      if (isVipLocked) {
+        badgeHTML = `<span class="lesson-badge-vip-lock">🔒 VIP</span>`;
+      } else if (isComp) {
         badgeHTML = `<span class="lesson-badge-completed">✓ Completed</span>`;
       } else if (isCurrent) {
         badgeHTML = `<span class="lesson-btn-inprogress">▶ In Progress</span>`;
@@ -1565,17 +1625,23 @@ function renderCurriculumWeeks() {
         badgeHTML = `<span class="lesson-badge-ongoing">Ongoing</span>`;
       }
 
+      const escapedTitle = (l.title || '').replace(/'/g, "\\'");
+      const escapedMonth = (currentMonth.title || '').replace(/'/g, "\\'");
+      const clickAction = isVipLocked
+        ? `openVipLessonLockModal('${escapedTitle}', '${escapedMonth}')`
+        : (isLocked
+            ? `showToast('🔒 ត្រូវប្រឡងជាប់មេរៀនមុនសិន ទើបអាចរៀននេះបាន!', 'warning')`
+            : `openLesson('${currentMonth.id}', '${w.id}', '${l.id}')`);
+
       return `
-        <div class="mobile-lesson-card ${isComp ? 'completed' : ''} ${isLocked ? 'locked' : ''}"
-             onclick="${isLocked
-               ? `showToast('🔒 ត្រូវប្រឡងជាប់មេរៀនមុនសិន ទើបអាចរៀននេះបាន!', 'warning')`
-               : `openLesson('${currentMonth.id}', '${w.id}', '${l.id}')`}">
+        <div class="mobile-lesson-card ${isComp ? 'completed' : ''} ${isVipLocked ? 'vip-locked' : (isLocked ? 'locked' : '')}"
+             onclick="${clickAction}">
           <div class="lesson-card-thumb">
             <span class="lesson-thumb-emoji">📖</span>
           </div>
           <div class="lesson-card-body">
-            <div class="lesson-card-title">${isLocked ? '🔒 ' : ''}${l.title}</div>
-            <div class="lesson-card-meta">⏱️ 15 mins</div>
+            <div class="lesson-card-title">${isVipLocked ? '🔒 ' : (isLocked ? '🔒 ' : '')}${l.title}</div>
+            <div class="lesson-card-meta">⏱️ 15 mins ${isFree ? '<span class="text-emerald-400 font-semibold text-[10px] ml-1">● Free Trial</span>' : ''}</div>
             <div class="lesson-card-desc">${escapeHtml(l.titleKhmer || l.description || 'មេរៀនភាសាអង់គ្លេស')}</div>
           </div>
           <div class="lesson-card-right">
@@ -2593,9 +2659,16 @@ async function openLesson(monthId, weekId, lessonId) {
       } catch (e) {}
     }
 
-    const res = await fetch(`/api/lesson/${monthId}/${weekId}/${lessonId}`);
+    const uidParam = encodeURIComponent(STATE.currentUser?.id || STATE.currentUser?.telegramId || '');
+    const res = await fetch(`/api/lesson/${monthId}/${weekId}/${lessonId}?userId=${uidParam}`);
     const data = await res.json();
-    if (!data.success) throw new Error('Lesson not found');
+    if (!res.ok || !data.success) {
+      if (res.status === 403 || data.isVipLocked) {
+        openVipLessonLockModal(data.lessonTitle || 'មេរៀននេះ');
+        return;
+      }
+      throw new Error(data.error || 'Lesson not found');
+    }
 
     STATE.currentLesson = {
       monthId,
@@ -4240,6 +4313,10 @@ async function startCurrentLessonQuiz() {
     const data = await res.json();
 
     if (!data.success) {
+      if (data.isVipLocked) {
+        openVipLessonLockModal(STATE.currentLesson?.title || 'មេរៀននេះ');
+        return;
+      }
       throw new Error(data.error || 'Failed to start quiz');
     }
 

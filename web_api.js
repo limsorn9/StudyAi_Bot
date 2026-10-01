@@ -2265,6 +2265,25 @@ Provide practical English pronunciation coaching:
   // 3. CURRICULUM & LESSONS
   // ==========================================
 
+  // Helper: Check if lesson is one of the 3 free trial lessons for each course level
+  function isLessonFree(monthId, weekId, lessonId) {
+    // 1. Beginner Level (bl1 to bl26)
+    if (monthId === 'beginner' || monthId === 'm0') {
+      const num = parseInt((lessonId || '').replace('bl', ''));
+      return num >= 1 && num <= 3;
+    }
+    // 2. Elementary Level (el1 to el72)
+    if (monthId === 'elementary' || (monthId && monthId.startsWith('em'))) {
+      const num = parseInt((lessonId || '').replace('el', ''));
+      return num >= 1 && num <= 3;
+    }
+    // 3. Standard / 12-Month Level
+    if (monthId === 'm1' && weekId === 'w1') {
+      return ['l1', 'l2', 'l3'].includes(lessonId);
+    }
+    return false;
+  }
+
   router.get('/curriculum', (req, res) => {
     try {
       const summaryMonths = curriculum.months.map(m => ({
@@ -2277,7 +2296,8 @@ Provide practical English pronunciation coaching:
           lessonsCount: w.lessons.length,
           lessons: w.lessons.map(l => ({
             id: l.id,
-            title: l.title
+            title: l.title,
+            isFree: isLessonFree(m.id, w.id, l.id)
           }))
         }))
       }));
@@ -2295,7 +2315,8 @@ Provide practical English pronunciation coaching:
           lessonsCount: w.lessons.length,
           lessons: w.lessons.map(l => ({
             id: l.id,
-            title: l.title
+            title: l.title,
+            isFree: isLessonFree('beginner', w.id, l.id)
           }))
         }))
       };
@@ -2323,7 +2344,8 @@ Provide practical English pronunciation coaching:
             lessons: w.lessons.map(l => ({
               id: l.id,
               day: l.day,
-              title: l.title
+              title: l.title,
+              isFree: isLessonFree(m.id, w.id, l.id)
             }))
           }))
         }))
@@ -2353,6 +2375,34 @@ Provide practical English pronunciation coaching:
   router.get('/lesson/:monthId/:weekId/:lessonId', async (req, res) => {
     try {
       const { monthId, weekId, lessonId } = req.params;
+      const userId = req.query.userId || req.headers['x-user-id'];
+
+      // Permission check: First 3 lessons of each course level are free for all.
+      // Lessons 4+ require VIP (or Super Admin).
+      const isFree = isLessonFree(monthId, weekId, lessonId);
+      if (!isFree) {
+        let isAuthorized = false;
+        if (userId) {
+          const adminAuth = await isUserAdmin(userId);
+          if (adminAuth) {
+            isAuthorized = true;
+          } else {
+            const vipAuth = await checkVIPCrossLinked(userId);
+            if (vipAuth) isAuthorized = true;
+          }
+        }
+
+        if (!isAuthorized) {
+          return res.status(403).json({
+            error: '🔒 មេរៀននេះសម្រាប់តែសមាជិក VIP ប៉ុណ្ណោះ! គណនី Free អាចរៀនសាកល្បងឥតគិតថ្លៃបាន ៣ មេរៀនដំបូងនៃកម្រិតនីមួយៗ។ សូមដំឡើង VIP ដើម្បីរៀនបន្តដោយគ្មានដែនកំណត់!',
+            isVipLocked: true,
+            isFree: false,
+            monthId,
+            weekId,
+            lessonId
+          });
+        }
+      }
       
       let month = null;
       let isBeginner = false;
@@ -2602,6 +2652,18 @@ Provide practical English pronunciation coaching:
         quizTitle = SUBJECT_EXAMS[subjectKey].title;
       } else {
         // Lesson quiz (Standard Curriculum, Beginner Course, or Elementary Course)
+        // VIP Check: Lessons 4+ require VIP to take the quiz
+        const isFree = isLessonFree(monthId, weekId, lessonId);
+        if (!isFree && !callerIsAdmin) {
+          const vipAuth = userId ? await checkVIPCrossLinked(userId) : false;
+          if (!vipAuth) {
+            return res.status(403).json({
+              error: '🔒 ការប្រឡង Quiz មេរៀននេះ គឺសម្រាប់តែសមាជិក VIP ប៉ុណ្ណោះ! គណនី Free អាចរៀន និងប្រឡងបាន ៣ មេរៀនដំបូងនៃកម្រិតនីមួយៗ។ សូមដំឡើង VIP ដើម្បីចូលប្រឡង!',
+              isVipLocked: true
+            });
+          }
+        }
+
         let qList = [];
         let l = null;
         if (monthId === 'beginner' || monthId === 'm0') {

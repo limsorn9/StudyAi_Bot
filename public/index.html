@@ -2149,7 +2149,33 @@
               <span>បិទ</span>
             </button>
           </div>
+  <!-- VIP LESSON LOCK PROMPT MODAL -->
+  <div id="vipLessonLockModal" class="modal-overlay hidden">
+    <div class="modal-card glass-panel max-w-md text-center p-6">
+      <div class="w-16 h-16 rounded-full bg-gradient-to-tr from-amber-500/20 to-amber-400/30 border-2 border-amber-400/60 flex items-center justify-center text-3xl mx-auto mb-4 shadow-xl">
+        🔒
+      </div>
+      <h3 class="text-xl font-bold text-white mb-2">💎 មេរៀនសម្រាប់តែសមាជិក VIP!</h3>
+      <p class="text-xs text-amber-300 font-semibold mb-2" id="vipLockLessonTitle">មេរៀន...</p>
+      
+      <div class="p-3 rounded-xl bg-slate-800/80 border border-slate-700/80 text-left mb-4">
+        <div class="text-xs text-slate-300 leading-relaxed">
+          💡 <strong>គោលការណ៍សិក្សាឥតគិតថ្លៃ៖</strong><br>
+          • គណនី Free អាចរៀនសាកល្បងឥតគិតថ្លៃបាន <strong>៣ មេរៀនដំបូង</strong> នៃកម្រិតនីមួយៗ (Beginner, Elementary, Standard)។<br>
+          • ដើម្បីរៀនបន្តពីមេរៀនទី ៤ ឡើងទៅ ស្ដាប់សំឡេងអាន និងប្រឡងយកវិញ្ញាបនបត្រ សូមដំឡើងទៅកាន់ <strong>VIP Member</strong>!
         </div>
+      </div>
+
+      <div class="flex flex-col gap-2">
+        <button class="btn btn-gold btn-block py-3 font-bold text-sm" onclick="closeModal('vipLessonLockModal'); navigateTo('vip');">
+          <span>👑 ដំឡើង VIP ឥឡូវនេះ (Upgrade VIP)</span>
+        </button>
+        <button class="btn btn-cyan btn-block py-2.5 font-bold text-xs" onclick="closeModal('vipLessonLockModal'); navigateTo('vip'); setTimeout(() => { const el = document.getElementById('licenseKeyInput'); if(el) el.focus(); }, 300);">
+          <span>🔑 ខ្ញុំមាន License Key រួចហើយ</span>
+        </button>
+        <button class="btn btn-outline btn-block py-2.5 text-xs" onclick="closeModal('vipLessonLockModal')">
+          <span>បិទ (Close)</span>
+        </button>
       </div>
     </div>
   </div>
