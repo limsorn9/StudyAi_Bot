@@ -2265,7 +2265,7 @@ Provide practical English pronunciation coaching:
   // 3. CURRICULUM & LESSONS
   // ==========================================
 
-  // Helper: Check if lesson is one of the 3 free trial lessons for each course level
+  // Helper: Check if lesson is one of the 3 free trial lessons for each course level / subject
   function isLessonFree(monthId, weekId, lessonId) {
     // 1. Beginner Level (bl1 to bl26)
     if (monthId === 'beginner' || monthId === 'm0') {
@@ -2277,15 +2277,108 @@ Provide practical English pronunciation coaching:
       const num = parseInt((lessonId || '').replace('el', ''));
       return num >= 1 && num <= 3;
     }
-    // 3. Standard / 12-Month Level
-    if (monthId === 'm1' && weekId === 'w1') {
-      return ['l1', 'l2', 'l3'].includes(lessonId);
+    // 3. Standard / 12-Month Level by Subject:
+    // Month 1 Weeks 1, 2, 3 correspond to Lessons 1, 2, 3 of every subject!
+    if (monthId === 'm1' && ['w1', 'w2', 'w3'].includes(weekId)) {
+      return true;
     }
     return false;
   }
 
+  const STANDARD_SUBJECT_DEFS = [
+    {
+      id: 'grammar',
+      title: 'វេយ្យាករណ៍ភាសាអង់គ្លេស',
+      titleEn: 'Grammar in Use',
+      icon: '📘',
+      description: 'វេយ្យាករណ៍ពេញលេញ ៤៨ មេរៀន (Nouns, Tenses, Modals, Passive, Conditionals...)',
+      lessonIdx: 0,
+      examKey: 'grammar'
+    },
+    {
+      id: 'conversation',
+      title: 'ការសន្ទនាជាក់ស្តែង',
+      titleEn: 'Situational Conversation',
+      icon: '🗣️',
+      description: 'ការសន្ទនាជាក់ស្តែង ៤៨ បរិបទ (Greetings, Shopping, Travel, Business, Daily Life...)',
+      lessonIdx: 1,
+      examKey: 'conversation'
+    },
+    {
+      id: 'vocabulary',
+      title: 'វាក្យសព្ទ និងឃ្លាទូទៅ',
+      titleEn: 'Vocabulary & Context',
+      icon: '📖',
+      description: 'វាក្យសព្ទ និងឃ្លាសំខាន់ៗ ៤៨ ប្រធានបទ ភ្ជាប់ជាមួយឧទាហរណ៍ជាក់ស្តែង',
+      lessonIdx: 2,
+      examKey: 'vocabulary'
+    },
+    {
+      id: 'verbs',
+      title: 'កិរិយាសព្ទ និងកាល',
+      titleEn: 'Verbs & Tenses',
+      icon: '⚡',
+      description: 'កិរិយាសព្ទគោល និងកិរិយាសព្ទមិនប្រក្រតី (V1, V2, V3) ៤៨ មេរៀន',
+      lessonIdx: 3,
+      examKey: 'verbs'
+    },
+    {
+      id: 'adjectives',
+      title: 'គុណនាម និងការប្រៀបធៀប',
+      titleEn: 'Adjectives & Comparison',
+      icon: '🎨',
+      description: 'គុណនាមពណ៌នា និងកម្រិតប្រៀបធៀប ៤៨ មេរៀន',
+      lessonIdx: 4,
+      examKey: 'adjectives'
+    },
+    {
+      id: 'sentences',
+      title: 'ទម្រង់ល្បះ និងកន្សោមពាក្យ',
+      titleEn: 'Sentence Patterns',
+      icon: '✍️',
+      description: 'ទម្រង់ល្បះគំរូ និងការតែងប្រយោគទំនាក់ទំនង ៤៨ មេរៀន',
+      lessonIdx: 5,
+      examKey: 'sentences'
+    }
+  ];
+
   router.get('/curriculum', (req, res) => {
     try {
+      // 1. Group 12-Month Course into 6 Subjects (48 lessons each)
+      const summarySubjects = STANDARD_SUBJECT_DEFS.map(s => {
+        const lessons = [];
+        let lessonNum = 1;
+        curriculum.months.forEach(m => {
+          (m.weeks || []).forEach(w => {
+            const l = w.lessons && w.lessons[s.lessonIdx];
+            if (l) {
+              lessons.push({
+                lessonNum,
+                id: l.id,
+                title: l.title,
+                monthId: m.id,
+                weekId: w.id,
+                monthTitle: m.title,
+                weekTitle: w.title,
+                dbKey: `${m.id}-${w.id}-${l.id}`,
+                isFree: lessonNum <= 3
+              });
+              lessonNum++;
+            }
+          });
+        });
+        return {
+          id: s.id,
+          title: s.title,
+          titleEn: s.titleEn,
+          icon: s.icon,
+          description: s.description,
+          examKey: s.examKey,
+          totalLessons: lessons.length,
+          lessons
+        };
+      });
+
       const summaryMonths = curriculum.months.map(m => ({
         id: m.id,
         title: m.title,
@@ -2351,7 +2444,13 @@ Provide practical English pronunciation coaching:
         }))
       };
 
-      res.json({ success: true, months: summaryMonths, beginner: summaryBeginner, elementary: summaryElementary });
+      res.json({
+        success: true,
+        subjects: summarySubjects,
+        months: summaryMonths,
+        beginner: summaryBeginner,
+        elementary: summaryElementary
+      });
     } catch (err) {
       res.status(500).json({ error: 'Failed to fetch curriculum' });
     }
@@ -2648,7 +2747,29 @@ Provide practical English pronunciation coaching:
           }
         }
 
-        rawQuestions = generateAnnualSubjectQuiz(curriculum, subjectKey, 20);
+        // Prerequisite check: Must pass all 48 lessons of this subject before taking the Final Subject Exam
+        if (userId && db && !callerIsAdmin && subjectKey !== 'grand') {
+          const userSnap = await db.ref(`users/${userId}/completed_lessons`).once('value');
+          const completed = userSnap.val() || {};
+          const subjDef = STANDARD_SUBJECT_DEFS.find(s => s.examKey === subjectKey || s.id === subjectKey);
+          if (subjDef) {
+            const lessonLId = `l${subjDef.lessonIdx + 1}`;
+            let passedCount = 0;
+            Object.entries(completed).forEach(([k, v]) => {
+              if (k.endsWith(`-${lessonLId}`) && (v.isPassed || ['A', 'B', 'C'].includes(v.grade) || (v.percent && v.percent >= 70))) {
+                passedCount++;
+              }
+            });
+            if (passedCount < 48) {
+              return res.status(403).json({
+                error: `🔒 អ្នកត្រូវរៀន និងប្រឡងជាប់គ្រប់ ៤៨ មេរៀននៃមុខវិជ្ជា «${subjDef.title}» ជាមុនសិន (បច្ចុប្បន្នជាប់ ${passedCount}/៤៨) ទើបអាចចូលប្រឡងបញ្ចប់មុខវិជ្ជាបាន!`,
+                isLocked: true
+              });
+            }
+          }
+        }
+
+        rawQuestions = generateAnnualSubjectQuiz(curriculum, subjectKey, 30);
         quizTitle = SUBJECT_EXAMS[subjectKey].title;
       } else {
         // Lesson quiz (Standard Curriculum, Beginner Course, or Elementary Course)
@@ -2721,40 +2842,31 @@ Provide practical English pronunciation coaching:
           qList = l ? generateQuiz(l) : [];
         } else {
           // ============================================================
-          // SEQUENTIAL LOCK FOR STANDARD 12-MONTH COURSE
-          // A lesson is locked unless the previous lesson in the global
-          // curriculum order has been passed by this user.
+          // SEQUENTIAL LOCK FOR STANDARD 12-MONTH COURSE (BY SUBJECT)
+          // A lesson is locked unless the previous lesson of the SAME SUBJECT
+          // has been passed by this user (Lesson N requires Lesson N-1 passed).
           // ADMIN BYPASS: Admin can access any lesson directly
           // ============================================================
           if (userId && db && monthId && weekId && lessonId && !callerIsAdmin) {
-            // Build global ordered list: [{key: 'm1-w1-l1'}, ...]
-            const globalOrder = [];
-            if (curriculum && curriculum.months) {
-              for (const m of curriculum.months) {
-                for (const w of m.weeks || []) {
-                  for (const lsn of w.lessons || []) {
-                    globalOrder.push({ key: `${m.id}-${w.id}-${lsn.id}`, mId: m.id, wId: w.id, lId: lsn.id, title: lsn.title });
-                  }
-                }
-              }
-            }
+            const mNum = parseInt(monthId.replace('m', ''));
+            const wSubNum = parseInt(weekId.replace('w', ''));
+            const wNum = (mNum - 1) * 4 + wSubNum; // 1 to 48
 
-            const currentKey = `${monthId}-${weekId}-${lessonId}`;
-            const currentIdx = globalOrder.findIndex(x => x.key === currentKey);
+            if (wNum > 1) {
+              const prevWNum = wNum - 1;
+              const prevMNum = Math.floor((prevWNum - 1) / 4) + 1;
+              const prevWSub = ((prevWNum - 1) % 4) + 1;
+              const prevKey = `m${prevMNum}-w${prevWSub}-${lessonId}`;
 
-            // Only lock if it's not the very first lesson
-            if (currentIdx > 0) {
-              const prevLesson = globalOrder[currentIdx - 1];
-              const userSnap = await db.ref(`users/${userId}/completed_lessons/${prevLesson.key}`).once('value');
+              const userSnap = await db.ref(`users/${userId}/completed_lessons/${prevKey}`).once('value');
               const prevData = userSnap.val();
               const prevPassed = prevData && (prevData.isPassed || ['A', 'B', 'C'].includes(prevData.grade) || (prevData.percent && prevData.percent >= 70));
 
               if (!prevPassed) {
                 return res.status(403).json({
-                  error: `🔒 ត្រូវប្រឡងជាប់មេរៀន "${prevLesson.title}" ជាមុនសិន ទើបអាចចូលប្រឡងមេរៀននេះបាន!`,
+                  error: `🔒 ត្រូវប្រឡងជាប់មេរៀនទី ${prevWNum} នៃមុខវិជ្ជានេះជាមុនសិន ទើបអាចចូលប្រឡងមេរៀនទី ${wNum} បាន!`,
                   isLocked: true,
-                  prevLessonKey: prevLesson.key,
-                  prevLessonTitle: prevLesson.title
+                  prevLessonKey: prevKey
                 });
               }
             }

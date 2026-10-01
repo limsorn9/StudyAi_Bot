@@ -18,6 +18,8 @@ const STATE = {
   currentCertPreviewId: null,
   allVerbsData: {},
   courseLevel: 'beginner',
+  selectedStandardSubjectId: 'grammar',
+  curriculumSubjects: [],
   beginnerCourse: null,
   beginnerStatus: { passedCount: 0, totalLessons: 26, passedLessons: [], isGraduated: false, beginnerCert: null },
   isBeginnerFinalExam: false,
@@ -852,6 +854,7 @@ async function loadCurriculum() {
     const data = await res.json();
     if (data.success) {
       STATE.curriculum = data.months || [];
+      STATE.curriculumSubjects = data.subjects || [];
       STATE.beginnerCourse = data.beginner || null;
       STATE.elementaryCourse = data.elementary || null;
       switchCourseLevel(STATE.courseLevel || 'beginner');
@@ -1022,7 +1025,7 @@ function switchCourseLevel(level) {
         </div>
       `;
     }
-    renderMonthsTabs();
+    renderSubjectTabs();
   }
 }
 
@@ -1038,9 +1041,9 @@ function isLessonFree(monthId, weekId, lessonId) {
     const num = parseInt((lessonId || '').replace('el', ''));
     return num >= 1 && num <= 3;
   }
-  // 3. Standard / 12-Month Level (m1-w1-l1, l2, l3)
-  if (monthId === 'm1' && weekId === 'w1') {
-    return ['l1', 'l2', 'l3'].includes(lessonId);
+  // 3. Standard / 12-Month Level by Subject (Month 1 Weeks 1-3 are lessons 1, 2, 3 of every subject!)
+  if (monthId === 'm1' && ['w1', 'w2', 'w3'].includes(weekId)) {
+    return true;
   }
   return false;
 }
@@ -1503,18 +1506,64 @@ async function startElementaryExam(monthNum) {
   }
 }
 
-function renderMonthsTabs() {
+function getStandardSubjectsFallback() {
+  const defs = [
+    { id: 'grammar', title: 'វេយ្យាករណ៍ភាសាអង់គ្លេស', titleEn: 'Grammar in Use', icon: '📘', lessonIdx: 0, examKey: 'grammar' },
+    { id: 'conversation', title: 'ការសន្ទនាជាក់ស្តែង', titleEn: 'Situational Conversation', icon: '🗣️', lessonIdx: 1, examKey: 'conversation' },
+    { id: 'vocabulary', title: 'វាក្យសព្ទ និងឃ្លាទូទៅ', titleEn: 'Vocabulary & Context', icon: '📖', lessonIdx: 2, examKey: 'vocabulary' },
+    { id: 'verbs', title: 'កិរិយាសព្ទ និងកាល', titleEn: 'Verbs & Tenses', icon: '⚡', lessonIdx: 3, examKey: 'verbs' },
+    { id: 'adjectives', title: 'គុណនាម និងការប្រៀបធៀប', titleEn: 'Adjectives & Comparison', icon: '🎨', lessonIdx: 4, examKey: 'adjectives' },
+    { id: 'sentences', title: 'ទម្រង់ល្បះ និងកន្សោមពាក្យ', titleEn: 'Sentence Patterns', icon: '✍️', lessonIdx: 5, examKey: 'sentences' }
+  ];
+
+  return defs.map(s => {
+    const lessons = [];
+    let lessonNum = 1;
+    (STATE.curriculum || []).forEach(m => {
+      (m.weeks || []).forEach(w => {
+        const l = w.lessons && w.lessons[s.lessonIdx];
+        if (l) {
+          lessons.push({
+            lessonNum,
+            id: l.id,
+            title: l.title,
+            monthId: m.id,
+            weekId: w.id,
+            monthTitle: m.title,
+            weekTitle: w.title,
+            dbKey: `${m.id}-${w.id}-${l.id}`,
+            isFree: lessonNum <= 3
+          });
+          lessonNum++;
+        }
+      });
+    });
+    return {
+      ...s,
+      totalLessons: lessons.length,
+      lessons
+    };
+  });
+}
+
+function renderSubjectTabs() {
   const bar = document.getElementById('monthsTabsBar');
   if (!bar) return;
+  bar.style.display = 'flex';
   bar.innerHTML = '';
 
-  STATE.curriculum.forEach(m => {
+  const subjects = STATE.curriculumSubjects && STATE.curriculumSubjects.length 
+    ? STATE.curriculumSubjects 
+    : getStandardSubjectsFallback();
+
+  subjects.forEach(s => {
     const btn = document.createElement('button');
-    btn.className = `month-tab-pill ${m.id === STATE.selectedMonthId ? 'active' : ''}`;
-    btn.textContent = m.title;
+    const isActive = s.id === (STATE.selectedStandardSubjectId || 'grammar');
+    btn.className = `month-tab-pill ${isActive ? 'active' : ''}`;
+    btn.innerHTML = `${s.icon || '📘'} <span>${s.title.split(' (')[0]}</span>`;
     btn.onclick = () => {
-      STATE.selectedMonthId = m.id;
-      renderMonthsTabs();
+      STATE.selectedStandardSubjectId = s.id;
+      renderSubjectTabs();
       renderCurriculumWeeks();
     };
     bar.appendChild(btn);
@@ -1527,152 +1576,167 @@ function renderCurriculumWeeks() {
   const container = document.getElementById('curriculumWeeksContainer');
   if (!container) return;
 
-  const currentMonth = STATE.curriculum.find(m => m.id === STATE.selectedMonthId);
-  if (!currentMonth) {
-    container.innerHTML = '<p class="text-muted">មិនមានទិន្នន័យខែនេះទេ</p>';
+  const subjects = STATE.curriculumSubjects && STATE.curriculumSubjects.length 
+    ? STATE.curriculumSubjects 
+    : getStandardSubjectsFallback();
+
+  const currentSubject = subjects.find(s => s.id === (STATE.selectedStandardSubjectId || 'grammar')) || subjects[0];
+  if (!currentSubject || !currentSubject.lessons) {
+    container.innerHTML = '<p class="text-muted p-4 text-center">មិនមានទិន្នន័យមុខវិជ្ជានេះទេ</p>';
     return;
   }
 
   const completed = STATE.currentUser?.completedLessons || {};
-  const isAdmin = !!(STATE.currentUser?.isAdmin);
+  const isAdmin = verifyIsAdmin();
+  const isVipUser = !!(STATE.currentUser?.isVIP);
 
-  // Build global ordered lesson list for sequential lock checking
-  const globalOrder = [];
-  STATE.curriculum.forEach(m => {
-    (m.weeks || []).forEach(w => {
-      (w.lessons || []).forEach(l => {
-        globalOrder.push(`${m.id}-${w.id}-${l.id}`);
-      });
-    });
+  // Check certifications
+  const certs = STATE.currentUser?.subject_certifications || {};
+  const currentCert = certs[currentSubject.examKey || currentSubject.id];
+  const isSubjectCertified = !!currentCert;
+
+  // Passed lessons in this subject
+  let passedCount = 0;
+  currentSubject.lessons.forEach(l => {
+    const comp = completed[l.dbKey];
+    if (comp && (comp.isPassed || ['A', 'B', 'C'].includes(comp.grade) || (comp.percent && comp.percent >= 70))) {
+      passedCount++;
+    }
   });
+
+  const totalLessons = currentSubject.lessons.length || 48;
+  const pct = Math.round((passedCount / totalLessons) * 100);
+  const canTakeFinal = isAdmin || passedCount >= totalLessons;
+
+  // Final Subject Exam Card at top (30 questions!)
+  const examCardHTML = `
+    <div class="beginner-final-exam-card" style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(139, 92, 246, 0.15)); border: 1px solid rgba(99, 102, 241, 0.35);">
+      <div class="final-exam-header">
+        <div class="final-exam-icon">${isSubjectCertified ? '🎓' : (isAdmin ? '🛡️' : (canTakeFinal ? '📜' : '🔒'))}</div>
+        <div class="final-exam-info">
+          <h3>${isSubjectCertified ? `✅ ការប្រឡងបញ្ចប់មុខវិជ្ជា៖ ${currentSubject.title} --- ជោគជ័យ!` : (isAdmin ? `🛡️ Admin View — ការប្រឡងបញ្ចប់មុខវិជ្ជា៖ ${currentSubject.title}` : `ការប្រឡងបញ្ចប់មុខវិជ្ជា៖ ${currentSubject.title}`)}</h3>
+          <p>${isSubjectCertified 
+            ? `អ្នកបានប្រឡងបញ្ចប់មុខវិជ្ជានេះជោគជ័យ! ទទួលបានវិញ្ញាបនបត្រផ្លូវការ 🏆`
+            : (isAdmin 
+                ? `🛡️ Admin ប្រឡងបានភ្លាម (Bypass prerequisites) • សិស្សជាប់ ${passedCount}/${totalLessons} មេរៀន`
+                : `រៀន និងប្រឡងជាប់គ្រប់ ${totalLessons} មេរៀននៃមុខវិជ្ជានេះ ទើបអាចចូលប្រឡងបញ្ចប់យកវិញ្ញាបនបត្រ (៣០ សំណួរ)`)
+          }</p>
+        </div>
+      </div>
+      <div class="final-exam-progress">
+        <div class="final-exam-progress-label">
+          <span>មេរៀនបានប្រឡងជាប់ក្នុងមុខវិជ្ជានេះ: ${passedCount}/${totalLessons}</span>
+          <span>${pct}%</span>
+        </div>
+        <div class="final-exam-progress-bar">
+          <div class="final-exam-progress-fill" style="width: ${isAdmin ? 100 : pct}%; background: linear-gradient(90deg, #38bdf8, #818cf8);"></div>
+        </div>
+      </div>
+      ${isSubjectCertified && currentCert?.certId
+        ? `<div class="graduated-badge">🎓 ប្រឡងបញ្ចប់ជោគជ័យ! វិញ្ញាបនបត្រ: <strong>${currentCert.certId}</strong></div>
+           <button class="btn-final-exam" style="margin-top:10px" onclick="openCertificatePreview('${currentCert.certId}')">📜 មើលវិញ្ញាបនបត្រ</button>`
+        : `<button class="btn-final-exam" ${!canTakeFinal ? 'disabled' : ''} onclick="startAnnualExam('${currentSubject.examKey || currentSubject.id}')">
+            ${!canTakeFinal 
+              ? `🔒 ប្រឡងបញ្ចប់មុខវិជ្ជា (ខ្វះ ${totalLessons - passedCount} មេរៀន)` 
+              : (isAdmin ? `🛡️ Admin • ចូលប្រឡងបញ្ចប់មុខវិជ្ជា (៣០ សំណួរ)` : `🎓 ចូលប្រឡងបញ្ចប់មុខវិជ្ជា (៣០ សំណួរ)`)}
+           </button>`
+      }
+    </div>
+  `;
+
+  // Update sticky bottom progress card
+  const progressRatio = document.getElementById('coursesProgressRatio');
+  const progressBarFill = document.getElementById('coursesProgressBarFill');
+  if (progressRatio) progressRatio.textContent = `${passedCount}/${totalLessons} Lessons (${currentSubject.titleEn || currentSubject.title})`;
+  if (progressBarFill) progressBarFill.style.width = `${pct}%`;
 
   const searchInput = document.getElementById('coursesSearchInput');
   const searchQ = (searchInput?.value || '').trim().toLowerCase();
   const filter = STATE.coursesFilter || 'all';
 
-  // Count progress
-  let totalLessonsInCourse = 0;
-  let passedLessonsInCourse = 0;
-  currentMonth.weeks.forEach(w => {
-    (w.lessons || []).forEach(l => {
-      totalLessonsInCourse++;
-      const key = `${currentMonth.id}-${w.id}-${l.id}`;
-      if (completed[key]) passedLessonsInCourse++;
-    });
+  // Filter lessons
+  let filteredLessons = currentSubject.lessons.filter((l, idx) => {
+    const isComp = !!completed[l.dbKey];
+    const isUnlocked = isAdmin || idx === 0 || !!completed[currentSubject.lessons[idx - 1].dbKey];
+    const isLocked = !isUnlocked;
+
+    if (filter === 'completed' && !isComp) return false;
+    if (filter === 'ongoing' && (isComp || isLocked)) return false;
+    if (filter === 'locked' && !isLocked) return false;
+
+    if (searchQ) {
+      const text = `${l.title} ${l.monthTitle || ''} ${l.weekTitle || ''}`.toLowerCase();
+      if (!text.includes(searchQ)) return false;
+    }
+    return true;
   });
 
-  const progressRatio = document.getElementById('coursesProgressRatio');
-  const progressBarFill = document.getElementById('coursesProgressBarFill');
-  const curPct = totalLessonsInCourse > 0 ? Math.round((passedLessonsInCourse / totalLessonsInCourse) * 100) : 0;
-  if (progressRatio) progressRatio.textContent = `${passedLessonsInCourse}/${totalLessonsInCourse} Lessons`;
-  if (progressBarFill) progressBarFill.style.width = `${curPct}%`;
+  const lessonsHTML = filteredLessons.map(l => {
+    const idx = currentSubject.lessons.findIndex(x => x.dbKey === l.dbKey);
+    const isComp = !!completed[l.dbKey];
+    const isUnlocked = isAdmin || idx <= 0 || !!completed[currentSubject.lessons[idx - 1].dbKey];
+    const isLocked = !isUnlocked;
 
-  container.innerHTML = currentMonth.weeks.map((w, wIdx) => {
-    let filteredLessons = (w.lessons || []).filter(l => {
-      const key = `${currentMonth.id}-${w.id}-${l.id}`;
-      const isComp = !!completed[key];
-      let isLocked = false;
-      if (!isAdmin) {
-        const globalIdx = globalOrder.indexOf(key);
-        if (globalIdx > 0) {
-          const prevKey = globalOrder[globalIdx - 1];
-          isLocked = !completed[prevKey];
-        }
-      }
+    const isFree = isLessonFree(l.monthId, l.weekId, l.id);
+    const isVipLocked = !isAdmin && !isVipUser && !isFree;
+    const isCurrent = !isComp && isUnlocked && !isVipLocked;
 
-      if (filter === 'completed' && !isComp) return false;
-      if (filter === 'ongoing' && (isComp || isLocked)) return false;
-      if (filter === 'locked' && !isLocked) return false;
-
-      if (searchQ) {
-        const text = `${l.title} ${l.titleKhmer || ''} ${l.description || ''}`.toLowerCase();
-        if (!text.includes(searchQ)) return false;
-      }
-      return true;
-    });
-
-    if (filteredLessons.length === 0 && (filter !== 'all' || searchQ)) {
-      return '';
+    let badgeHTML = '';
+    if (isVipLocked) {
+      badgeHTML = `<span class="lesson-badge-vip-lock">🔒 VIP</span>`;
+    } else if (isComp) {
+      badgeHTML = `<span class="lesson-badge-completed">✓ Completed</span>`;
+    } else if (isCurrent) {
+      badgeHTML = `<span class="lesson-btn-inprogress">▶ In Progress</span>`;
+    } else if (isLocked) {
+      badgeHTML = `<span class="lesson-badge-locked">🔒 Locked</span>`;
+    } else {
+      badgeHTML = `<span class="lesson-badge-ongoing">Ongoing</span>`;
     }
 
-    const lessonsHTML = filteredLessons.map(l => {
-      const key = `${currentMonth.id}-${w.id}-${l.id}`;
-      const isComp = !!completed[key];
-      const isFree = isLessonFree(currentMonth.id, w.id, l.id);
-      const isVipUser = !!(STATE.currentUser?.isVIP);
-      const isVipLocked = !isAdmin && !isVipUser && !isFree;
-
-      let isLocked = false;
-      if (!isAdmin) {
-        const globalIdx = globalOrder.indexOf(key);
-        if (globalIdx > 0) {
-          const prevKey = globalOrder[globalIdx - 1];
-          isLocked = !completed[prevKey];
-        }
+    // Clean title for display: remove repetitive prefix if any
+    let displayTitle = l.title;
+    if (displayTitle.startsWith('មេរៀនទី')) {
+      const parts = displayTitle.split(' - ');
+      if (parts.length > 1) {
+        displayTitle = `មេរៀនទី ${l.lessonNum}៖ ${parts.slice(1).join(' - ')}`;
       }
-      const isCurrent = !isComp && !isLocked && !isVipLocked;
+    } else {
+      displayTitle = `មេរៀនទី ${l.lessonNum}៖ ${l.title}`;
+    }
 
-      let badgeHTML = '';
-      if (isVipLocked) {
-        badgeHTML = `<span class="lesson-badge-vip-lock">🔒 VIP</span>`;
-      } else if (isComp) {
-        badgeHTML = `<span class="lesson-badge-completed">✓ Completed</span>`;
-      } else if (isCurrent) {
-        badgeHTML = `<span class="lesson-btn-inprogress">▶ In Progress</span>`;
-      } else if (isLocked) {
-        badgeHTML = `<span class="lesson-badge-locked">🔒 Locked</span>`;
-      } else {
-        badgeHTML = `<span class="lesson-badge-ongoing">Ongoing</span>`;
-      }
+    const escapedTitle = displayTitle.replace(/'/g, "\\'");
+    const escapedSubject = (currentSubject.title || '').replace(/'/g, "\\'");
 
-      const escapedTitle = (l.title || '').replace(/'/g, "\\'");
-      const escapedMonth = (currentMonth.title || '').replace(/'/g, "\\'");
-      const clickAction = isVipLocked
-        ? `openVipLessonLockModal('${escapedTitle}', '${escapedMonth}')`
-        : (isLocked
-            ? `showToast('🔒 ត្រូវប្រឡងជាប់មេរៀនមុនសិន ទើបអាចរៀននេះបាន!', 'warning')`
-            : `openLesson('${currentMonth.id}', '${w.id}', '${l.id}')`);
-
-      return `
-        <div class="mobile-lesson-card ${isComp ? 'completed' : ''} ${isVipLocked ? 'vip-locked' : (isLocked ? 'locked' : '')}"
-             onclick="${clickAction}">
-          <div class="lesson-card-thumb">
-            <span class="lesson-thumb-emoji">📖</span>
-          </div>
-          <div class="lesson-card-body">
-            <div class="lesson-card-title">${isVipLocked ? '🔒 ' : (isLocked ? '🔒 ' : '')}${l.title}</div>
-            <div class="lesson-card-meta">⏱️ 15 mins ${isFree ? '<span class="text-emerald-400 font-semibold text-[10px] ml-1">● Free Trial</span>' : ''}</div>
-            <div class="lesson-card-desc">${escapeHtml(l.titleKhmer || l.description || 'មេរៀនភាសាអង់គ្លេស')}</div>
-          </div>
-          <div class="lesson-card-right">
-            ${badgeHTML}
-          </div>
-        </div>
-      `;
-    }).join('');
-
-    const isCollapsed = wIdx > 0 && filter === 'all' && !searchQ;
+    const clickAction = isVipLocked
+      ? `openVipLessonLockModal('${escapedTitle}', '${escapedSubject}')`
+      : (isLocked
+          ? `showToast('🔒 ត្រូវប្រឡងជាប់មេរៀនទី ${l.lessonNum - 1} នៃមុខវិជ្ជានេះជាមុនសិន!', 'warning')`
+          : `openLesson('${l.monthId}', '${l.weekId}', '${l.id}')`);
 
     return `
-      <div class="unit-accordion-item ${isCollapsed ? 'collapsed' : ''}" id="unit-${w.id}">
-        <button class="unit-header-btn" onclick="toggleUnitAccordion('unit-${w.id}')">
-          <div class="unit-header-left">
-            <span class="unit-header-icon">📁</span>
-            <div class="unit-header-title-box">
-              <span class="unit-header-title">${w.title}</span>
-              <span class="unit-header-sub">${w.lessons.length} Lessons</span>
-            </div>
-          </div>
-          <div class="unit-header-right">
-            <span class="unit-chevron">▾</span>
-          </div>
-        </button>
-        <div class="unit-lessons-body">
-          ${lessonsHTML || '<p class="text-xs text-muted p-2">មិនមានមេរៀនត្រូវនឹងការស្វែងរកទេ</p>'}
+      <div class="mobile-lesson-card ${isComp ? 'completed' : ''} ${isVipLocked ? 'vip-locked' : (isLocked ? 'locked' : '')}"
+           onclick="${clickAction}">
+        <div class="lesson-card-thumb">
+          <span class="lesson-thumb-emoji">${currentSubject.icon || '📖'}</span>
+        </div>
+        <div class="lesson-card-body">
+          <div class="lesson-card-title">${isVipLocked ? '🔒 ' : (isLocked ? '🔒 ' : '')}${displayTitle}</div>
+          <div class="lesson-card-meta">⏱️ 15 mins • ១០ សំណួរ ${isFree ? '<span class="text-emerald-400 font-semibold text-[10px] ml-1">● Free Trial</span>' : ''}</div>
+          <div class="lesson-card-desc">${escapeHtml(currentSubject.title)} • វគ្គសិក្សាពេញលេញ</div>
+        </div>
+        <div class="lesson-card-right">
+          ${badgeHTML}
         </div>
       </div>
     `;
   }).join('');
+
+  container.innerHTML = examCardHTML + `
+    <div class="subject-lessons-list mt-3">
+      ${lessonsHTML || '<p class="text-xs text-muted p-4 text-center">មិនមានមេរៀនត្រូវនឹងការស្វែងរកទេ</p>'}
+    </div>
+  `;
 }
 
 
@@ -2703,7 +2767,7 @@ async function openLesson(monthId, weekId, lessonId) {
     if (compData) {
       document.getElementById('lessonStatusBadge').textContent = `✅ បានប្រឡងជាប់ - និទ្ទេស ${compData.grade}`;
       document.getElementById('lessonStatusBadge').className = 'badge badge-emerald';
-      if (certBtn) certBtn.classList.remove('hidden');
+      if (certBtn) certBtn.classList.add('hidden'); // Individual lessons do not award certificates
     } else {
       document.getElementById('lessonStatusBadge').textContent = '📖 មេរៀនធម្មតា';
       document.getElementById('lessonStatusBadge').className = 'badge badge-cyan';
@@ -4328,20 +4392,23 @@ async function startCurrentLessonQuiz() {
 
 async function startAnnualExam(subjectKey) {
   try {
-    showToast('⏳ កំពុងរៀបចំវិញ្ញាសាប្រឡងបញ្ចប់មុខវិជ្ជា...', 'info');
+    showToast('⏳ កំពុងរៀបចំវិញ្ញាសាប្រឡងបញ្ចប់មុខវិជ្ជា (៣០ សំណួរ)...', 'info');
     const res = await fetch(`/api/quiz/start?type=annual&subjectKey=${subjectKey}&userId=${STATE.currentUser?.id || ''}`);
     const data = await res.json();
 
     if (!data.success) {
       if (data.isLocked) {
-        showToast(data.error, 'error');
-        navigateTo('vip');
+        showToast(data.error, 'error', 5000);
+        return;
+      }
+      if (data.isVipLocked) {
+        openVipLessonLockModal('ការប្រឡងបញ្ចប់មុខវិជ្ជា');
         return;
       }
       throw new Error(data.error || 'Failed to start annual exam');
     }
 
-    launchQuizEngine(data, 'ANNUAL EXAM');
+    launchQuizEngine(data, 'ANNUAL EXAM (30 Qs)');
   } catch (err) {
     showToast(err.message, 'error');
   }

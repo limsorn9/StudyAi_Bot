@@ -580,27 +580,25 @@ function findNextLesson(curriculum, currentMonthId, currentWeekId, currentLesson
   const lIdx = currentWeek.lessons.findIndex(l => l.id === currentLessonId);
   if (lIdx === -1) return null;
 
-  // 1. Next lesson in same week
-  if (lIdx + 1 < currentWeek.lessons.length) {
-    const nextL = currentWeek.lessons[lIdx + 1];
-    return { monthId: currentMonthId, weekId: currentWeekId, lessonId: nextL.id, lessonTitle: nextL.title, isEnd: false };
-  }
-
-  // 2. First lesson in next week (same month)
+  // Follow subject-based sequential progression (same lessonId across weeks/months)
+  // 1. Next week in same month
   if (wIdx + 1 < currentMonth.weeks.length) {
     const nextW = currentMonth.weeks[wIdx + 1];
-    if (nextW.lessons && nextW.lessons.length > 0) {
-      const nextL = nextW.lessons[0];
+    const nextL = (nextW.lessons || []).find(l => l.id === currentLessonId);
+    if (nextL) {
       return { monthId: currentMonthId, weekId: nextW.id, lessonId: nextL.id, lessonTitle: nextL.title, isEnd: false };
     }
   }
 
-  // 3. First lesson in next month
+  // 2. First week in next month
   if (mIdx + 1 < months.length) {
     const nextM = months[mIdx + 1];
-    if (nextM.weeks && nextM.weeks.length > 0 && nextM.weeks[0].lessons && nextM.weeks[0].lessons.length > 0) {
-      const nextL = nextM.weeks[0].lessons[0];
-      return { monthId: nextM.id, weekId: nextM.weeks[0].id, lessonId: nextL.id, lessonTitle: nextL.title, isEnd: false };
+    if (nextM.weeks && nextM.weeks.length > 0) {
+      const nextW = nextM.weeks[0];
+      const nextL = (nextW.lessons || []).find(l => l.id === currentLessonId);
+      if (nextL) {
+        return { monthId: nextM.id, weekId: nextW.id, lessonId: nextL.id, lessonTitle: nextL.title, isEnd: false };
+      }
     }
   }
 

@@ -2,6 +2,8 @@ const grammarQuizData = require('./grammar_quiz.js');
 const grammarData = require('./grammar_data.js');
 const vocabData = require('./vocab_data.js');
 const irregularVerbs = require('./irregular_verbs.js');
+const { getConversationForWeek } = require('./conversations_data.js');
+const { getSentencePatternForWeek } = require('./sentences_data.js');
 
 // All vocab words pool for wrong answers
 const allVocabWords = [];
@@ -113,8 +115,30 @@ const CONV_QUESTION_BANK = [
   { q: "'Pleased to meet you' has the same meaning as?", c: ["A) Nice to meet you", "B) See you tomorrow", "C) Take care", "D) I don't know you"], a: "A" }
 ];
 
+// Dynamically generate extra conversation questions from 48 weekly dialogues
+function getExtendedConvQuestions() {
+  const extra = [];
+  const labels = ['A', 'B', 'C', 'D'];
+  for (let w = 1; w <= 48; w++) {
+    const c = getConversationForWeek(w);
+    if (c && c.vocab) {
+      c.vocab.forEach(v => {
+        const wrongKh = shuffle(allVocabWords.filter(x => x.kh !== v.kh)).slice(0, 3).map(x => x.kh);
+        const choices = shuffle([v.kh, ...wrongKh]);
+        extra.push({
+          q: `ក្នុងបរិបទសន្ទនាជាក់ស្តែង តើឃ្លា "${v.en}" មានន័យដូចម្តេច?`,
+          c: choices.map((ch, idx) => `${labels[idx]}) ${ch}`),
+          a: labels[choices.indexOf(v.kh)]
+        });
+      });
+    }
+  }
+  return extra;
+}
+
 function generateConversationQuiz(count = 10) {
-  return shuffle(CONV_QUESTION_BANK).slice(0, count);
+  const allConv = [...CONV_QUESTION_BANK, ...getExtendedConvQuestions()];
+  return shuffle(allConv).slice(0, count);
 }
 
 const SENT_QUESTION_BANK = [
@@ -140,8 +164,42 @@ const SENT_QUESTION_BANK = [
   { q: "Choose the correct order: 'She bought a ___ car.'", c: ["A) red beautiful new", "B) beautiful new red", "C) new red beautiful", "D) red new beautiful"], a: "B" }
 ];
 
+// Dynamically generate extra sentence pattern questions from 48 weekly patterns
+function getExtendedSentenceQuestions() {
+  const extra = [];
+  const labels = ['A', 'B', 'C', 'D'];
+  const sampleAlternatives = [
+    'ខ្ញុំចូលចិត្តរៀនភាសាអង់គ្លេសណាស់។',
+    'ពួកយើងទៅសាលារៀនជារៀងរាល់ព្រឹក។',
+    'គាត់ជាមិត្តល្អបំផុតរបស់ខ្ញុំ។',
+    'អាកាសធាតុថ្ងៃនេះស្រស់បំព្រងណាស់។',
+    'គ្រួសាររបស់ខ្ញុំរស់នៅរាជធានីភ្នំពេញ។',
+    'ខ្ញុំចង់ស្វែងរកការងារដែលល្អប្រសើរ។'
+  ];
+  for (let w = 1; w <= 48; w++) {
+    const sp = getSentencePatternForWeek(w);
+    if (sp && sp.patterns) {
+      sp.patterns.forEach(p => {
+        if (p.examples) {
+          p.examples.forEach(ex => {
+            const wrongKh = shuffle(sampleAlternatives.filter(x => x !== ex.kh)).slice(0, 3);
+            const choices = shuffle([ex.kh, ...wrongKh]);
+            extra.push({
+              q: `តើល្បះ "${ex.en}" ប្រែជាភាសាខ្មែរថាដូចម្តេច?`,
+              c: choices.map((ch, idx) => `${labels[idx]}) ${ch}`),
+              a: labels[choices.indexOf(ex.kh)]
+            });
+          });
+        }
+      });
+    }
+  }
+  return extra;
+}
+
 function generateSentenceQuiz(count = 10) {
-  return shuffle(SENT_QUESTION_BANK).slice(0, count);
+  const allSent = [...SENT_QUESTION_BANK, ...getExtendedSentenceQuestions()];
+  return shuffle(allSent).slice(0, count);
 }
 
 /**
@@ -203,57 +261,57 @@ const SUBJECT_EXAMS = {
     id: 'grammar',
     title: 'មុខវិជ្ជា៖ វេយ្យាករណ៍ភាសាអង់គ្លេស (Grammar in Use)',
     shortTitle: 'វេយ្យាករណ៍ (Grammar)',
-    description: 'ការប្រឡងបញ្ចប់មុខវិជ្ជាវេយ្យាករណ៍ប្រចាំឆ្នាំ (២០ សំណួរ)',
+    description: 'ការប្រឡងបញ្ចប់មុខវិជ្ជាវេយ្យាករណ៍ប្រចាំឆ្នាំ (៣០ សំណួរ)',
     icon: '📘'
   },
   conversation: {
     id: 'conversation',
     title: 'មុខវិជ្ជា៖ ការសន្ទនា និងទំនាក់ទំនង (Conversation & Speaking)',
     shortTitle: 'សន្ទនា (Conversation)',
-    description: 'ការប្រឡងបញ្ចប់មុខវិជ្ជាសន្ទនាប្រចាំឆ្នាំ (២០ សំណួរ)',
+    description: 'ការប្រឡងបញ្ចប់មុខវិជ្ជាសន្ទនាប្រចាំឆ្នាំ (៣០ សំណួរ)',
     icon: '🗣️'
   },
   vocabulary: {
     id: 'vocabulary',
     title: 'មុខវិជ្ជា៖ វាក្យសព្ទ និងឃ្លាទូទៅ (Vocabulary & Idioms)',
     shortTitle: 'វាក្យសព្ទ (Vocabulary)',
-    description: 'ការប្រឡងបញ្ចប់មុខវិជ្ជាវាក្យសព្ទប្រចាំឆ្នាំ (២០ សំណួរ)',
+    description: 'ការប្រឡងបញ្ចប់មុខវិជ្ជាវាក្យសព្ទប្រចាំឆ្នាំ (៣០ សំណួរ)',
     icon: '📖'
   },
   verbs: {
     id: 'verbs',
     title: 'មុខវិជ្ជា៖ កិរិយាសព្ទ និងកិរិយាសព្ទមិនប្រក្រតី (Verbs & Irregular Verbs)',
     shortTitle: 'កិរិយាសព្ទ (Verbs)',
-    description: 'ការប្រឡងបញ្ចប់មុខវិជ្ជាកិរិយាសព្ទប្រចាំឆ្នាំ (២០ សំណួរ)',
+    description: 'ការប្រឡងបញ្ចប់មុខវិជ្ជាកិរិយាសព្ទប្រចាំឆ្នាំ (៣០ សំណួរ)',
     icon: '⚡'
   },
   adjectives: {
     id: 'adjectives',
     title: 'មុខវិជ្ជា៖ គុណនាម និងការពិពណ៌នា (Adjectives & Descriptions)',
     shortTitle: 'គុណនាម (Adjectives)',
-    description: 'ការប្រឡងបញ្ចប់មុខវិជ្ជាគុណនាមប្រចាំឆ្នាំ (២០ សំណួរ)',
+    description: 'ការប្រឡងបញ្ចប់មុខវិជ្ជាគុណនាមប្រចាំឆ្នាំ (៣០ សំណួរ)',
     icon: '🎨'
   },
   sentences: {
     id: 'sentences',
     title: 'មុខវិជ្ជា៖ ការបង្កើតល្បះ និងវេយ្យាករណ៍ជាក់ស្ដែង (Sentence Construction)',
     shortTitle: 'ល្បះ (Sentences)',
-    description: 'ការប្រឡងបញ្ចប់មុខវិជ្ជាបង្កើតល្បះប្រចាំឆ្នាំ (២០ សំណួរ)',
+    description: 'ការប្រឡងបញ្ចប់មុខវិជ្ជាបង្កើតល្បះប្រចាំឆ្នាំ (៣០ សំណួរ)',
     icon: '✍️'
   },
   grand: {
     id: 'grand',
     title: 'ការប្រឡងបញ្ចប់កម្មវិធីសិក្សាប្រចាំឆ្នាំទូទៅ (All Subjects Grand Final Exam)',
     shortTitle: 'ប្រឡងបញ្ចប់រួមប្រចាំឆ្នាំ (Grand Exam)',
-    description: 'ការប្រឡងបញ្ចប់គ្រប់មុខវិជ្ជាប្រចាំឆ្នាំរួមគ្នា (២០ សំណួរចម្រុះ)',
+    description: 'ការប្រឡងបញ្ចប់គ្រប់មុខវិជ្ជាប្រចាំឆ្នាំរួមគ្នា (៣០ សំណួរចម្រុះ)',
     icon: '🏆'
   }
 };
 
 /**
- * Generate Annual Subject Final Exam Questions (20 Questions)
+ * Generate Annual Subject Final Exam Questions (30 Questions)
  */
-function generateAnnualSubjectQuiz(curriculum, subjectKey, count = 20) {
+function generateAnnualSubjectQuiz(curriculum, subjectKey, count = 30) {
   if (subjectKey === 'grammar') {
     // Collect all grammar questions from all 48 grammar topics
     const allGrammarQs = [];
@@ -306,15 +364,15 @@ function generateAnnualSubjectQuiz(curriculum, subjectKey, count = 20) {
   }
 
   if (subjectKey === 'grand') {
-    // Pull questions across all subjects: 4 grammar, 3 conv, 3 sentences, 3 verbs, 4 vocab, 3 adj = 20
+    // 5 questions from each of the 6 subjects = 30 questions
     const gQs = [];
     grammarQuizData.forEach(entry => { if (entry.questions) gQs.push(...entry.questions); });
-    const partGrammar = shuffle(gQs).slice(0, 4);
-    const partConv = generateConversationQuiz(3);
-    const partSent = generateSentenceQuiz(3);
-    const partVerbs = generateVerbQuestions(4);
+    const partGrammar = shuffle(gQs).slice(0, 5);
+    const partConv = generateConversationQuiz(5);
+    const partSent = generateSentenceQuiz(5);
+    const partVerbs = generateVerbQuestions(5);
     const partVocab = [];
-    const pool = shuffle(allVocabWords).slice(0, 6);
+    const pool = shuffle(allVocabWords).slice(0, 10);
     pool.forEach(w => {
       const wrongs = shuffle(allVocabWords.filter(x => x.kh !== w.kh)).slice(0, 3).map(x => x.kh);
       const choices = shuffle([w.kh, ...wrongs]);
@@ -325,8 +383,7 @@ function generateAnnualSubjectQuiz(curriculum, subjectKey, count = 20) {
         a: labels[choices.indexOf(w.kh)]
       });
     });
-
-    const combined = [...partGrammar, ...partConv, ...partSent, ...partVerbs, ...partVocab];
+    const combined = [...partGrammar, ...partConv, ...partSent, ...partVerbs, ...partVocab.slice(0, 5), ...shuffle(partVocab).slice(0, 5)];
     return shuffle(combined).slice(0, count);
   }
 
@@ -625,21 +682,34 @@ function generateQuiz(lessonOrCurriculum, monthId, weekId, lessonId) {
     return generateBeginnerQuiz(lesson);
   }
 
-  // Try extracting vocabulary first if available in lesson
-  const vocabQuestions = generateVocabQuiz(content, 'vocab');
-  if (vocabQuestions && vocabQuestions.length >= 4) {
-    return vocabQuestions;
-  }
-
-  if (title.includes('វេយ្យាករណ៍') || title.includes('Grammar') || title.includes('Phonics') || title.includes('អក្សរ')) {
-    return generateGrammarQuiz(content) || generateSentenceQuiz(10);
-  } else if (title.includes('សន្ទនា') || title.includes('Conversation') || title.includes('Greetings')) {
-    return generateConversationQuiz(10);
+  let qResult = [];
+  if (title.includes('សន្ទនា') || title.includes('Conversation') || title.includes('Greetings')) {
+    qResult = generateConversationQuiz(10);
+  } else if (title.includes('វេយ្យាករណ៍') || title.includes('Grammar') || title.includes('Phonics') || title.includes('អក្សរ')) {
+    qResult = generateGrammarQuiz(content) || generateSentenceQuiz(10);
   } else if (title.includes('ល្បះ') || title.includes('Sentence')) {
-    return generateSentenceQuiz(10);
+    qResult = generateSentenceQuiz(10);
+  } else if (title.includes('កិរិយាសព្ទ') || title.includes('Verb')) {
+    qResult = generateVerbQuestions(10);
+  } else {
+    // Vocab & Adjectives
+    const vocabQuestions = generateVocabQuiz(content, 'vocab');
+    if (vocabQuestions && vocabQuestions.length >= 10) {
+      qResult = vocabQuestions;
+    } else if (vocabQuestions && vocabQuestions.length > 0) {
+      const needed = 10 - vocabQuestions.length;
+      qResult = [...vocabQuestions, ...generateSentenceQuiz(needed)];
+    } else {
+      qResult = generateSentenceQuiz(10);
+    }
   }
 
-  return generateGrammarQuiz(content) || generateSentenceQuiz(10);
+  // Guarantee exactly 10 questions for every standard lesson
+  if (!qResult || qResult.length < 10) {
+    const pad = generateSentenceQuiz(10 - (qResult ? qResult.length : 0));
+    qResult = [...(qResult || []), ...pad];
+  }
+  return qResult.slice(0, 10);
 }
 
 module.exports = {
