@@ -6137,8 +6137,11 @@ function renderAdminStudentsTable(students) {
           <div class="student-table-item">
             <div class="student-table-avatar">${initial}</div>
             <div>
-              <div class="student-name-main">${escapeHtml(s.name)} ${s.khmerName ? `<span class="text-xs text-slate-400">(${escapeHtml(s.khmerName)})</span>` : ''}</div>
-              <div class="student-name-sub font-mono">ID: ${escapeHtml(s.id)}</div>
+              <div class="student-name-main font-semibold">${escapeHtml(s.name)} ${s.khmerName && s.khmerName !== s.name ? `<span class="text-xs text-slate-400">(${escapeHtml(s.khmerName)})</span>` : ''}</div>
+              <div class="student-name-sub flex items-center gap-2 flex-wrap">
+                ${s.telegramFullName && s.telegramFullName !== s.name ? `<span class="text-cyan-300 text-[11px] font-medium" title="ឈ្មោះលើ Telegram ពេញ">✈️ ${escapeHtml(s.telegramFullName)}</span>` : ''}
+                <span class="font-mono text-slate-500 text-[11px]">ID: ${escapeHtml(s.id)}</span>
+              </div>
             </div>
           </div>
         </td>
@@ -6301,13 +6304,23 @@ function openAdminEditStudentModal(studentId) {
   if (elId) elId.value = student.id;
   if (elHeaderId) elHeaderId.textContent = `ID: ${student.id}`;
   if (elHeaderName) elHeaderName.textContent = student.name;
+  const elTg = document.getElementById('editStudentTelegramName');
+  if (elTg) {
+    if (student.telegramFullName) {
+      elTg.textContent = `✈️ Telegram: ${student.telegramFullName}`;
+    } else if (student.telegramUsername) {
+      elTg.textContent = `✈️ @${student.telegramUsername.replace('@', '')}`;
+    } else {
+      elTg.textContent = '';
+    }
+  }
   if (elAvatar) elAvatar.textContent = (student.name || 'S').charAt(0).toUpperCase();
   if (elVipBadge) {
     elVipBadge.innerHTML = student.isVIP
       ? `<span class="user-tier-badge vip">💎 VIP (${student.daysRemaining} ថ្ងៃ)</span>`
       : `<span class="user-tier-badge free">Free Account</span>`;
   }
-  if (elName) elName.value = student.name || '';
+  if (elName) elName.value = student.accountName || student.name || '';
   if (elKhmerName) elKhmerName.value = student.khmerName || '';
   if (elPhone) elPhone.value = student.phone || '';
   if (elLevel) elLevel.value = student.courseLevel || 'beginner';
@@ -6540,7 +6553,11 @@ function renderAdminPaymentsTable(payments) {
   tbody.innerHTML = payments.map(p => `
     <tr>
       <td class="text-xs text-slate-400 font-mono">${escapeHtml(p.dateFormatted || new Date(p.timestamp).toLocaleString())}</td>
-      <td class="font-bold text-white font-mono">${escapeHtml(p.userId || 'N/A')}</td>
+      <td>
+        <div class="font-bold text-white text-sm">${escapeHtml(p.studentName || p.userId || 'N/A')}</div>
+        ${p.telegramFullName && p.telegramFullName !== p.studentName ? `<div class="text-[10px] text-cyan-300">✈️ ${escapeHtml(p.telegramFullName)}</div>` : ''}
+        <div class="text-[10px] text-slate-500 font-mono">ID: ${escapeHtml(p.userId || '')}</div>
+      </td>
       <td>
         <span class="badge-level">${escapeHtml(p.action || (p.licenseKey ? 'បញ្ចូល Key' : 'បង់ប្រាក់'))}</span>
       </td>

@@ -573,8 +573,28 @@ bot.action(/tg_auth_deny_(.+)/, async (ctx) => {
 // Apply Group Admin Guard as global middleware (runs before every command/message)
 bot.use(groupAdminGuard);
 
-// Automatically set Mini Web chat menu button at bottom-left for private chats
+// Automatically record Telegram full name & set Mini Web chat menu button
 bot.use(async (ctx, next) => {
+  if (ctx.from?.id && db) {
+    try {
+      const uid = ctx.from.id.toString();
+      const tgFirst = (ctx.from.first_name || '').trim();
+      const tgLast = (ctx.from.last_name || '').trim();
+      const tgFull = [tgFirst, tgLast].filter(Boolean).join(' ').trim();
+      if (tgFull) {
+        // Asynchronously update Telegram names so student's full name is always stored
+        db.ref(`users/${uid}/profile`).update({
+          telegramFullName: tgFull,
+          telegramFirstName: tgFirst,
+          telegramLastName: tgLast,
+          first_name: tgFirst,
+          last_name: tgLast,
+          username: ctx.from.username || ''
+        }).catch(() => {});
+      }
+    } catch (_) {}
+  }
+
   if (ctx.chat?.type === 'private') {
     try {
       ctx.setChatMenuButton({
@@ -590,7 +610,27 @@ bot.use(async (ctx, next) => {
 // Start Command & Curriculum Menu
 bot.start(async (ctx) => {
   const userId = ctx.from.id;
-  const username = ctx.from.first_name || 'Student';
+  const tgFirst = (ctx.from.first_name || '').trim();
+  const tgLast = (ctx.from.last_name || '').trim();
+  const tgFullName = [tgFirst, tgLast].filter(Boolean).join(' ').trim() || ctx.from.username || 'Student';
+
+  // Check if student has an Account Name (ឈ្មោះគណនី)
+  let studentAccountName = null;
+  let existingProf = {};
+  if (db) {
+    try {
+      const pSnap = await db.ref(`users/${userId}/profile`).once('value');
+      existingProf = pSnap.val() || {};
+      studentAccountName = (existingProf.accountName && existingProf.accountName.trim()) ||
+                           (existingProf.khmerName && existingProf.khmerName.trim()) || null;
+      if (!studentAccountName && existingProf.name && existingProf.name !== 'Student' && !existingProf.name.startsWith('User ') && existingProf.hasCustomAccountName) {
+        studentAccountName = existingProf.name.trim();
+      }
+    } catch (_) {}
+  }
+
+  // Final display name: Account Name if set, otherwise Full Telegram Name
+  const username = studentAccountName || tgFullName;
 
   // Ensure bottom-left chat menu button is set to Mini Web App
   if (ctx.chat?.type === 'private') {
@@ -639,11 +679,20 @@ bot.start(async (ctx) => {
   // Handle 1-Click Telegram Auto-Enroll: e.g. /start web_enroll
   if (payload && (payload === 'web_enroll' || payload === 'enroll' || payload.startsWith('web_enroll'))) {
     if (db) {
-      await db.ref(`users/${userId}/profile`).update({
-        name: username,
+      const enrollProfUpdate = {
+        first_name: tgFirst,
+        last_name: tgLast,
+        telegramFirstName: tgFirst,
+        telegramLastName: tgLast,
+        telegramFullName: tgFullName,
+        username: ctx.from.username || '',
         registeredAt: Date.now(),
         isTelegram: true
-      });
+      };
+      if (!studentAccountName) {
+        enrollProfUpdate.name = tgFullName;
+      }
+      await db.ref(`users/${userId}/profile`).update(enrollProfUpdate);
     }
 
     const syncCode = Math.floor(100000 + Math.random() * 900000).toString();
@@ -687,10 +736,21 @@ bot.start(async (ctx) => {
     );
   }
 
-  await db.ref(`users/${userId}/profile`).update({
-    name: username,
-    registeredAt: Date.now()
-  });
+  if (db) {
+    const startProfUpdate = {
+      first_name: tgFirst,
+      last_name: tgLast,
+      telegramFirstName: tgFirst,
+      telegramLastName: tgLast,
+      telegramFullName: tgFullName,
+      username: ctx.from.username || '',
+      registeredAt: Date.now()
+    };
+    if (!studentAccountName) {
+      startProfUpdate.name = tgFullName;
+    }
+    await db.ref(`users/${userId}/profile`).update(startProfUpdate);
+  }
 
   // Send the persistent menu first
   await ctx.reply(`សួស្តី ${username}! ស្វាគមន៍មកកាន់ប្រព័ន្ធសិក្សាភាសាអង់គ្លេសខ្នាតស្តង់ដារ ១២ ខែ 📚`, mainMenuKeyboard);
@@ -2159,11 +2219,11 @@ async function handleQuizSubmission(ctx, userId) {
 
   // IF PASSED (Grade A, B, C): Mark Completed & Issue Certificate
   if (isPassed) {
-    const studentName = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ') || `សិស្ស ID ${userId}`;
+    let studentName = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ').trim() || `សិស្ស ID ${userId}`;
     let certId = Math.random().toString(36).substring(2, 8).toUpperCase();
     const dateStr = new Date().toLocaleDateString('km-KH');
 
-    // Fetch profile for khmerName & photo
+    // Fetch profile for accountName, khmerName & photo
     let khmerName = null;
     let photoUrl = null;
     if (db) {
@@ -2172,6 +2232,13 @@ async function handleQuizSubmission(ctx, userId) {
         const prof = profSnap.val() || {};
         khmerName = prof.khmerName || null;
         photoUrl = prof.photoUrl || prof.avatar || null;
+        if (prof.accountName && prof.accountName.trim()) {
+          studentName = prof.accountName.trim();
+        } else if (khmerName) {
+          studentName = khmerName;
+        } else if (prof.name && prof.name.trim() && !prof.name.startsWith('User ') && prof.name !== 'Student') {
+          studentName = prof.name.trim();
+        }
       } catch (e) { console.error('Profile fetch for cert:', e.message); }
     }
 
@@ -2480,12 +2547,12 @@ async function handleCertificateVerification(ctx, rawCertId) {
  * and delivers them to the student on Telegram.
  */
 async function refreshAndSendCertificate(ctx, userId, certInfo) {
-  const currentStudentName = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ') || `សិស្ស ID ${userId}`;
+  let currentStudentName = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ').trim() || `សិស្ស ID ${userId}`;
   const certId = certInfo.certId || Math.random().toString(36).substring(2, 8).toUpperCase();
   const dateStr = certInfo.dateStr || new Date().toLocaleDateString('km-KH');
   const titleText = certInfo.title || certInfo.subjectTitle || certInfo.lessonTitle || (certInfo.isAnnualExam ? 'ការប្រឡងបញ្ចប់មុខវិជ្ជាប្រចាំឆ្នាំ' : 'វិញ្ញាបនបត្របញ្ចប់មេរៀន');
 
-  // Fetch profile for khmerName & photo
+  // Fetch profile for accountName, khmerName & photo
   let khmerName = null;
   let photoUrl = null;
   if (db) {
@@ -2494,6 +2561,13 @@ async function refreshAndSendCertificate(ctx, userId, certInfo) {
       const prof = profSnap.val() || {};
       khmerName = prof.khmerName || certInfo.khmerName || null;
       photoUrl = prof.photoUrl || prof.avatar || certInfo.photoUrl || null;
+      if (prof.accountName && prof.accountName.trim()) {
+        currentStudentName = prof.accountName.trim();
+      } else if (khmerName) {
+        currentStudentName = khmerName;
+      } else if (prof.name && prof.name.trim() && !prof.name.startsWith('User ') && prof.name !== 'Student') {
+        currentStudentName = prof.name.trim();
+      }
     } catch (e) { console.error('refreshCert profile fetch:', e.message); }
   }
 
@@ -3721,8 +3795,24 @@ bot.on('photo', async (ctx) => {
 
   await ctx.reply("✅ វិក្កយបត្ររបស់អ្នកត្រូវបានបញ្ជូនទៅកាន់ Admin រួចរាល់! សូមរង់ចាំការពិនិត្យយល់ព្រមបន្តិចណា៎។");
 
+  let studentDisplayName = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ').trim() || ctx.from.username || `User ${userId}`;
+  if (db) {
+    try {
+      const profSnap = await db.ref(`users/${userId}/profile`).once('value');
+      const prof = profSnap.val() || {};
+      if (prof.accountName && prof.accountName.trim()) {
+        studentDisplayName = prof.accountName.trim();
+      } else if (prof.khmerName && prof.khmerName.trim()) {
+        studentDisplayName = prof.khmerName.trim();
+      } else if (prof.name && prof.name.trim() && !prof.name.startsWith('User ') && prof.name !== 'Student') {
+        studentDisplayName = prof.name.trim();
+      }
+    } catch (_) {}
+  }
+
+  const tgFull = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ').trim();
   const caption = `🧾 **វិក្កយបត្រថ្មីពីសិស្ស!**
-👤 ឈ្មោះ៖ ${ctx.from.first_name || 'No Name'}
+👤 ឈ្មោះ៖ ${studentDisplayName}${tgFull && tgFull !== studentDisplayName ? `\n✈️ Telegram: ${tgFull}` : ''}
 🆔 ID៖ \`${userId}\`
 
 តើអ្នកចង់អនុម័តប៉ុន្មានខែ?`;

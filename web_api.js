@@ -52,6 +52,57 @@ function parseDeviceName(userAgent) {
 }
 
 /**
+ * Resolves student display name strictly following:
+ * 1. Account Name (ឈ្មោះគណនី) - explicit accountName, khmerName, or custom profile name
+ * 2. Full Telegram Name (ឈ្មោះលើតេលេក្រាមពេញ) - first_name + last_name
+ * 3. Fallback: Telegram @username or ID
+ */
+function resolveStudentDisplayName(prof = {}, udata = {}) {
+  // 1. Explicit Account Name (ឈ្មោះគណនី)
+  const explicitAccountName = (prof.accountName && prof.accountName.trim()) ||
+                              (prof.khmerName && prof.khmerName.trim());
+  if (explicitAccountName) {
+    return explicitAccountName;
+  }
+
+  // Telegram names
+  const tgFirst = (prof.first_name || prof.telegramFirstName || udata.first_name || '').trim();
+  const tgLast = (prof.last_name || prof.telegramLastName || udata.last_name || '').trim();
+  const tgFullName = (prof.telegramFullName || [tgFirst, tgLast].filter(Boolean).join(' ') || '').trim();
+
+  const rawName = (prof.name || '').trim();
+  const isDefaultPlaceholder = !rawName || rawName === 'Student' || rawName.startsWith('User ') || rawName.startsWith('សិស្ស #') || rawName.startsWith('សិស្ស ID');
+
+  // If student was registered by phone / admin or edited their profile name
+  if ((prof.hasCustomAccountName || prof.isPhoneRegistration || prof.registeredBy) && rawName && !isDefaultPlaceholder) {
+    return rawName;
+  }
+
+  // If rawName is set and different from just the truncated first name, treat as custom Account Name
+  if (rawName && !isDefaultPlaceholder && tgFirst && rawName !== tgFirst && rawName !== tgFullName) {
+    return rawName;
+  }
+
+  // 2. Full Telegram Name (ឈ្មោះលើតេលេក្រាមពេញ)
+  if (tgFullName) {
+    return tgFullName;
+  }
+
+  // If rawName is not a placeholder
+  if (rawName && !isDefaultPlaceholder) {
+    return rawName;
+  }
+
+  // 3. Fallback: Telegram @username
+  const username = (prof.username || udata.username || '').trim();
+  if (username) {
+    return username.startsWith('@') ? username : `@${username}`;
+  }
+
+  return 'សិស្សទូទៅ';
+}
+
+/**
  * Creates the Express Web API Router
  */
 function createWebAPIRouter({ db, auth, curriculum, bot, SUPER_ADMIN_IDS, checkVIP, checkYearlyVIP, getNextGroqKey, getNextGeminiKey }) {
@@ -507,15 +558,32 @@ Provide practical English pronunciation coaching:
       }
 
       const userId = id.toString();
-      const displayName = [first_name, last_name].filter(Boolean).join(' ') || username || `User ${userId}`;
+      const tgFirstName = (first_name || '').trim();
+      const tgLastName = (last_name || '').trim();
+      const tgFullName = [tgFirstName, tgLastName].filter(Boolean).join(' ').trim() || username || `User ${userId}`;
 
       if (db) {
-        await db.ref(`users/${userId}/profile`).update({
-          name: displayName,
-          username: username || '',
+        // Read existing profile to preserve Account Name if previously set
+        const existingSnap = await db.ref(`users/${userId}/profile`).once('value');
+        const existingProf = existingSnap.val() || {};
+
+        const updateData = {
+          first_name: tgFirstName,
+          last_name: tgLastName,
+          telegramFirstName: tgFirstName,
+          telegramLastName: tgLastName,
+          telegramFullName: tgFullName,
+          username: username || existingProf.username || '',
           lastWebLogin: Date.now(),
           isTelegram: true
-        });
+        };
+
+        // Only update 'name' if no custom accountName was set
+        if (!existingProf.accountName && !existingProf.khmerName && !existingProf.hasCustomAccountName) {
+          updateData.name = tgFullName;
+        }
+
+        await db.ref(`users/${userId}/profile`).update(updateData);
       }
 
       const isVIP = await checkVIPCrossLinked(userId);
@@ -524,21 +592,25 @@ Provide practical English pronunciation coaching:
       let completedLessons = {};
       let subjectCerts = {};
       let profile = {};
+      let userData = {};
       if (db) {
         const snap = await db.ref(`users/${userId}`).once('value');
-        const data = snap.val() || {};
-        completedLessons = data.completed_lessons || {};
-        subjectCerts = data.subject_certifications || {};
-        profile = data.profile || {};
+        userData = snap.val() || {};
+        completedLessons = userData.completed_lessons || {};
+        subjectCerts = userData.subject_certifications || {};
+        profile = userData.profile || {};
       }
 
       const session = await createDeviceSession(userId, deviceId, userAgent || req.headers['user-agent'], req.ip);
+      const resolvedName = resolveStudentDisplayName(profile, userData);
 
       return res.json({
         success: true,
         user: {
           id: userId,
-          name: profile.name || displayName,
+          name: resolvedName,
+          accountName: profile.accountName || profile.khmerName || null,
+          telegramFullName: tgFullName,
           username: username || profile.username || '',
           khmerName: profile.khmerName || null,
           photoUrl: profile.photoUrl || profile.avatar || null,
@@ -2101,6 +2173,11 @@ Provide practical English pronunciation coaching:
       const isVIP = checkVIP ? await checkVIP(userId) : false;
       const yearly = checkYearlyVIP ? await checkYearlyVIP(userId) : { eligible: false };
 
+      const resolvedName = resolveStudentDisplayName(profile, data);
+      const tgFirst = (profile.first_name || profile.telegramFirstName || data.first_name || '').trim();
+      const tgLast = (profile.last_name || profile.telegramLastName || data.last_name || '').trim();
+      const tgFullName = (profile.telegramFullName || [tgFirst, tgLast].filter(Boolean).join(' ') || '').trim();
+
       // Calculate total quiz points
       let totalQuizScore = 0;
       let totalPossible = 0;
@@ -2113,7 +2190,9 @@ Provide practical English pronunciation coaching:
         success: true,
         profile: {
           id: userId,
-          name: profile.name || `សិស្ស ID ${userId}`,
+          name: resolvedName,
+          accountName: profile.accountName || profile.khmerName || null,
+          telegramFullName: tgFullName,
           khmerName: profile.khmerName || null,
           photoUrl: profile.photoUrl || profile.avatar || null,
           phone: profile.phone || null,
@@ -2140,14 +2219,17 @@ Provide practical English pronunciation coaching:
 
   router.post('/user/profile/update', async (req, res) => {
     try {
-      const { userId, name, khmerName, photoUrl, phone } = req.body;
+      const { userId, name, accountName, khmerName, photoUrl, phone } = req.body;
       if (!userId) return res.status(400).json({ error: 'Missing userId' });
-      if (!name || !name.trim()) return res.status(400).json({ error: 'សូមបញ្ចូលឈ្មោះពេញរបស់សិស្ស' });
+      const customName = (accountName || name || '').trim();
+      if (!customName) return res.status(400).json({ error: 'សូមបញ្ចូលឈ្មោះពេញរបស់សិស្ស' });
 
       if (!db) return res.status(500).json({ error: 'Database disconnected' });
 
       const updates = {
-        name: name.trim(),
+        name: customName,
+        accountName: customName,
+        hasCustomAccountName: true,
         updatedAt: Date.now()
       };
       if (khmerName !== undefined) updates.khmerName = (khmerName || '').trim();
@@ -2164,7 +2246,8 @@ Provide practical English pronunciation coaching:
         message: 'បានរក្សាទុកព័ត៌មាន និងរូបថតសិស្សដោយជោគជ័យ!',
         user: {
           id: userId,
-          name: updatedProfile.name || name.trim(),
+          name: updatedProfile.accountName || updatedProfile.name || customName,
+          accountName: updatedProfile.accountName || customName,
           khmerName: updatedProfile.khmerName || null,
           photoUrl: updatedProfile.photoUrl || null,
           phone: updatedProfile.phone || null
@@ -3629,7 +3712,12 @@ Provide practical English pronunciation coaching:
         const isVIP = !!(sub && sub.expiresAt && sub.expiresAt > now && sub.status !== 'revoked');
         const daysRemaining = isVIP ? Math.max(0, Math.floor((sub.expiresAt - now) / (1000 * 60 * 60 * 24))) : 0;
 
-        const name = prof.name || prof.username || (prof.khmerName ? `${prof.khmerName}` : `សិស្ស #${uid}`);
+        const tgFirst = (prof.first_name || prof.telegramFirstName || udata.first_name || '').trim();
+        const tgLast = (prof.last_name || prof.telegramLastName || udata.last_name || '').trim();
+        const telegramFullName = (prof.telegramFullName || [tgFirst, tgLast].filter(Boolean).join(' ') || '').trim();
+        const displayName = resolveStudentDisplayName(prof, udata);
+        const accountName = (prof.accountName || prof.khmerName || (displayName !== telegramFullName ? displayName : '')).trim();
+
         const phone = prof.phone || (uid.startsWith('p_') ? uid.replace('p_', '') : '');
         const email = prof.email || '';
         const courseLevel = prof.courseLevel || 'beginner';
@@ -3643,10 +3731,12 @@ Provide practical English pronunciation coaching:
         if (search) {
           const match = (
             uid.toLowerCase().includes(search) ||
-            name.toLowerCase().includes(search) ||
+            displayName.toLowerCase().includes(search) ||
+            telegramFullName.toLowerCase().includes(search) ||
             phone.toLowerCase().includes(search) ||
             email.toLowerCase().includes(search) ||
-            (prof.khmerName || '').toLowerCase().includes(search)
+            (prof.khmerName || '').toLowerCase().includes(search) ||
+            (prof.username || '').toLowerCase().includes(search)
           );
           if (!match) continue;
         }
@@ -3656,7 +3746,10 @@ Provide practical English pronunciation coaching:
 
         students.push({
           id: uid,
-          name: name,
+          name: displayName,
+          accountName: accountName,
+          telegramFullName: telegramFullName,
+          telegramUsername: prof.username || '',
           khmerName: prof.khmerName || '',
           phone: phone,
           email: email,
@@ -3742,6 +3835,9 @@ Provide practical English pronunciation coaching:
       // Update / Create user record
       const studentProfile = {
         name: name.trim(),
+        accountName: name.trim(),
+        hasCustomAccountName: true,
+        isPhoneRegistration: true,
         phone: cleanPhone,
         courseLevel: courseLevel || 'beginner',
         role: 'student',
@@ -3785,6 +3881,7 @@ Provide practical English pronunciation coaching:
         student: {
           id: studentId,
           name: name.trim(),
+          accountName: name.trim(),
           phone: cleanPhone,
           courseLevel: courseLevel || 'beginner',
           loginCode: loginCode,
@@ -3839,11 +3936,16 @@ Provide practical English pronunciation coaching:
       if (!adminId) return;
       if (!db) return res.status(500).json({ error: 'Database disconnected' });
 
-      const { studentId, name, khmerName, phone, courseLevel, notes, isBlocked } = req.body;
+      const { studentId, name, accountName, khmerName, phone, courseLevel, notes, isBlocked } = req.body;
       if (!studentId) return res.status(400).json({ error: 'Missing studentId' });
 
       const updates = {};
-      if (name !== undefined) updates.name = name.trim();
+      const newAccName = (accountName || name || '').trim();
+      if (newAccName) {
+        updates.name = newAccName;
+        updates.accountName = newAccName;
+        updates.hasCustomAccountName = true;
+      }
       if (khmerName !== undefined) updates.khmerName = khmerName.trim();
       if (phone !== undefined) updates.phone = phone.trim();
       if (courseLevel !== undefined) updates.courseLevel = courseLevel;
@@ -3892,22 +3994,51 @@ Provide practical English pronunciation coaching:
       if (!adminId) return;
       if (!db) return res.status(500).json({ error: 'Database disconnected' });
 
-      const logsSnap = await db.ref('payments_log').limitToLast(100).once('value');
-      const logsVal = logsSnap.val() || {};
-      const payments = Object.entries(logsVal).map(([id, item]) => ({
-        id,
-        ...item,
-        dateFormatted: formatCambodiaTime(item.timestamp)
-      })).reverse();
+      const [logsSnap, receiptsSnap, usersSnap] = await Promise.all([
+        db.ref('payments_log').limitToLast(100).once('value'),
+        db.ref('receipts').limitToLast(50).once('value'),
+        db.ref('users').once('value')
+      ]);
 
-      // Also fetch receipts if any
-      const receiptsSnap = await db.ref('receipts').limitToLast(50).once('value');
+      const logsVal = logsSnap.val() || {};
       const receiptsVal = receiptsSnap.val() || {};
-      const receipts = Object.entries(receiptsVal).map(([id, item]) => ({
-        id,
-        ...item,
-        dateFormatted: formatCambodiaTime(item.timestamp)
-      })).reverse();
+      const allUsers = usersSnap.val() || {};
+
+      const payments = Object.entries(logsVal).map(([id, item]) => {
+        const u = allUsers[item.userId] || {};
+        const prof = u.profile || {};
+        const studentName = resolveStudentDisplayName(prof, u);
+        const tgFirst = (prof.first_name || prof.telegramFirstName || u.first_name || '').trim();
+        const tgLast = (prof.last_name || prof.telegramLastName || u.last_name || '').trim();
+        const tgFullName = (prof.telegramFullName || [tgFirst, tgLast].filter(Boolean).join(' ') || '').trim();
+
+        return {
+          id,
+          ...item,
+          studentName,
+          telegramFullName: tgFullName,
+          studentPhone: prof.phone || (item.userId?.startsWith('p_') ? item.userId.replace('p_', '') : ''),
+          dateFormatted: formatCambodiaTime(item.timestamp)
+        };
+      }).reverse();
+
+      const receipts = Object.entries(receiptsVal).map(([id, item]) => {
+        const u = allUsers[item.userId] || {};
+        const prof = u.profile || {};
+        const studentName = resolveStudentDisplayName(prof, u);
+        const tgFirst = (prof.first_name || prof.telegramFirstName || u.first_name || '').trim();
+        const tgLast = (prof.last_name || prof.telegramLastName || u.last_name || '').trim();
+        const tgFullName = (prof.telegramFullName || [tgFirst, tgLast].filter(Boolean).join(' ') || '').trim();
+
+        return {
+          id,
+          ...item,
+          studentName,
+          telegramFullName: tgFullName,
+          studentPhone: prof.phone || (item.userId?.startsWith('p_') ? item.userId.replace('p_', '') : ''),
+          dateFormatted: formatCambodiaTime(item.timestamp)
+        };
+      }).reverse();
 
       res.json({ success: true, payments, receipts });
     } catch (err) {
