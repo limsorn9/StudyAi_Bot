@@ -26,22 +26,31 @@ function getGradeTitle(grade) {
  * Generate Telegram Markdown Certificate Card
  */
 function generateCertificateCard(data) {
-  const { studentName, userId, grade, score, total, percent, dateStr, certId, isAnnualExam, isBeginnerFinal } = data;
+  const { studentName, userId, grade, score, total, percent, dateStr, certId, isAnnualExam, isBeginnerFinal, isElementaryExam, isElementaryFinal } = data;
   const certTitle = data.title || data.lessonTitle || 'ភាសាអង់គ្លេស';
   const gradeTitle = getGradeTitle(grade);
-  const examType = isBeginnerFinal
-    ? '🎓 ការប្រឡងបញ្ចប់ថ្នាក់ដំបូង (Beginner Final Exam)'
-    : (isAnnualExam ? '🏆 ការប្រឡងបញ្ចប់មុខវិជ្ជាប្រចាំឆ្នាំ' : '📚 ការប្រឡងបញ្ចប់មេរៀន');
-  const certType = isBeginnerFinal
-    ? 'វិញ្ញាបនបត្របញ្ចប់ការសិក្សា ថ្នាក់ដំបូង (A-Z)'
-    : (isAnnualExam ? 'វិញ្ញាបនបត្របញ្ចប់មុខវិជ្ជាប្រចាំឆ្នាំ' : 'វិញ្ញាបនបត្របញ្ចប់មេរៀនជោគជ័យ');
+  const examType = isElementaryFinal
+    ? '🎓 ការប្រឡងបញ្ចប់វគ្គបឋមសិក្សា (Elementary Level Graduation Exam)'
+    : (isElementaryExam
+      ? `🏆 ការប្រឡងបញ្ចប់ខែទី ${data.examMonth || 1} ថ្នាក់បឋមសិក្សា`
+      : (isBeginnerFinal
+        ? '🎓 ការប្រឡងបញ្ចប់ថ្នាក់ដំបូង (Beginner Final Exam)'
+        : (isAnnualExam ? '🏆 ការប្រឡងបញ្ចប់មុខវិជ្ជាប្រចាំឆ្នាំ' : '📚 ការប្រឡងបញ្ចប់មេរៀន')));
+  const certType = isElementaryFinal
+    ? 'វិញ្ញាបនបត្របញ្ចប់ការសិក្សា ថ្នាក់បឋមសិក្សា (Elementary Level)'
+    : (isElementaryExam
+      ? `វិញ្ញាបនបត្របញ្ចប់ការសិក្សា ប្រចាំខែទី ${data.examMonth || 1} ថ្នាក់បឋមសិក្សា`
+      : (isBeginnerFinal
+        ? 'វិញ្ញាបនបត្របញ្ចប់ការសិក្សា ថ្នាក់ដំបូង (A-Z)'
+        : (isAnnualExam ? 'វិញ្ញាបនបត្របញ្ចប់មុខវិជ្ជាប្រចាំឆ្នាំ' : 'វិញ្ញាបនបត្របញ្ចប់មេរៀនជោគជ័យ')));
 
   const baseUrl = process.env.RENDER_EXTERNAL_URL || process.env.BASE_URL || '';
   const botUser = process.env.TELEGRAM_BOT_USERNAME || 'StudyAiEngKH_bot';
   const verifyWebUrl = baseUrl ? `${baseUrl}/cert/${certId}` : null;
   const verifyTgUrl = `https://t.me/${botUser}?start=verify_${certId}`;
 
-  const instructorName = isBeginnerFinal ? 'អ្នកគ្រូ ពិសិដ្ឋ (Teacher Piseth AI)' : `@${botUser}`;
+  const isPiseth = isBeginnerFinal || isElementaryExam || isElementaryFinal;
+  const instructorName = isPiseth ? 'អ្នកគ្រូ ពិសិដ្ឋ (Teacher Piseth AI)' : (data.instructor || `@${botUser}`);
 
   return (
     `╔════════════════════════════════════════════╗\n` +
@@ -76,11 +85,18 @@ async function generateCertificateHTML(data) {
   const certTitle = data.title || data.lessonTitle || 'ភាសាអង់គ្លេស';
   const gradeTitle = getGradeTitle(grade);
   const isBeginnerFinal = data.isBeginnerFinal || false;
-  const certSubheading = isBeginnerFinal
-    ? 'CERTIFICATE OF GRADUATION – BEGINNER FOUNDATION (A-Z)'
-    : (isAnnualExam
-      ? 'ANNUAL SUBJECT FINAL EXAMINATION CERTIFICATE'
-      : 'CERTIFICATE OF ACHIEVEMENT & COMPLETION');
+  const isElementaryFinal = data.isElementaryFinal || false;
+  const isElementaryExam = data.isElementaryExam || false;
+  const isPiseth = isBeginnerFinal || isElementaryExam || isElementaryFinal;
+  const certSubheading = isElementaryFinal
+    ? 'CERTIFICATE OF GRADUATION – ELEMENTARY ENGLISH LEVEL'
+    : (isElementaryExam
+      ? `CERTIFICATE OF ACHIEVEMENT – ELEMENTARY MONTH ${data.examMonth || 1}`
+      : (isBeginnerFinal
+        ? 'CERTIFICATE OF GRADUATION – BEGINNER FOUNDATION (A-Z)'
+        : (isAnnualExam
+          ? 'ANNUAL SUBJECT FINAL EXAMINATION CERTIFICATE'
+          : 'CERTIFICATE OF ACHIEVEMENT & COMPLETION')));
 
   let finalStudentName = studentName;
   if (data.khmerName && data.khmerName.trim() && studentName && data.khmerName.trim() !== studentName.trim()) {
@@ -496,7 +512,7 @@ async function generateCertificateHTML(data) {
           <div class="cert-line-2">សូមប្រគល់ជូនសិស្សឈ្មោះ</div>
           <div class="stu-name">${finalStudentName}</div>
           <p class="achieve">
-            បានប្រឡងបញ្ចប់ដោយជោគជ័យ${isBeginnerFinal ? 'នូវវគ្គបណ្តុះបណ្តាលភាសាអង់គ្លេសកម្រិតដំបូង (English for Children - A to Z)' : (isAnnualExam ? 'នូវការប្រឡងបញ្ចប់មុខវិជ្ជាប្រចាំឆ្នាំ' : 'នូវវគ្គបណ្តុះបណ្តាល')}<br>
+            បានប្រឡងបញ្ចប់ដោយជោគជ័យ${isElementaryFinal ? 'នូវវគ្គបណ្តុះបណ្តាលភាសាអង់គ្លេសកម្រិតបឋមសិក្សា (Elementary Level - 72 Lessons)' : (isElementaryExam ? `នូវការប្រឡងប្រចាំខែទី ${data.examMonth || 1} ថ្នាក់បឋមសិក្សា (Elementary Level)` : (isBeginnerFinal ? 'នូវវគ្គបណ្តុះបណ្តាលភាសាអង់គ្លេសកម្រិតដំបូង (English for Children - A to Z)' : (isAnnualExam ? 'នូវការប្រឡងបញ្ចប់មុខវិជ្ជាប្រចាំឆ្នាំ' : 'នូវវគ្គបណ្តុះបណ្តាល')))}<br>
             <span class="subj-red">「 ${certTitle} 」</span>
           </p>
           <p class="official-decree-note">
@@ -518,7 +534,8 @@ async function generateCertificateHTML(data) {
             <!-- Center note -->
             <div class="footer-center">
               <p class="cert-legal-text">
-                វិញ្ញាបនបត្រផ្លូវការចេញដោយ<br>Teacher SSOnline English Institute
+                វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline<br>
+                ${isPiseth ? 'គ្រូបង្រៀន៖ អ្នកគ្រូ ពិសិដ្ឋ (Teacher Piseth AI)' : 'គ្រូបង្រៀន៖ គ្រូសន (Teacher Sorn AI)'}
               </p>
               <div class="cert-code-pill">
                 TMS-SSO-${now.getFullYear()}-${certId}

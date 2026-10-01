@@ -454,6 +454,148 @@ function generateBeginnerFinalExam() {
   return questions;
 }
 
+function generateElementaryLessonQuiz(lesson) {
+  const questions = [];
+  const vocab = lesson.vocab || [];
+  const sentences = lesson.sentences || [];
+
+  // Question 1: Vocab En -> Kh
+  if (vocab.length > 0) {
+    const v1 = vocab[0];
+    const wrong = shuffle(allVocabWords.filter(w => w.kh !== v1.kh)).slice(0, 3).map(w => w.kh);
+    const opts = shuffle([v1.kh, ...wrong]);
+    questions.push({
+      question: `ពាក្យ "${v1.en}" ប្រែជាភាសាខ្មែរថាអ្វី?`,
+      options: opts,
+      correct: opts.indexOf(v1.kh),
+      answer: v1.kh,
+      explanation: `"${v1.en}" ប្រែថា "${v1.kh}"។ ឧទាហរណ៍៖ ${v1.exEn || ''}`
+    });
+  }
+
+  // Question 2: Vocab Kh -> En
+  if (vocab.length > 1) {
+    const v2 = vocab[1];
+    const wrong = shuffle(allVocabWords.filter(w => w.eng.toLowerCase() !== v2.en.toLowerCase())).slice(0, 3).map(w => w.eng);
+    const opts = shuffle([v2.en, ...wrong]);
+    questions.push({
+      question: `ពាក្យ "${v2.kh}" ជាភាសាអង់គ្លេសសរសេរដូចម្តេច?`,
+      options: opts,
+      correct: opts.indexOf(v2.en),
+      answer: v2.en,
+      explanation: `"${v2.kh}" ជាភាសាអង់គ្លេសគឺ "${v2.en}" (${v2.ipa || ''})។`
+    });
+  }
+
+  // Question 3: More vocab or sentence meaning
+  if (vocab.length > 2) {
+    const v3 = vocab[Math.floor(Math.random() * (vocab.length - 2)) + 2];
+    const wrong = shuffle(allVocabWords.filter(w => w.kh !== v3.kh)).slice(0, 3).map(w => w.kh);
+    const opts = shuffle([v3.kh, ...wrong]);
+    questions.push({
+      question: `តើពាក្យ "${v3.en}" មានន័យដូចម្តេចជាភាសាខ្មែរ?`,
+      options: opts,
+      correct: opts.indexOf(v3.kh),
+      answer: v3.kh,
+      explanation: `"${v3.en}" មានន័យថា "${v3.kh}"។`
+    });
+  }
+
+  // Question 4: Sentence translation
+  if (sentences.length > 0) {
+    const s1 = sentences[0];
+    const otherKh = [
+      'ខ្ញុំចូលចិត្តរៀនភាសាអង់គ្លេសណាស់។',
+      'ពួកយើងទៅសាលារៀនជារៀងរាល់ព្រឹក។',
+      'គាត់ជាមិត្តល្អបំផុតរបស់ខ្ញុំ។',
+      'អាកាសធាតុថ្ងៃនេះស្រស់បំព្រងណាស់។',
+      'គ្រួសាររបស់ខ្ញុំរស់នៅរាជធានីភ្នំពេញ។'
+    ];
+    const wrongS = shuffle(otherKh.filter(x => x !== s1.kh)).slice(0, 3);
+    const opts = shuffle([s1.kh, ...wrongS]);
+    questions.push({
+      question: `ល្បះ "${s1.en}" មានន័យជាភាសាខ្មែរដូចម្តេច?`,
+      options: opts,
+      correct: opts.indexOf(s1.kh),
+      answer: s1.kh,
+      explanation: `"${s1.en}" = "${s1.kh}"`
+    });
+  }
+
+  return questions.length > 0 ? questions : generateSentenceQuiz(5);
+}
+
+function generateElementaryExam(monthNum) {
+  const elementaryCourse = require('./elementary_curriculum.js');
+  let targetLessons = [];
+  if (monthNum === 1) {
+    const m = elementaryCourse.months.find(m => m.id === 'em1');
+    m?.weeks.forEach(w => w.lessons.forEach(l => targetLessons.push(l)));
+  } else if (monthNum === 2) {
+    const m = elementaryCourse.months.find(m => m.id === 'em2');
+    m?.weeks.forEach(w => w.lessons.forEach(l => targetLessons.push(l)));
+  } else {
+    // Month 3 or Grand Final: include all 3 months
+    elementaryCourse.months.forEach(m => {
+      m.weeks.forEach(w => w.lessons.forEach(l => targetLessons.push(l)));
+    });
+  }
+
+  const count = monthNum === 3 ? 25 : 20;
+  const picked = shuffle(targetLessons).slice(0, count);
+  const questions = [];
+
+  picked.forEach((l, idx) => {
+    const vList = l.vocab || [];
+    const sList = l.sentences || [];
+    const v = vList.length > 0 ? vList[idx % vList.length] : null;
+    const s = sList.length > 0 ? sList[idx % sList.length] : null;
+
+    if (idx % 2 === 0 && v) {
+      const wrong = shuffle(allVocabWords.filter(w => w.kh !== v.kh)).slice(0, 3).map(w => w.kh);
+      const opts = shuffle([v.kh, ...wrong]);
+      questions.push({
+        question: `[សំណួរទី ${idx + 1}] ពាក្យ "${v.en}" មានន័យជាភាសាខ្មែរដូចម្តេច?`,
+        options: opts,
+        correct: opts.indexOf(v.kh),
+        answer: v.kh,
+        explanation: `ពាក្យ "${v.en}" ប្រែថា "${v.kh}"។ (មេរៀនថ្ងៃទី ${l.day})`
+      });
+    } else if (s) {
+      const otherKh = [
+        'ខ្ញុំចូលចិត្តរៀនភាសាអង់គ្លេសណាស់។',
+        'ពួកយើងទៅសាលារៀនជារៀងរាល់ព្រឹក។',
+        'គាត់ជាមិត្តល្អបំផុតរបស់ខ្ញុំ។',
+        'អាកាសធាតុថ្ងៃនេះស្រស់បំព្រងណាស់។',
+        'គ្រួសាររបស់ខ្ញុំរស់នៅរាជធានីភ្នំពេញ។',
+        'ខ្ញុំមានកាតាបសាលាថ្មីមួយ។',
+        'អ្នកគ្រូពិសិដ្ឋពន្យល់មេរៀនបានច្បាស់លាស់។'
+      ];
+      const wrongS = shuffle(otherKh.filter(x => x !== s.kh)).slice(0, 3);
+      const opts = shuffle([s.kh, ...wrongS]);
+      questions.push({
+        question: `[សំណួរទី ${idx + 1}] ល្បះ "${s.en}" ប្រែជាភាសាខ្មែរថាដូចម្តេច?`,
+        options: opts,
+        correct: opts.indexOf(s.kh),
+        answer: s.kh,
+        explanation: `"${s.en}" ប្រែថា "${s.kh}"។ (មេរៀនថ្ងៃទី ${l.day})`
+      });
+    } else if (v) {
+      const wrong = shuffle(allVocabWords.filter(w => w.eng.toLowerCase() !== v.en.toLowerCase())).slice(0, 3).map(w => w.eng);
+      const opts = shuffle([v.en, ...wrong]);
+      questions.push({
+        question: `[សំណួរទី ${idx + 1}] តើពាក្យ "${v.kh}" ជាភាសាអង់គ្លេសសរសេរដូចម្តេច?`,
+        options: opts,
+        correct: opts.indexOf(v.en),
+        answer: v.en,
+        explanation: `"${v.kh}" ជាភាសាអង់គ្លេសគឺ "${v.en}"។`
+      });
+    }
+  });
+
+  return questions;
+}
+
 function generateQuiz(lessonOrCurriculum, monthId, weekId, lessonId) {
   let lesson = lessonOrCurriculum;
 
@@ -473,8 +615,13 @@ function generateQuiz(lessonOrCurriculum, monthId, weekId, lessonId) {
   const title = lesson.title || '';
   const content = lesson.content || '';
 
+  // Elementary Daily Lessons (el1 to el72)
+  if (monthId === 'elementary' || (monthId && monthId.startsWith('em')) || (lesson.id && lesson.id.startsWith('el'))) {
+    return generateElementaryLessonQuiz(lesson);
+  }
+
   // Beginner Daily Lessons (1 Day = 1 Letter, 1 Word, 1 Sentence) - Exactly 1 Question
-  if (monthId === 'beginner' || (lesson.id && lesson.id.startsWith('bl')) || title.includes('English for Children') || title.includes('ថ្ងៃទី')) {
+  if (monthId === 'beginner' || (lesson.id && lesson.id.startsWith('bl')) || title.includes('English for Children') || (title.includes('ថ្ងៃទី') && !lesson.id.startsWith('el'))) {
     return generateBeginnerQuiz(lesson);
   }
 
@@ -498,6 +645,8 @@ function generateQuiz(lessonOrCurriculum, monthId, weekId, lessonId) {
 module.exports = {
   generateQuiz,
   generateBeginnerFinalExam,
+  generateElementaryLessonQuiz,
+  generateElementaryExam,
   generateAnnualSubjectQuiz,
   SUBJECT_EXAMS
 };

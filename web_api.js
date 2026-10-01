@@ -7,12 +7,13 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const Groq = require('groq-sdk');
 const OpenAI = require('openai');
 
-const { generateQuiz, generateBeginnerFinalExam, generateAnnualSubjectQuiz, SUBJECT_EXAMS } = require('./quiz_generator.js');
+const { generateQuiz, generateBeginnerFinalExam, generateElementaryExam, generateElementaryLessonQuiz, generateAnnualSubjectQuiz, SUBJECT_EXAMS } = require('./quiz_generator.js');
 const { generateCertificateCard, generateCertificateHTML, getGradeTitle } = require('./certificate_generator.js');
 const { redeemLicenseKey, getUserLicenseInfo } = require('./license_manager.js');
 const irregularVerbs = require('./irregular_verbs.js');
 const { sendOtpEmail, sendConfirmEmail } = require('./mailer.js');
 const beginnerCourse = require('./beginner_curriculum.js');
+const elementaryCourse = require('./elementary_curriculum.js');
 
 function hashPassword(password) {
   return crypto.createHash('sha256').update(password + '_studyai_secret_salt_2026').digest('hex');
@@ -2188,7 +2189,36 @@ Provide practical English pronunciation coaching:
         }))
       };
 
-      res.json({ success: true, months: summaryMonths, beginner: summaryBeginner });
+      // Elementary Course taught by Teacher Piseth (អ្នកគ្រូពិសិដ្ឋ) - 3 Months / 72 Lessons
+      const summaryElementary = {
+        id: elementaryCourse.id,
+        title: elementaryCourse.title,
+        teacher: elementaryCourse.teacher,
+        monthsCount: elementaryCourse.monthsCount,
+        totalLessons: elementaryCourse.totalLessons,
+        months: elementaryCourse.months.map(m => ({
+          id: m.id,
+          monthNum: m.monthNum,
+          title: m.title,
+          examId: m.examId,
+          examTitle: m.examTitle,
+          weeks: m.weeks.map(w => ({
+            id: w.id,
+            weekNum: w.weekNum,
+            monthWeekNum: w.monthWeekNum,
+            title: w.title,
+            description: w.description,
+            lessonsCount: w.lessons.length,
+            lessons: w.lessons.map(l => ({
+              id: l.id,
+              day: l.day,
+              title: l.title
+            }))
+          }))
+        }))
+      };
+
+      res.json({ success: true, months: summaryMonths, beginner: summaryBeginner, elementary: summaryElementary });
     } catch (err) {
       res.status(500).json({ error: 'Failed to fetch curriculum' });
     }
@@ -2215,10 +2245,22 @@ Provide practical English pronunciation coaching:
       
       let month = null;
       let isBeginner = false;
+      let isElementary = false;
 
       if (monthId === 'beginner' || monthId === 'm0') {
         isBeginner = true;
         month = beginnerCourse;
+      } else if (monthId === 'elementary' || monthId.startsWith('em')) {
+        isElementary = true;
+        month = elementaryCourse.months.find(m => m.id === monthId);
+        if (!month) {
+          for (const em of elementaryCourse.months) {
+            if (em.weeks.some(w => w.id === weekId)) {
+              month = em;
+              break;
+            }
+          }
+        }
       } else {
         month = curriculum.months.find(m => m.id === monthId);
       }
@@ -2243,16 +2285,19 @@ Provide practical English pronunciation coaching:
         }
       }
 
+      const activeTeacher = isBeginner ? beginnerCourse.teacher : (isElementary ? elementaryCourse.teacher : {
+        id: 'sorn',
+        name: 'គ្រូសន',
+        englishName: 'Teacher Sorn',
+        avatar: '👨‍🏫',
+        role: 'នាយកវិទ្យាស្ថាន & គ្រូបង្រៀនភាសាអង់គ្លេសទូទៅ'
+      });
+
       res.json({
         success: true,
         isBeginner,
-        teacher: isBeginner ? beginnerCourse.teacher : {
-          id: 'sorn',
-          name: 'គ្រូសន',
-          englishName: 'Teacher Sorn',
-          avatar: '👨‍🏫',
-          role: 'នាយកវិទ្យាស្ថាន & គ្រូបង្រៀនភាសាអង់គ្លេសទូទៅ'
-        },
+        isElementary,
+        teacher: activeTeacher,
         month: { id: month.id, title: month.title },
         week: { id: week.id, title: week.title },
         lesson: {
@@ -2382,6 +2427,49 @@ Provide practical English pronunciation coaching:
 
         rawQuestions = generateBeginnerFinalExam();
         quizTitle = 'ការប្រឡងបញ្ចប់ថ្នាក់ដំបូង (Beginner Final Graduation Exam)';
+      } else if (type === 'elementary_exam') {
+        const examMonth = parseInt(req.query.month || '1');
+        const examTitles = {
+          1: 'ការប្រឡងប្រចាំខែទី ១ - ថ្នាក់បឋមសិក្សា (Elementary Month 1 Final Exam)',
+          2: 'ការប្រឡងប្រចាំខែទី ២ - ថ្នាក់បឋមសិក្សា (Elementary Month 2 Final Exam)',
+          3: 'ការប្រឡងបញ្ចប់វគ្គបឋមសិក្សា (Elementary Level Graduation Exam)'
+        };
+        const title = examTitles[examMonth] || examTitles[1];
+
+        // Prerequisite check:
+        // Month 1 exam requires passed Days 1-24
+        // Month 2 exam requires passed Days 25-48
+        // Month 3 exam requires passed all 72 Days
+        if (userId && db && !callerIsAdmin) {
+          const userSnap = await db.ref(`users/${userId}`).once('value');
+          const userData = userSnap.val() || {};
+          const completed = userData.completed_lessons || {};
+
+          let startDay = 1;
+          let endDay = examMonth === 1 ? 24 : (examMonth === 2 ? 48 : 72);
+          let passedLessons = 0;
+          let totalReq = endDay - startDay + 1;
+
+          for (let d = startDay; d <= endDay; d++) {
+            const lid = `el${d}`;
+            const hasPassed = Object.entries(completed).some(([k, v]) => {
+              return k.includes(`-${lid}`) && (v.isPassed || ['A', 'B', 'C'].includes(v.grade) || (v.percent && v.percent >= 70));
+            });
+            if (hasPassed) passedLessons++;
+          }
+
+          if (passedLessons < totalReq) {
+            return res.status(403).json({
+              error: `🔒 អ្នកត្រូវប្រឡងជាប់គ្រប់ ${totalReq} មេរៀននៃខែនេះជាមុនសិន ទើបមានសិទ្ធិប្រឡង! (បច្ចុប្បន្នជាប់ ${passedLessons}/${totalReq} មេរៀន)`,
+              isLocked: true,
+              passedCount: passedLessons,
+              totalRequired: totalReq
+            });
+          }
+        }
+
+        rawQuestions = generateElementaryExam(examMonth);
+        quizTitle = title;
       } else if (type === 'annual') {
         if (!SUBJECT_EXAMS[subjectKey]) {
           return res.status(400).json({ error: 'Invalid annual subject key' });
@@ -2402,7 +2490,7 @@ Provide practical English pronunciation coaching:
         rawQuestions = generateAnnualSubjectQuiz(curriculum, subjectKey, 20);
         quizTitle = SUBJECT_EXAMS[subjectKey].title;
       } else {
-        // Lesson quiz (Standard Curriculum or Beginner Course)
+        // Lesson quiz (Standard Curriculum, Beginner Course, or Elementary Course)
         let qList = [];
         let l = null;
         if (monthId === 'beginner' || monthId === 'm0') {
@@ -2427,6 +2515,36 @@ Provide practical English pronunciation coaching:
 
           const w = beginnerCourse.weeks.find(w => w.id === weekId);
           l = w?.lessons.find(l => l.id === lessonId);
+          qList = l ? generateQuiz(l) : [];
+        } else if (monthId === 'elementary' || (monthId && monthId.startsWith('em'))) {
+          // Sequential unlock check for Elementary Lesson: Day N requires Day N-1 passed!
+          // ADMIN BYPASS: Admin can access any elementary lesson directly
+          const lessonNum = parseInt((lessonId || '').replace('el', ''));
+          if (lessonNum > 1 && userId && db && !callerIsAdmin) {
+            const prevLessonId = `el${lessonNum - 1}`;
+            const userSnap = await db.ref(`users/${userId}`).once('value');
+            const userData = userSnap.val() || {};
+            const completed = userData.completed_lessons || {};
+            const prevPassed = Object.entries(completed).some(([k, v]) => {
+              return k.includes(`-${prevLessonId}`) && (v.isPassed || ['A', 'B', 'C'].includes(v.grade) || (v.percent && v.percent >= 70));
+            });
+            if (!prevPassed) {
+              return res.status(403).json({
+                error: `🔒 សូមប្រឡងជាប់មេរៀនថ្ងៃទី ${lessonNum - 1} ជាមុនសិន ទើបអាចចូលប្រឡងមេរៀនថ្ងៃទី ${lessonNum} បាន!`,
+                isLocked: true
+              });
+            }
+          }
+
+          let elLesson = null;
+          for (const m of elementaryCourse.months) {
+            const w = m.weeks.find(w => w.id === weekId);
+            if (w) {
+              elLesson = w.lessons.find(l => l.id === lessonId);
+              if (elLesson) break;
+            }
+          }
+          l = elLesson;
           qList = l ? generateQuiz(l) : [];
         } else {
           // ============================================================
@@ -2524,7 +2642,8 @@ Provide practical English pronunciation coaching:
         weekId,
         lessonId,
         subjectKey,
-        quizTitle
+        quizTitle,
+        examMonth: type === 'elementary_exam' ? parseInt(req.query.month || '1') : null
       });
 
       res.json({
@@ -2637,6 +2756,60 @@ Provide practical English pronunciation coaching:
             };
 
             await db.ref(`certificates/${certId}`).set(certData);
+          } else if (isElementaryExam) {
+            // Elementary Month Final Exam or Elementary Graduation Exam
+            const examMonth = session.examMonth || 1;
+            const prefix = examMonth === 3 ? 'ELG' : `ELM${examMonth}`;
+            const certKey = examMonth === 3 ? 'elementary_graduation_certification' : `elementary_m${examMonth}_certification`;
+
+            const prevSnap = await db.ref(`users/${userId}/${certKey}`).once('value');
+            const prevVal = prevSnap.val();
+            certId = prevVal && prevVal.certId ? prevVal.certId : prefix + Math.random().toString(36).substring(2, 7).toUpperCase();
+
+            const certTitle = examMonth === 3 
+              ? 'វិញ្ញាបនបត្របញ្ចប់ការសិក្សា ថ្នាក់ភាសាអង់គ្លេសបឋមសិក្សា (Elementary Level Graduation Certificate)'
+              : `វិញ្ញាបនបត្របញ្ចប់ការសិក្សា ប្រចាំខែទី ${examMonth} ថ្នាក់បឋមសិក្សា (Elementary Level - Month ${examMonth})`;
+
+            await db.ref(`users/${userId}/${certKey}`).set({
+              certId,
+              title: certTitle,
+              studentName: effectiveName,
+              grade,
+              score,
+              total,
+              percent,
+              dateStr,
+              examMonth,
+              completedAt: Date.now()
+            });
+
+            if (examMonth === 3) {
+              await db.ref(`users/${userId}/elementary_graduated`).set(true);
+            }
+
+            certData = {
+              certId,
+              userId: userId.toString(),
+              studentName: effectiveName,
+              title: certTitle,
+              lessonTitle: quizTitle,
+              grade,
+              score,
+              total,
+              percent,
+              dateStr,
+              isAnnualExam: false,
+              isBeginnerFinal: false,
+              isElementaryExam: true,
+              isElementaryFinal: examMonth === 3,
+              examMonth,
+              issuedAt: Date.now(),
+              director: 'លីម សន (Lim Sorn)',
+              instructor: 'អ្នកគ្រូ ពិសិដ្ឋ (Teacher Piseth AI)',
+              schoolName: 'វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline'
+            };
+
+            await db.ref(`certificates/${certId}`).set(certData);
           } else if (isAnnualExam) {
             // Annual Subject Exam: issue subject certificate
             const prevSnap = await db.ref(`users/${userId}/subject_certifications/${subjectKey}`).once('value');
@@ -2718,6 +2891,8 @@ Provide practical English pronunciation coaching:
         certId,
         certData,
         isBeginnerFinal,
+        isElementaryExam,
+        isElementaryFinal: session.examMonth === 3,
         review
       });
     } catch (err) {
@@ -2752,7 +2927,38 @@ Provide practical English pronunciation coaching:
           title: beginnerCert.title || 'វិញ្ញាបនបត្របញ្ចប់ការសិក្សា ថ្នាក់ភាសាអង់គ្លេសដំបូង (English for Children)'
         });
       }
-      // 2. Annual Subject Certifications
+
+      // 2. Elementary Month 1, Month 2, & Graduation Certificates
+      if (data.elementary_m1_certification && data.elementary_m1_certification.certId) {
+        list.push({
+          ...data.elementary_m1_certification,
+          isElementaryExam: true,
+          examMonth: 1,
+          isAnnualExam: false,
+          instructor: 'អ្នកគ្រូ ពិសិដ្ឋ (Teacher Piseth AI)'
+        });
+      }
+      if (data.elementary_m2_certification && data.elementary_m2_certification.certId) {
+        list.push({
+          ...data.elementary_m2_certification,
+          isElementaryExam: true,
+          examMonth: 2,
+          isAnnualExam: false,
+          instructor: 'អ្នកគ្រូ ពិសិដ្ឋ (Teacher Piseth AI)'
+        });
+      }
+      if (data.elementary_graduation_certification && data.elementary_graduation_certification.certId) {
+        list.push({
+          ...data.elementary_graduation_certification,
+          isElementaryFinal: true,
+          isElementaryExam: true,
+          examMonth: 3,
+          isAnnualExam: false,
+          instructor: 'អ្នកគ្រូ ពិសិដ្ឋ (Teacher Piseth AI)'
+        });
+      }
+
+      // 3. Annual Subject Certifications
       for (const [key, val] of Object.entries(annualCerts)) {
         list.push({ ...val, subjectKey: key, isAnnualExam: true, isBeginnerFinal: false });
       }
@@ -2793,6 +2999,47 @@ Provide practical English pronunciation coaching:
       });
     } catch (e) {
       res.status(500).json({ error: 'Failed to fetch beginner status' });
+    }
+  });
+
+  router.get('/elementary/status/:userId', async (req, res) => {
+    try {
+      const { userId } = req.params;
+      if (!userId || !db) {
+        return res.json({ success: true, passedCount: 0, totalLessons: 72, isGraduated: false, passedLessons: [] });
+      }
+
+      const snap = await db.ref(`users/${userId}`).once('value');
+      const data = snap.val() || {};
+      const completed = data.completed_lessons || {};
+      const passedLessons = [];
+
+      for (let i = 1; i <= 72; i++) {
+        const lid = `el${i}`;
+        const hasPassed = Object.entries(completed).some(([k, v]) => {
+          return k.includes(`-${lid}`) && (v.isPassed || ['A', 'B', 'C'].includes(v.grade) || (v.percent && v.percent >= 70));
+        });
+        if (hasPassed) passedLessons.push(lid);
+      }
+
+      const m1Cert = data.elementary_m1_certification || null;
+      const m2Cert = data.elementary_m2_certification || null;
+      const gradCert = data.elementary_graduation_certification || null;
+
+      res.json({
+        success: true,
+        passedCount: passedLessons.length,
+        totalLessons: 72,
+        passedLessons,
+        month1Passed: !!m1Cert,
+        month2Passed: !!m2Cert,
+        isGraduated: !!(data.elementary_graduated || gradCert),
+        m1Cert,
+        m2Cert,
+        gradCert
+      });
+    } catch (e) {
+      res.status(500).json({ error: 'Failed to fetch elementary status' });
     }
   });
 

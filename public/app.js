@@ -21,6 +21,11 @@ const STATE = {
   beginnerCourse: null,
   beginnerStatus: { passedCount: 0, totalLessons: 26, passedLessons: [], isGraduated: false, beginnerCert: null },
   isBeginnerFinalExam: false,
+  elementaryCourse: null,
+  selectedElementaryMonthId: 'em1',
+  elementaryStatus: { passedCount: 0, totalLessons: 72, passedLessons: [], isGraduated: false, month1Passed: false, month2Passed: false },
+  isElementaryExam: false,
+  elementaryExamMonth: 1,
   activeTutor: 'piseth',
   studioTutor: 'piseth'
 };
@@ -41,6 +46,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (STATE.currentUser) {
     refreshUserProfile();
     loadBeginnerStatus();
+    loadElementaryStatus();
   }
 });
 
@@ -373,9 +379,14 @@ function navigateTo(tabName) {
 function returnToLessonList() {
   if (STATE.currentLesson?.monthId === 'beginner') {
     switchCourseLevel('beginner');
+  } else if (STATE.currentLesson?.monthId === 'elementary' || (STATE.currentLesson?.monthId && STATE.currentLesson.monthId.startsWith('em'))) {
+    if (STATE.currentLesson?.monthId.startsWith('em')) {
+      STATE.selectedElementaryMonthId = STATE.currentLesson.monthId;
+    }
+    switchCourseLevel('elementary');
   } else if (STATE.currentLesson?.monthId) {
     STATE.selectedMonthId = STATE.currentLesson.monthId;
-    if (STATE.courseLevel === 'beginner') {
+    if (STATE.courseLevel === 'beginner' || STATE.courseLevel === 'elementary') {
       switchCourseLevel('standard');
     } else {
       switchCourseLevel(STATE.courseLevel || 'standard');
@@ -395,6 +406,7 @@ async function loadCurriculum() {
     if (data.success) {
       STATE.curriculum = data.months || [];
       STATE.beginnerCourse = data.beginner || null;
+      STATE.elementaryCourse = data.elementary || null;
       switchCourseLevel(STATE.courseLevel || 'beginner');
     }
   } catch (e) {
@@ -410,29 +422,54 @@ async function loadBeginnerStatus() {
     const data = await res.json();
     if (data.success) {
       STATE.beginnerStatus = data;
+      const isAdmin = !!(STATE.currentUser?.isAdmin || STATE.currentUser?.id === '240224709' || STATE.currentUser?.telegramId === 240224709);
       // Update Elementary button lock state
       const elemBtn = document.getElementById('courseLevelElementaryBtn');
-      if (elemBtn && data.isGraduated) {
+      if (elemBtn && (data.isGraduated || isAdmin)) {
         elemBtn.classList.remove('locked-level');
-        elemBtn.querySelector('.course-icon').textContent = '🎓';
+        elemBtn.querySelector('.course-icon').textContent = '🎒';
         const lockHint = elemBtn.querySelector('.lock-hint');
-        if (lockHint) lockHint.textContent = 'ជំហ្សើររៀន';
+        if (lockHint) lockHint.textContent = `${STATE.elementaryStatus?.passedCount || 0}/72 ថ្ងៃ • បើកដំណើរការ`;
+      }
+    }
+  } catch (e) { /* silent */ }
+}
+
+async function loadElementaryStatus() {
+  const userId = STATE.currentUser?.id;
+  if (!userId) return;
+  try {
+    const res = await fetch(`/api/elementary/status/${userId}`);
+    const data = await res.json();
+    if (data.success) {
+      STATE.elementaryStatus = data;
+      const isAdmin = !!(STATE.currentUser?.isAdmin || STATE.currentUser?.id === '240224709' || STATE.currentUser?.telegramId === 240224709);
+      const elemBtn = document.getElementById('courseLevelElementaryBtn');
+      if (elemBtn && (STATE.beginnerStatus?.isGraduated || isAdmin)) {
+        elemBtn.classList.remove('locked-level');
+        elemBtn.querySelector('.course-icon').textContent = '🎒';
+        const lockHint = elemBtn.querySelector('.lock-hint');
+        if (lockHint) lockHint.textContent = `${data.passedCount}/72 ថ្ងៃ • ${data.isGraduated ? '🎓 បញ្ចប់វគ្គ' : 'ចុចចូលរៀន'}`;
       }
     }
   } catch (e) { /* silent */ }
 }
 
 function switchCourseLevel(level) {
+  const isAdmin = !!(STATE.currentUser?.isAdmin || STATE.currentUser?.id === '240224709' || STATE.currentUser?.telegramId === 240224709);
+
   // Locked levels: elementary, intermediate, advanced need graduation
   if (level === 'elementary') {
-    if (!STATE.beginnerStatus?.isGraduated) {
+    if (!STATE.beginnerStatus?.isGraduated && !isAdmin) {
       const passedCount = STATE.beginnerStatus?.passedCount || 0;
       showToast(`🔒 ថ្នាក់នេះត្រូវការប្រឡងបញ្ចប់ថ្នាក់ដំបូង (English for Children) ជាមុន!\n(បច្ចុប្បន្ន: ${passedCount}/26 ថ្ងៃ)`, 'error', 4000);
       return;
     }
   } else if (level === 'intermediate' || level === 'advanced') {
-    showToast('🔒 កម្រិតនេះកំពុងរៀបចំ! ត្រូវបំពេញថ្នាក់ទាបជាង ហើយប្រឡងជ្រះជ្រា ទើបចូលបានទេ 🚧', 'warning', 4000);
-    return;
+    if (!isAdmin && (!STATE.elementaryStatus?.isGraduated || level === 'advanced')) {
+      showToast('🔒 កម្រិតនេះកំពុងរៀបចំ! ត្រូវបំពេញថ្នាក់ទាបជាង ហើយប្រឡងជ្រះជ្រា ទើបចូលបានទេ 🚧', 'warning', 4000);
+      return;
+    }
   }
 
   STATE.courseLevel = level;
@@ -483,6 +520,34 @@ function switchCourseLevel(level) {
       `;
     }
     renderBeginnerWeeks();
+  } else if (level === 'elementary') {
+    if (monthsBar) monthsBar.style.display = 'flex';
+    if (instructorCard) {
+      instructorCard.innerHTML = `
+        <div class="instructor-card-content">
+          <div class="instructor-avatar-wrap">
+            <span class="instructor-avatar-emoji">👩‍🏫</span>
+            <span class="pulse-status-dot"></span>
+          </div>
+          <div class="instructor-details">
+            <div class="instructor-name-row">
+              <h3 class="instructor-name">អ្នកគ្រូ ពិសិដ្ឋ (Teacher Piseth AI)</h3>
+              <span class="badge badge-emerald">✓ ថ្នាក់បឋមសិក្សា • Elementary Level</span>
+            </div>
+            <p class="instructor-bio">
+              កម្មវិធីសិក្សា ៣ ខែពេញលេញ (៧២ ថ្ងៃ) ផ្តោតលើវេយ្យាករណ៍គ្រឹះ កិរិយាសព្ទ វាក្យសព្ទប្រចាំថ្ងៃ ការសន្ទនា និងការអនុវត្តជាក់ស្តែង ប្រកបដោយភាពរស់រវើក!
+            </p>
+            <div class="instructor-badges-list">
+              <span class="pill-chip">📅 ៣ ខែ (៧២ ថ្ងៃ)</span>
+              <span class="pill-chip">📘 វេយ្យាករណ៍គ្រឹះបឋម</span>
+              <span class="pill-chip">🗣️ ការសន្ទនាជាក់ស្តែង</span>
+              <span class="pill-chip">🎓 វិញ្ញាបនបត្រប្រចាំខែ & បញ្ចប់វគ្គ</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+    renderElementaryMonthsTabs();
   } else {
     if (monthsBar) monthsBar.style.display = 'flex';
     if (instructorCard) {
@@ -638,6 +703,189 @@ async function startBeginnerFinalExam() {
   }
 }
 
+function renderElementaryMonthsTabs() {
+  const bar = document.getElementById('monthsTabsBar');
+  if (!bar) return;
+  bar.innerHTML = '';
+
+  const course = STATE.elementaryCourse;
+  if (!course || !course.months) {
+    bar.innerHTML = '<span class="text-sm text-slate-400">កំពុងទាញយកទិន្នន័យថ្នាក់បឋមសិក្សា...</span>';
+    return;
+  }
+
+  course.months.forEach(m => {
+    const btn = document.createElement('button');
+    btn.className = `month-tab-pill ${m.id === STATE.selectedElementaryMonthId ? 'active' : ''}`;
+    btn.textContent = m.title;
+    btn.onclick = () => {
+      STATE.selectedElementaryMonthId = m.id;
+      renderElementaryMonthsTabs();
+      renderElementaryWeeks();
+    };
+    bar.appendChild(btn);
+  });
+
+  renderElementaryWeeks();
+}
+
+function renderElementaryWeeks() {
+  const container = document.getElementById('curriculumWeeksContainer');
+  if (!container) return;
+
+  const course = STATE.elementaryCourse;
+  if (!course || !course.months) {
+    container.innerHTML = '<p class="text-muted">មិនទាន់មានទិន្នន័យថ្នាក់បឋមសិក្សានៅឡើយទេ</p>';
+    return;
+  }
+
+  const currentMonth = course.months.find(m => m.id === STATE.selectedElementaryMonthId) || course.months[0];
+  if (!currentMonth) return;
+
+  const monthNum = currentMonth.monthNumber || (currentMonth.id === 'em1' ? 1 : (currentMonth.id === 'em2' ? 2 : 3));
+  const startDay = (monthNum - 1) * 24 + 1;
+  const endDay = monthNum * 24;
+
+  const completed = STATE.currentUser?.completedLessons || {};
+  const isAdmin = !!(STATE.currentUser?.isAdmin || STATE.currentUser?.id === '240224709' || STATE.currentUser?.telegramId === 240224709);
+  const status = STATE.elementaryStatus || {};
+  const passedLessons = new Set(status.passedLessons || []);
+
+  // Calculate passed in this month (out of 24)
+  let passedInMonth = 0;
+  for (let d = startDay; d <= endDay; d++) {
+    if (passedLessons.has(`el${d}`)) passedInMonth++;
+  }
+  const monthPct = Math.round((passedInMonth / 24) * 100);
+
+  // Month certification status
+  let isMonthCertPassed = false;
+  let monthCert = null;
+  if (monthNum === 1) {
+    isMonthCertPassed = !!status.month1Passed || !!status.m1Cert;
+    monthCert = status.m1Cert;
+  } else if (monthNum === 2) {
+    isMonthCertPassed = !!status.month2Passed || !!status.m2Cert;
+    monthCert = status.m2Cert;
+  } else if (monthNum === 3) {
+    isMonthCertPassed = !!status.isGraduated || !!status.gradCert;
+    monthCert = status.gradCert;
+  }
+
+  const canTakeExam = isAdmin || passedInMonth >= 24;
+
+  const examTitles = {
+    1: 'ការប្រឡងប្រចាំខែទី ១ • Month 1 Progress Exam',
+    2: 'ការប្រឡងប្រចាំខែទី ២ • Month 2 Progress Exam',
+    3: 'ការប្រឡងបញ្ចប់វគ្គបឋមសិក្សា • Elementary Graduation Exam'
+  };
+  const qCount = monthNum === 3 ? 25 : 20;
+
+  const examCardHTML = `
+    <div class="beginner-final-exam-card" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(6, 182, 212, 0.12)); border: 1px solid rgba(16, 185, 129, 0.3);">
+      <div class="final-exam-header">
+        <div class="final-exam-icon">${isMonthCertPassed ? '🎓' : (isAdmin ? '🛡️' : '📜')}</div>
+        <div class="final-exam-info">
+          <h3>${isMonthCertPassed ? `✅ ${examTitles[monthNum]} --- ជោគជ័យ!` : (isAdmin ? `🛡️ Admin View — ${examTitles[monthNum]}` : examTitles[monthNum])}</h3>
+          <p>${isMonthCertPassed
+            ? `អ្នកបានសម្រេចខែទី ${monthNum}! ទទួលបានវិញ្ញាបនបត្រជោគជ័យ 🏆`
+            : (isAdmin
+                ? `🛡️ Admin ប្រឡងបានភ្លាម (Bypass prerequisites) • សិស្សជាប់ ${passedInMonth}/24 ថ្ងៃនៃខែនេះ`
+                : `ត្រូវប្រឡងជាប់គ្រប់ ២៤ ថ្ងៃនៃខែនេះ ទើបអាចប្រឡង & ទទួលបានវិញ្ញាបនបត្រ`)
+          }</p>
+        </div>
+      </div>
+      <div class="final-exam-progress">
+        <div class="final-exam-progress-label">
+          <span>ថ្ងៃបានប្រឡងជាប់ក្នុងខែទី ${monthNum}: ${passedInMonth}/24</span>
+          <span>${monthPct}%</span>
+        </div>
+        <div class="final-exam-progress-bar">
+          <div class="final-exam-progress-fill" style="width: ${isAdmin ? 100 : monthPct}%"></div>
+        </div>
+      </div>
+      ${isMonthCertPassed && monthCert?.certId
+        ? `<div class="graduated-badge">🎓 ប្រឡងជាប់ជោគជ័យ! វិញ្ញាបនបត្រ: <strong>${monthCert.certId}</strong></div>
+           <button class="btn-final-exam" style="margin-top:10px" onclick="openCertificatePreview('${monthCert.certId}')">📜 មើលវិញ្ញាបនបត្រ</button>`
+        : `<button class="btn-final-exam" ${!canTakeExam ? 'disabled' : ''} onclick="startElementaryExam(${monthNum})">
+            ${!canTakeExam 
+              ? `🔒 ប្រឡងបញ្ចប់ខែទី ${monthNum} (ខ្វះ ${24 - passedInMonth} ថ្ងៃ)` 
+              : (isAdmin ? `🛡️ Admin • ចូលប្រឡង (${qCount} សំណួរ)` : `🎓 ចូលប្រឡង (${qCount} សំណួរ)`)}
+           </button>`
+      }
+    </div>
+  `;
+
+  const weeksHTML = currentMonth.weeks.map(w => {
+    const lessonsHTML = w.lessons.map(l => {
+      const lessonNum = parseInt((l.id || '').replace('el', ''));
+      const isComp = passedLessons.has(l.id) || !!completed[`elementary-${w.id}-${l.id}`] || !!completed[`${currentMonth.id}-${w.id}-${l.id}`];
+      const grade = isComp ? (completed[`elementary-${w.id}-${l.id}`]?.grade || completed[`${currentMonth.id}-${w.id}-${l.id}`]?.grade || 'A') : null;
+
+      // Sequential lock: lesson N requires lesson N-1 passed
+      // el1 is always unlocked; el2 requires el1, etc.
+      const isUnlocked = isAdmin || lessonNum <= 1 || passedLessons.has(`el${lessonNum - 1}`);
+      const isLocked = !isUnlocked;
+
+      return `
+        <div class="lesson-item-card beginner-lesson-item ${isComp ? 'completed' : ''} ${isLocked ? 'lesson-locked' : ''}" 
+             onclick="${isLocked ? `showToast('🔒 ត្រូវប្រឡងជាប់ថ្ងៃទី${lessonNum - 1} ជាមុន!', 'warning')` : `openLesson('${currentMonth.id}', '${w.id}', '${l.id}')`}">
+          <div class="l-info">
+            <div class="l-title">${isLocked ? '🔒 ' : (isAdmin && !isComp ? '🛡️ ' : '')}${l.title}</div>
+            <div class="l-status">${isComp ? `✅ ជាប់និទ្ទេស ${grade}` : (isLocked ? '🔒 ចាំប្រឡងថ្ងៃកន្លងទៅ' : (isAdmin ? '🛡️ Admin • ចូលបានភ្លាម' : `📖 ${l.content?.grammar?.title || 'វេយ្យាករណ៍ & វាក្យសព្ទ'}`))}</div>
+          </div>
+          <div class="l-icon">${isComp ? '🏆' : (isLocked ? '🔒' : (isAdmin ? '🛡️' : '➡️'))}</div>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="week-card glass-panel beginner-week-card">
+        <div class="week-header">
+          <div class="week-title-wrap">
+            <div class="week-title">📅 ${w.title} (${w.lessons.length} ថ្ងៃ)</div>
+            ${w.description ? `<div class="week-desc text-xs text-slate-400 mt-0.5">${w.description}</div>` : ''}
+          </div>
+          <span class="badge ${isAdmin ? 'badge-amber' : 'badge-emerald'}">${isAdmin ? '🛡️ Admin View' : '👩‍🏫 អ្នកគ្រូ ពិសិដ្ឋ AI'}</span>
+        </div>
+        <div class="lessons-grid">${lessonsHTML}</div>
+      </div>
+    `;
+  }).join('');
+
+  container.innerHTML = examCardHTML + weeksHTML;
+}
+
+async function startElementaryExam(monthNum) {
+  const userId = STATE.currentUser?.id;
+  if (!userId) { showToast('❌ ត្រូវ Login ជាមុន', 'error'); return; }
+
+  try {
+    const examTitles = {
+      1: 'ខែទី ១ (20 សំណួរ)',
+      2: 'ខែទី ២ (20 សំណួរ)',
+      3: 'បញ្ចប់វគ្គបឋមសិក្សា (25 សំណួរ)'
+    };
+    showToast(`⏳ កំពុងរៀបចំវិញ្ញាសាប្រឡង ${examTitles[monthNum] || ''}...`, 'info');
+    const res = await fetch(`/api/quiz/start?type=elementary_exam&month=${monthNum}&userId=${userId}`);
+    const data = await res.json();
+
+    if (!data.success) {
+      if (data.isLocked) {
+        showToast(data.error, 'error', 5000);
+        return;
+      }
+      throw new Error(data.error || 'Failed to start elementary exam');
+    }
+
+    STATE.isElementaryExam = true;
+    STATE.elementaryExamMonth = monthNum;
+    launchQuizEngine(data, monthNum === 3 ? 'ELEMENTARY GRADUATION' : `ELEMENTARY MONTH ${monthNum}`);
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
 function renderMonthsTabs() {
   const bar = document.getElementById('monthsTabsBar');
   if (!bar) return;
@@ -733,8 +981,9 @@ async function speakEnglish(text, btnElement, customTutor) {
                     .replace(/[()"]/g, '').trim();
   if (!clean) return;
 
-  // Determine tutor: beginner class / beginner course uses Teacher Piseth (Female Voice)
-  const isBeginner = STATE.currentLesson?.monthId === 'beginner' || STATE.courseLevel === 'beginner' || STATE.activeTutor === 'piseth';
+  // Determine tutor: beginner & elementary classes use Teacher Piseth (Female Voice)
+  const isElementary = STATE.currentLesson?.monthId === 'elementary' || (STATE.currentLesson?.monthId && STATE.currentLesson.monthId.startsWith('em')) || STATE.courseLevel === 'elementary';
+  const isBeginner = STATE.currentLesson?.monthId === 'beginner' || STATE.courseLevel === 'beginner' || isElementary || STATE.activeTutor === 'piseth';
   const tutor = customTutor || (isBeginner ? 'piseth' : (STATE.activeTutor || 'sorn'));
   const hasKhmer = /[\u1780-\u17FF]/.test(clean);
   const lang = hasKhmer ? 'km' : 'en';
@@ -1394,7 +1643,13 @@ async function openLesson(monthId, weekId, lessonId) {
         const cData = await cRes.json();
         if (cData.success && cData.beginner) STATE.beginnerCourse = cData.beginner;
       } catch (e) {}
-    } else if (monthId !== 'beginner' && (!STATE.curriculum || !STATE.curriculum.length)) {
+    } else if ((monthId === 'elementary' || monthId.startsWith('em')) && (!STATE.elementaryCourse || !STATE.elementaryCourse.months)) {
+      try {
+        const cRes = await fetch('/api/curriculum');
+        const cData = await cRes.json();
+        if (cData.success && cData.elementary) STATE.elementaryCourse = cData.elementary;
+      } catch (e) {}
+    } else if (monthId !== 'beginner' && !monthId.startsWith('em') && (!STATE.curriculum || !STATE.curriculum.length)) {
       try {
         const cRes = await fetch('/api/curriculum');
         const cData = await cRes.json();
@@ -1455,22 +1710,24 @@ async function openLesson(monthId, weekId, lessonId) {
 
     // Setup Active Teacher info for this lesson (Teacher Piseth vs Teacher Sorn)
     const isBeginner = !!(data.isBeginner || monthId === 'beginner');
-    STATE.activeTutor = isBeginner ? 'piseth' : 'sorn';
+    const isElementary = !!(data.isElementary || monthId === 'elementary' || monthId.startsWith('em'));
+    const isPiseth = isBeginner || isElementary;
+    STATE.activeTutor = isPiseth ? 'piseth' : 'sorn';
 
     const drawerAvatar = document.getElementById('lessonDrawerAvatar');
     const drawerName = document.getElementById('lessonDrawerName');
     const drawerStatus = document.getElementById('lessonDrawerStatus');
-    if (drawerAvatar) drawerAvatar.textContent = isBeginner ? '👩‍🏫' : '👨‍🏫';
-    if (drawerName) drawerName.textContent = isBeginner ? 'អ្នកគ្រូពិសិដ្ឋ (Teacher Piseth AI)' : 'គ្រូសន (Teacher Sorn AI)';
-    if (drawerStatus) drawerStatus.textContent = isBeginner ? '🟢 កំពុងអនឡាញ • គ្រូបង្រៀនថ្នាក់ដំបូង' : '🟢 កំពុងអនឡាញ • ជួយឆ្លើយសំណួរមេរៀន';
+    if (drawerAvatar) drawerAvatar.textContent = isPiseth ? '👩‍🏫' : '👨‍🏫';
+    if (drawerName) drawerName.textContent = isPiseth ? 'អ្នកគ្រូពិសិដ្ឋ (Teacher Piseth AI)' : 'គ្រូសន (Teacher Sorn AI)';
+    if (drawerStatus) drawerStatus.textContent = isPiseth ? (isElementary ? '🟢 កំពុងអនឡាញ • គ្រូបង្រៀនថ្នាក់បឋមសិក្សា' : '🟢 កំពុងអនឡាញ • គ្រូបង្រៀនថ្នាក់ដំបូង') : '🟢 កំពុងអនឡាញ • ជួយឆ្លើយសំណួរមេរៀន';
 
     // Reset Chat drawer with initial greeting from the assigned teacher
     const chatBox = document.getElementById('chatMessagesBox');
     if (chatBox) {
       chatBox.innerHTML = `
         <div class="chat-bubble ai">
-          ${isBeginner 
-            ? `សួស្តីកូនសិស្សជាទីស្រឡាញ់! អ្នកគ្រូគឺ <strong>អ្នកគ្រូពិសិដ្ឋ (Teacher Piseth)</strong>។ កូនកំពុងរៀនមេរៀន <strong>"${data.lesson.title}"</strong> នៃថ្នាក់ដំបូង។ តើកូនមានចម្ងល់ ឬចង់ឱ្យអ្នកគ្រូជួយពន្យល់អ្វីបន្ថែមទេ? អ្នកគ្រូរីករាយនឹងជួយកូនជានិច្ច! 🌟`
+          ${isPiseth 
+            ? `សួស្តីកូនសិស្សជាទីស្រឡាញ់! អ្នកគ្រូគឺ <strong>អ្នកគ្រូពិសិដ្ឋ (Teacher Piseth)</strong>។ កូនកំពុងរៀនមេរៀន <strong>"${data.lesson.title}"</strong> នៃ${isElementary ? 'ថ្នាក់បឋមសិក្សា' : 'ថ្នាក់ដំបូង'}។ តើកូនមានចម្ងល់ ឬចង់ឱ្យអ្នកគ្រូជួយពន្យល់អ្វីបន្ថែមទេ? អ្នកគ្រូរីករាយនឹងជួយកូនជានិច្ច! 🌟`
             : `សួស្តីប្អូន! ខ្ញុំគឺគ្រូសន (Teacher Sorn)។ ប្អូនកំពុងរៀនមេរៀន <strong>"${data.lesson.title}"</strong>។ តើប្អូនមានចម្ងល់ ឬចង់ឱ្យគ្រូជួយពន្យល់អ្វីបន្ថែមទេ?`
           }
         </div>
@@ -1515,6 +1772,50 @@ function getLessonNavInfo() {
       if (!isAdmin && nextLessonNum > 1) {
         const passed = new Set(STATE.beginnerStatus?.passedLessons || []);
         nextLocked = !passed.has(`bl${nextLessonNum - 1}`);
+      }
+    }
+
+    return {
+      hasPrev: !!prevItem,
+      hasNext: !!nextItem,
+      prevItem,
+      nextItem,
+      nextLocked,
+      nextLessonNum,
+      isFirst: idx === 0,
+      isLast: idx === flat.length - 1
+    };
+  }
+
+  if (monthId === 'elementary' || monthId.startsWith('em')) {
+    const course = STATE.elementaryCourse;
+    if (!course || !course.months) return { hasPrev: false, hasNext: false, nextLocked: false };
+    const flat = [];
+    course.months.forEach(m => {
+      (m.weeks || []).forEach(w => {
+        (w.lessons || []).forEach(l => {
+          flat.push({
+            monthId: m.id,
+            weekId: w.id,
+            lessonId: l.id,
+            lessonNum: parseInt(l.id.replace('el', ''))
+          });
+        });
+      });
+    });
+    const idx = flat.findIndex(x => x.lessonId === lessonId);
+    if (idx === -1) return { hasPrev: false, hasNext: false, nextLocked: false };
+
+    const prevItem = idx > 0 ? flat[idx - 1] : null;
+    const nextItem = idx < flat.length - 1 ? flat[idx + 1] : null;
+    let nextLocked = false;
+    let nextLessonNum = null;
+
+    if (nextItem) {
+      nextLessonNum = nextItem.lessonNum;
+      if (!isAdmin && nextLessonNum > 1) {
+        const passed = new Set(STATE.elementaryStatus?.passedLessons || []);
+        nextLocked = !passed.has(`el${nextLessonNum - 1}`);
       }
     }
 
@@ -3070,6 +3371,12 @@ function showQuizResultModal(result) {
   const isBeginnerLesson = STATE.currentLesson?.monthId === 'beginner' && !isBeginnerFinal;
   STATE.isBeginnerFinalExam = false; // reset
 
+  const isElementaryExam = result.isElementaryExam || STATE.isElementaryExam;
+  const isElementaryFinal = result.isElementaryFinal || (isElementaryExam && (result.examMonth === 3 || STATE.elementaryExamMonth === 3));
+  const isElementaryLesson = (STATE.currentLesson?.monthId === 'elementary' || (STATE.currentLesson?.monthId && STATE.currentLesson.monthId.startsWith('em'))) && !isElementaryExam;
+  const examMonth = result.examMonth || STATE.elementaryExamMonth || 1;
+  STATE.isElementaryExam = false; // reset
+
   gradeCircle.textContent = result.grade;
   gradeTitle.textContent = result.gradeTitle || `និទ្ទេស ${result.grade}`;
   scoreText.textContent = `${result.score} / ${result.total} ពិន្ទុ (${result.percent}%)`;
@@ -3085,14 +3392,38 @@ function showQuizResultModal(result) {
           <span>🎓 មើលវិញ្ញាបនបត្របញ្ចប់ថ្នាក់ដំបូង</span>
         </button>
         <button class="btn btn-outline" onclick="closeModal('quizResultModal'); navigateTo('curriculum'); loadBeginnerStatus();">
-          <span>🔓 ចូលរៀនថ្នាក់បន្ទាប់</span>
+          <span>🔓 ចូលរៀនថ្នាក់បឋមសិក្សា</span>
         </button>
       `;
       // Reload beginner status to reflect graduation
       loadBeginnerStatus().then(() => renderBeginnerWeeks());
-    } else if (isBeginnerLesson) {
-      // Daily lesson passed (1/1) - no certificate!
-      feedback.innerHTML = `✅ <strong>ល្អណាស់!</strong> អ្នកបានប្រឡងជាប់មេរៀនថ្ងៃនេះ! <br>(<strong>ចំណាំ:</strong> ការប្រឡងប្រចាំថ្ងៃ មិនទទួលបានវិញ្ញាបនបត្រឡើយ — ប្រឡងបញ្ចប់ ២៦ ថ្ងៃ ទើបបានវិញ្ញាបនបត្រ!)`;
+    } else if (isElementaryFinal && result.certId) {
+      // Elementary Graduation!
+      feedback.innerHTML = `🎓 <strong>អបអរសាទរយ៉ាងក្រៃលែង! អ្នកបានបញ្ចប់ថ្នាក់បឋមសិក្សា (Elementary Level)!</strong><br>ទទួលបានវិញ្ញាបនបត្របញ្ចប់ការសិក្សាផ្លូវការ 🏆`;
+      actions.innerHTML = `
+        <button class="btn btn-gold btn-lg" onclick="openCertificatePreview('${result.certId}')">
+          <span>🎓 មើលវិញ្ញាបនបត្របញ្ចប់ថ្នាក់បឋមសិក្សា</span>
+        </button>
+        <button class="btn btn-outline" onclick="closeModal('quizResultModal'); navigateTo('curriculum'); loadElementaryStatus();">
+          <span>📚 បន្តទៅបញ្ជីមេរៀន</span>
+        </button>
+      `;
+      loadElementaryStatus().then(() => renderElementaryWeeks());
+    } else if (isElementaryExam && result.certId) {
+      // Elementary Month 1 or Month 2 exam passed!
+      feedback.innerHTML = `🎉 <strong>អបអរសាទរ! អ្នកបានប្រឡងជាប់ខែទី ${examMonth} នៃថ្នាក់បឋមសិក្សា!</strong><br>ទទួលបានវិញ្ញាបនបត្រផ្លូវការប្រចាំខែ 📜`;
+      actions.innerHTML = `
+        <button class="btn btn-gold btn-lg" onclick="openCertificatePreview('${result.certId}')">
+          <span>📜 មើលវិញ្ញាបនបត្រប្រចាំខែទី ${examMonth}</span>
+        </button>
+        <button class="btn btn-outline" onclick="closeModal('quizResultModal'); STATE.selectedElementaryMonthId = 'em${examMonth + 1}'; renderElementaryMonthsTabs();">
+          <span>📚 ចូលរៀនខែទី ${examMonth + 1} ▶</span>
+        </button>
+      `;
+      loadElementaryStatus().then(() => renderElementaryWeeks());
+    } else if (isBeginnerLesson || isElementaryLesson) {
+      // Daily lesson passed (1/1 or 4/4) - no certificate!
+      feedback.innerHTML = `✅ <strong>ល្អណាស់!</strong> អ្នកបានប្រឡងជាប់មេរៀនថ្ងៃនេះ! <br>(<strong>ចំណាំ:</strong> ការប្រឡងប្រចាំថ្ងៃ មិនទទួលបានវិញ្ញាបនបត្រឡើយ — ប្រឡងបញ្ចប់${isElementaryLesson ? 'ប្រចាំខែ' : '២៦ ថ្ងៃ'} ទើបបានវិញ្ញាបនបត្រ!)`;
       actions.innerHTML = `
         <button class="btn btn-primary" onclick="closeModal('quizResultModal'); goToNextLesson();">
           <span>មេរៀនបន្ទាប់ ▶</span>
@@ -3105,9 +3436,11 @@ function showQuizResultModal(result) {
         </button>
       `;
       refreshUserProfile().then(() => {
-        loadBeginnerStatus().then(() => {
-          updateLessonNavButtons();
-        });
+        if (isElementaryLesson) {
+          loadElementaryStatus().then(() => updateLessonNavButtons());
+        } else {
+          loadBeginnerStatus().then(() => updateLessonNavButtons());
+        }
       });
     } else if (result.certId) {
       // Annual exam or standard lesson with cert
@@ -3139,6 +3472,26 @@ function showQuizResultModal(result) {
         </button>
         <button class="btn btn-outline" onclick="closeModal('quizResultModal');">
           <span>📖 អានមេរៀនម្តងទៀត</span>
+        </button>
+      `;
+    } else if (isElementaryLesson) {
+      feedback.innerHTML = `❌ <strong>មិនទាន់ជាប់ទេ!</strong> ការប្រឡងមេរៀនប្រចាំថ្ងៃត្រូវការ ≥70% (3/4 សំណួរ)។ <strong>ព្យាយាមម្តងទៀត!</strong>`;
+      actions.innerHTML = `
+        <button class="btn btn-primary" onclick="closeModal('quizResultModal'); startCurrentLessonQuiz();">
+          <span>🔄 ប្រឡងម្តងទៀត (៤ សំណួរ)</span>
+        </button>
+        <button class="btn btn-outline" onclick="closeModal('quizResultModal');">
+          <span>📖 អានមេរៀនម្តងទៀត</span>
+        </button>
+      `;
+    } else if (isElementaryExam) {
+      feedback.innerHTML = `❌ <strong>មិនទាន់ជាប់ទេ!</strong> ការប្រឡង${isElementaryFinal ? 'បញ្ចប់វគ្គ' : `ប្រចាំខែទី ${examMonth}`} ត្រូវការ ≥70%។ ព្យាយាមម្តងទៀត!`;
+      actions.innerHTML = `
+        <button class="btn btn-primary" onclick="closeModal('quizResultModal'); startElementaryExam(${examMonth});">
+          <span>🔄 ប្រឡងម្តងទៀត</span>
+        </button>
+        <button class="btn btn-outline" onclick="closeModal('quizResultModal');">
+          <span>📚 ត្រឡប់ទៅ</span>
         </button>
       `;
     } else if (isBeginnerFinal) {
@@ -3263,7 +3616,13 @@ async function loadUserCertificates() {
 
     container.innerHTML = data.certificates.map(cert => {
       const isAnnual = cert.isAnnualExam;
-      const typeLabel = isAnnual ? '🎓 ប្រឡងបញ្ចប់មុខវិជ្ជាប្រចាំឆ្នាំ' : '📚 បញ្ចប់មេរៀនជោគជ័យ';
+      const isBeginner = cert.isBeginnerFinal;
+      const isElemFinal = cert.isElementaryFinal;
+      const isElemExam = cert.isElementaryExam;
+      const typeLabel = isBeginner ? '🎓 បញ្ចប់ថ្នាក់ដំបូង (English for Children)' : 
+                       (isElemFinal ? '🎓 បញ្ចប់ថ្នាក់បឋមសិក្សា (Elementary Graduation)' : 
+                       (isElemExam ? `📜 ប្រឡងប្រចាំខែទី ${cert.examMonth || 1} (Elementary)` : 
+                       (isAnnual ? '🎓 ប្រឡងបញ្ចប់មុខវិជ្ជាប្រចាំឆ្នាំ' : '📚 បញ្ចប់មេរៀនជោគជ័យ')));
       const certTitle = cert.subjectTitle || cert.lessonTitle || cert.title || 'វិញ្ញាបនបត្រ';
 
       return `
