@@ -1282,84 +1282,501 @@ body.day-mode .theme-toggle-btn:hover {
 }
 
 /* ==========================================================================
-   PROFESSIONAL BILINGUAL LESSON SYSTEM
+   PROFESSIONAL UNIFIED LESSON DESIGN SYSTEM (WORLD-CLASS EDUCATIONAL UX/UI)
    ========================================================================== */
 
 .pro-lesson-container {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 22px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
+/* --------------------------------------------------------------------------
+   1. ACADEMY HERO BANNER
+   -------------------------------------------------------------------------- */
 .pro-academy-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 22px;
+  border-radius: 18px;
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.pro-academy-banner::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #6366f1, #38bdf8, #10b981);
+}
+
+/* Course Theme Variants */
+.pro-academy-banner.badge-beginner {
+  background: linear-gradient(135deg, rgba(236, 72, 153, 0.16), rgba(139, 92, 246, 0.12));
+  border: 1px solid rgba(236, 72, 153, 0.35);
+}
+.pro-academy-banner.badge-beginner::before {
+  background: linear-gradient(90deg, #ec4899, #a855f7, #f43f5e);
+}
+
+.pro-academy-banner.badge-elementary {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.16), rgba(6, 182, 212, 0.12));
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+.pro-academy-banner.badge-elementary::before {
+  background: linear-gradient(90deg, #10b981, #06b6d4, #3b82f6);
+}
+
+.pro-academy-banner.badge-general {
+  background: linear-gradient(135deg, rgba(79, 70, 229, 0.18), rgba(56, 189, 248, 0.14));
+  border: 1px solid rgba(99, 102, 241, 0.35);
+}
+.pro-academy-banner.badge-general::before {
+  background: linear-gradient(90deg, #6366f1, #38bdf8, #8b5cf6);
+}
+
+.pro-banner-top-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 10px;
-  padding: 12px 18px;
-  background: linear-gradient(135deg, rgba(79, 70, 229, 0.2), rgba(6, 182, 212, 0.15));
-  border: 1px solid rgba(99, 102, 241, 0.3);
-  border-radius: var(--radius-sm);
 }
 
-.pro-banner-left {
+.pro-brand-left {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   font-weight: 700;
-  color: #fff;
-  font-size: 14px;
+  font-size: 13.5px;
+  color: #e2e8f0;
+  letter-spacing: 0.2px;
 }
 
-.pro-banner-badge {
+.pro-brand-icon {
+  font-size: 17px;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+}
+
+.pro-level-badge {
   font-size: 11.5px;
-  padding: 4px 10px;
-  border-radius: var(--radius-full);
-  background: rgba(6, 182, 212, 0.2);
-  border: 1px solid rgba(6, 182, 212, 0.4);
-  color: #38bdf8;
-  font-weight: 600;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #fff;
+  letter-spacing: 0.3px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-.pro-section-block {
-  padding: 18px 20px;
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-left: 4px solid #4f46e5;
+.pro-topic-hero {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 6px;
 }
 
+.pro-topic-title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.pro-topic-icon {
+  font-size: 22px;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.pro-topic-title {
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.45;
+  color: #ffffff;
+  margin: 0;
+  background: linear-gradient(135deg, #ffffff, #e2e8f0);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.pro-context-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  color: #94a3b8;
+  padding-left: 32px;
+}
+
+.pro-banner-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.pro-tutor-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 5px 14px;
+  border-radius: 9999px;
+  backdrop-filter: blur(8px);
+}
+
+.pro-tutor-pill.tutor-piseth {
+  background: rgba(236, 72, 153, 0.2);
+  border: 1px solid rgba(236, 72, 153, 0.45);
+  color: #f472b6;
+}
+
+.pro-tutor-pill.tutor-sorn {
+  background: rgba(14, 165, 233, 0.2);
+  border: 1px solid rgba(14, 165, 233, 0.45);
+  color: #38bdf8;
+}
+
+.pro-banner-quick-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pro-quick-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  font-size: 12.5px;
+  font-weight: 700;
+  border-radius: 9999px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #f1f5f9;
+  transition: all 0.2s ease;
+}
+
+.pro-quick-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+  transform: translateY(-1px);
+  color: #fff;
+}
+
+.pro-quick-btn.gold {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(217, 119, 6, 0.25));
+  border-color: rgba(245, 158, 11, 0.45);
+  color: #fbbf24;
+}
+
+.pro-quick-btn.gold:hover {
+  background: #f59e0b;
+  color: #0f172a;
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.4);
+}
+
+/* --------------------------------------------------------------------------
+   2. SECTION BLOCKS & TITLES
+   -------------------------------------------------------------------------- */
+.pro-section-block {
+  padding: 20px 22px;
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-left: 4px solid #6366f1;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: border-color 0.2s ease;
+}
+
+.pro-section-block:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.pro-section-block.pro-phonics-block { border-left-color: #ec4899; }
+.pro-section-block.pro-grammar-block { border-left-color: #6366f1; }
+.pro-section-block.pro-vocab-block { border-left-color: #10b981; }
+.pro-section-block.pro-sentences-block { border-left-color: #38bdf8; }
+.pro-section-block.pro-dialogue-block { border-left-color: #a855f7; }
+.pro-section-block.pro-mistakes-block { border-left-color: #ef4444; }
+.pro-section-block.pro-tutor-tip-block { border-left-color: #f59e0b; }
+.pro-section-block.pro-practice-block { border-left-color: #fbbf24; }
+
 .pro-section-title {
-  font-size: 16px;
+  font-size: 16.5px;
   font-weight: 800;
   color: #38bdf8;
   display: flex;
   align-items: center;
+  gap: 10px;
+  margin: 0;
+  letter-spacing: 0.1px;
+}
+
+.pro-sec-icon {
+  font-size: 20px;
+}
+
+/* --------------------------------------------------------------------------
+   3. PHONICS & ALPHABET MODULE
+   -------------------------------------------------------------------------- */
+.pro-phonics-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  background: rgba(30, 41, 59, 0.45);
+  border: 1px solid rgba(236, 72, 153, 0.25);
+  border-radius: 14px;
+}
+
+.pro-phonics-hero-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.pro-phonics-letter-hero {
+  min-width: 110px;
+  padding: 14px 18px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(236, 72, 153, 0.25), rgba(139, 92, 246, 0.25));
+  border: 1.5px solid rgba(236, 72, 153, 0.45);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 18px rgba(236, 72, 153, 0.25);
+}
+
+.phonics-giant-letter {
+  font-size: 38px;
+  font-weight: 900;
+  background: linear-gradient(135deg, #f472b6, #c084fc);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  line-height: 1;
+}
+
+.phonics-letter-desc {
+  font-size: 13px;
+  font-weight: 700;
+  color: #e2e8f0;
+  margin-top: 4px;
+}
+
+.pro-phonics-details {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+}
+
+.pro-phonics-sound-box, .pro-phonics-spelling-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.phonics-tag {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.phonics-ipa-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.phonics-ipa-text {
+  font-size: 17px;
+  font-weight: 800;
+  color: #38bdf8;
+  font-family: monospace, sans-serif;
+  padding: 4px 12px;
+  background: rgba(14, 165, 233, 0.12);
+  border: 1px solid rgba(14, 165, 233, 0.3);
+  border-radius: 8px;
+}
+
+.phonics-tokens-rail {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.spelling-token-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #f8fafc;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.spelling-token-btn:hover {
+  background: #ec4899;
+  border-color: #f472b6;
+  color: #fff;
+  transform: translateY(-2px) scale(1.08);
+  box-shadow: 0 4px 12px rgba(236, 72, 153, 0.4);
+}
+
+.token-letter {
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.token-sound {
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.pro-phonics-note-banner {
+  display: flex;
+  align-items: flex-start;
   gap: 8px;
-  margin-bottom: 4px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  font-size: 13.5px;
+  color: #fef3c7;
+  line-height: 1.6;
+}
+
+/* --------------------------------------------------------------------------
+   4. GRAMMAR, FORMULAS & DEFINITIONS
+   -------------------------------------------------------------------------- */
+.pro-definition-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pro-def-paragraph {
+  font-size: 15px;
+  line-height: 1.8;
+  color: #e2e8f0;
+  margin: 0;
 }
 
 .pro-formula-box {
-  background: rgba(15, 23, 42, 0.85);
-  border: 1px solid rgba(56, 189, 248, 0.3);
-  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.85));
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  border-radius: 12px;
   padding: 14px 18px;
-  font-family: monospace, sans-serif;
-  color: #a5f3fc;
-  font-size: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.formula-badge-label {
+  font-size: 11.5px;
+  font-weight: 800;
+  color: #818cf8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.formula-code {
+  font-family: 'Fira Code', monospace, sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  color: #38bdf8;
   line-height: 1.7;
   white-space: pre-wrap;
 }
 
-.pro-formula-box b, .pro-formula-box strong {
-  color: #38bdf8;
+.pro-rules-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-/* Bilingual Example Cards */
+.pro-rule-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 14.5px;
+  color: #f1f5f9;
+}
+
+.pro-rule-item.bilingual {
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.rule-en-side {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rule-bullet {
+  color: #818cf8;
+  font-size: 11px;
+}
+
+.rule-en-key {
+  font-weight: 700;
+  color: #fff;
+  font-size: 14.5px;
+}
+
+.rule-kh-side {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rule-arrow {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.rule-kh-val {
+  color: #38bdf8;
+  font-weight: 600;
+}
+
+/* --------------------------------------------------------------------------
+   5. BILINGUAL VOCABULARY & SENTENCE CARDS
+   -------------------------------------------------------------------------- */
 .pro-bilingual-grid {
   display: flex;
   flex-direction: column;
@@ -1367,122 +1784,201 @@ body.day-mode .theme-toggle-btn:hover {
 }
 
 .pro-bilingual-card {
-  padding: 14px 16px;
-  border-radius: var(--radius-sm);
-  background: rgba(30, 41, 59, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 14px 18px;
+  border-radius: 14px;
+  background: rgba(30, 41, 59, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.07);
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  transition: all 0.2s ease;
+  gap: 8px;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .pro-bilingual-card:hover {
-  background: rgba(30, 41, 59, 0.8);
-  border-color: rgba(99, 102, 241, 0.3);
-  transform: translateX(4px);
+  background: rgba(30, 41, 59, 0.85);
+  border-color: rgba(99, 102, 241, 0.4);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+
+.pro-sentence-card {
+  border-left: 3px solid #38bdf8;
+}
+
+.pro-sentence-header-tag {
+  font-size: 12.5px;
+  font-weight: 800;
+  color: #a78bfa;
+  margin-bottom: 2px;
+  letter-spacing: 0.2px;
 }
 
 .pro-en-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 12px;
 }
 
 .pro-en-left {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   flex: 1;
+}
+
+.pro-en-word-box {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pro-en-text {
+  font-size: 16px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: 0.2px;
+  line-height: 1.5;
+}
+
+.pro-ipa-pill {
+  font-size: 12px;
+  font-weight: 600;
+  color: #38bdf8;
+  font-family: monospace, sans-serif;
+  padding: 2px 8px;
+  background: rgba(14, 165, 233, 0.14);
+  border-radius: 6px;
+  border: 1px solid rgba(14, 165, 233, 0.25);
+}
+
+.pro-kh-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-left: 50px;
+}
+
+.pro-flag {
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+.pro-kh-text {
+  font-size: 14.5px;
+  color: #38bdf8;
+  font-weight: 600;
+  line-height: 1.6;
 }
 
 .pro-word-logo-badge {
   width: 38px;
   height: 38px;
   min-width: 38px;
-  border-radius: 10px;
+  border-radius: 11px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 20px;
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(168, 85, 247, 0.15));
-  border: 1px solid rgba(168, 85, 247, 0.28);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  font-size: 21px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(168, 85, 247, 0.2));
+  border: 1px solid rgba(168, 85, 247, 0.35);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
   transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
   user-select: none;
   flex-shrink: 0;
 }
 
 .pro-bilingual-card:hover .pro-word-logo-badge {
-  transform: scale(1.12) rotate(-3deg);
-  border-color: rgba(99, 102, 241, 0.55);
-  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
+  transform: scale(1.15) rotate(-4deg);
+  border-color: rgba(99, 102, 241, 0.6);
+  box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4);
 }
 
 .pro-word-logo-badge .letter-monogram {
-  font-weight: 800;
-  font-size: 17px;
+  font-weight: 900;
+  font-size: 18px;
   background: linear-gradient(135deg, #38bdf8, #818cf8);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  text-shadow: 0 0 10px rgba(56, 189, 248, 0.3);
 }
 
-body.day-mode .pro-word-logo-badge {
-  background: linear-gradient(135deg, #eef2ff, #f5f3ff);
-  border-color: #cbd5e1;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+/* Sub-Example Drawer in Vocabulary */
+.pro-vocab-sub-example {
+  margin-top: 4px;
+  margin-left: 50px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
-body.day-mode .pro-word-logo-badge .letter-monogram {
-  background: linear-gradient(135deg, #2563eb, #7c3aed);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+.sub-ex-en-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  color: #e2e8f0;
 }
 
-.pro-en-text {
-  font-size: 15px;
+.sub-ex-label {
   font-weight: 700;
-  color: #ffffff;
-  letter-spacing: 0.2px;
+  color: #a78bfa;
 }
 
+.sub-ex-en-text {
+  font-weight: 600;
+  color: #fff;
+  flex: 1;
+}
+
+.sub-ex-kh-row {
+  font-size: 13px;
+  color: #38bdf8;
+  padding-left: 6px;
+}
+
+/* --------------------------------------------------------------------------
+   6. SPEAK BUTTON (AUDIO)
+   -------------------------------------------------------------------------- */
 .pro-speak-btn {
-  background: rgba(79, 70, 229, 0.2);
-  border: 1px solid rgba(99, 102, 241, 0.3);
+  background: rgba(99, 102, 241, 0.2);
+  border: 1px solid rgba(99, 102, 241, 0.35);
   color: #818cf8;
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-full);
+  width: 34px;
+  height: 34px;
+  border-radius: 9999px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   font-size: 14px;
-  transition: all 0.15s ease;
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
   flex-shrink: 0;
 }
 
+.pro-speak-btn.sm {
+  width: 26px;
+  height: 26px;
+  font-size: 11px;
+}
+
 .pro-speak-btn:hover {
-  background: #4f46e5;
+  background: #6366f1;
   color: #fff;
-  transform: scale(1.1);
-  box-shadow: 0 0 10px rgba(99, 102, 241, 0.5);
+  transform: scale(1.12);
+  box-shadow: 0 0 12px rgba(99, 102, 241, 0.6);
 }
 
 .pro-speak-btn.playing {
-  background: #4f46e5 !important;
+  background: #6366f1 !important;
   color: #fff !important;
   transform: scale(1.18);
-  box-shadow: 0 0 14px rgba(99, 102, 241, 0.75) !important;
+  box-shadow: 0 0 14px rgba(99, 102, 241, 0.8) !important;
   animation: speakPulse 0.8s ease-in-out infinite alternate;
-}
-
-.pro-speak-btn.playing.piseth {
-  background: #ec4899 !important;
-  border-color: #f472b6 !important;
-  box-shadow: 0 0 14px rgba(236, 72, 153, 0.75) !important;
 }
 
 @keyframes speakPulse {
@@ -1490,33 +1986,21 @@ body.day-mode .pro-word-logo-badge .letter-monogram {
   100% { transform: scale(1.22); }
 }
 
-.pro-kh-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding-left: 24px;
-}
-
-.pro-kh-text {
-  font-size: 14px;
-  color: #38bdf8;
-  font-weight: 500;
-  line-height: 1.6;
-}
-
-/* Dialogue Speech Bubbles */
+/* --------------------------------------------------------------------------
+   7. BILINGUAL DIALOGUES
+   -------------------------------------------------------------------------- */
 .pro-dialogue-thread {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  margin: 10px 0;
+  gap: 16px;
+  margin: 6px 0;
 }
 
 .pro-dialogue-turn {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  max-width: 90%;
+  gap: 6px;
+  max-width: 88%;
 }
 
 .pro-dialogue-turn.speaker-b {
@@ -1524,7 +2008,7 @@ body.day-mode .pro-word-logo-badge .letter-monogram {
 }
 
 .pro-speaker-name {
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 700;
   color: #94a3b8;
   display: flex;
@@ -1532,97 +2016,379 @@ body.day-mode .pro-word-logo-badge .letter-monogram {
   gap: 6px;
 }
 
+.pro-speaker-avatar {
+  font-size: 16px;
+}
+
 .pro-dialogue-turn.speaker-b .pro-speaker-name {
   justify-content: flex-end;
 }
 
 .pro-dialogue-bubble {
-  padding: 12px 16px;
-  border-radius: 12px;
+  padding: 14px 18px;
+  border-radius: 16px;
   background: rgba(30, 41, 59, 0.7);
   border: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .pro-dialogue-turn.speaker-a .pro-dialogue-bubble {
-  border-left: 3px solid #6366f1;
+  border-left: 3.5px solid #6366f1;
+  border-bottom-left-radius: 4px;
 }
 
 .pro-dialogue-turn.speaker-b .pro-dialogue-bubble {
-  border-right: 3px solid #10b981;
-  background: rgba(16, 185, 129, 0.08);
+  border-right: 3.5px solid #10b981;
+  border-bottom-right-radius: 4px;
+  background: rgba(16, 185, 129, 0.09);
 }
 
-/* Common Mistake Alert Card */
-.pro-mistake-box {
-  background: rgba(239, 68, 68, 0.08);
+/* --------------------------------------------------------------------------
+   8. COMMON MISTAKES
+   -------------------------------------------------------------------------- */
+.pro-mistakes-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pro-mistake-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 14.5px;
+}
+
+.pro-mistake-row.wrong {
+  background: rgba(239, 68, 68, 0.1);
   border: 1px solid rgba(239, 68, 68, 0.3);
-  border-left: 4px solid #ef4444;
-  border-radius: var(--radius-sm);
-  padding: 14px 18px;
-  font-size: 14px;
-  line-height: 1.7;
+  color: #fca5a5;
 }
 
-.pro-mistake-box .pro-wrong {
+.pro-mistake-row.correct {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #6ee7b7;
+}
+
+.mistake-badge {
+  font-size: 12px;
+  font-weight: 800;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  flex-shrink: 0;
+}
+
+.mistake-badge.wrong {
+  background: rgba(239, 68, 68, 0.25);
   color: #f87171;
-  font-weight: 700;
-  display: block;
-  margin-bottom: 4px;
 }
 
-.pro-mistake-box .pro-correct {
+.mistake-badge.correct {
+  background: rgba(16, 185, 129, 0.25);
   color: #34d399;
-  font-weight: 700;
-  display: block;
 }
 
-/* Practice Card */
-.pro-practice-box {
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(217, 119, 6, 0.05));
-  border: 1px solid rgba(245, 158, 11, 0.3);
-  border-radius: var(--radius-sm);
-  padding: 16px 20px;
+.mistake-text {
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.pro-mistake-note {
+  font-size: 13.5px;
+  color: #cbd5e1;
+  padding: 4px 8px;
+}
+
+/* --------------------------------------------------------------------------
+   9. AI TUTOR PRO TIPS
+   -------------------------------------------------------------------------- */
+.pro-tutor-tip-card {
+  padding: 18px 22px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.14), rgba(217, 119, 6, 0.08));
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  box-shadow: 0 4px 20px rgba(245, 158, 11, 0.12);
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
-.pro-practice-header {
-  font-size: 15px;
-  font-weight: 800;
-  color: #fbbf24;
+.tutor-tip-header {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: 4px;
 }
 
-.pro-practice-content {
-  font-size: 14px;
-  color: #f3f4f6;
-  line-height: 1.7;
-  white-space: pre-wrap;
-}
-
-.pro-practice-btn {
-  align-self: flex-start;
-  padding: 8px 16px;
-  border-radius: var(--radius-full);
-  background: #f59e0b;
-  border: none;
-  color: #000;
-  font-weight: 700;
-  font-size: 13px;
-  cursor: pointer;
+.tutor-tip-badge-row {
   display: flex;
   align-items: center;
   gap: 6px;
-  transition: all 0.2s ease;
 }
 
-.pro-practice-btn:hover {
-  background: #d97706;
+.tutor-tip-badge {
+  font-size: 11px;
+  font-weight: 800;
+  color: #fbbf24;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+
+.tutor-tip-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: #fef08a;
+  margin: 0;
+}
+
+.tutor-tip-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.tutor-tip-avatar {
+  font-size: 28px;
+  flex-shrink: 0;
+  filter: drop-shadow(0 2px 6px rgba(245, 158, 11, 0.4));
+}
+
+.tutor-tip-content {
+  font-size: 14.5px;
+  color: #f8fafc;
+  line-height: 1.8;
+  white-space: pre-wrap;
+}
+
+/* --------------------------------------------------------------------------
+   10. PRACTICE EXERCISE
+   -------------------------------------------------------------------------- */
+.pro-practice-box {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 22px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(168, 85, 247, 0.08));
+  border: 1px solid rgba(99, 102, 241, 0.3);
+}
+
+.pro-practice-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pro-practice-icon {
+  font-size: 20px;
+}
+
+.pro-practice-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: #a5b4fc;
+}
+
+.pro-practice-content {
+  font-size: 15px;
+  color: #f1f5f9;
+  line-height: 1.8;
+  white-space: pre-wrap;
+}
+
+.pro-practice-action-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.pro-practice-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 9999px;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  border: none;
+}
+
+.pro-practice-btn.primary {
+  background: linear-gradient(135deg, #6366f1, #4f46e5);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
+}
+
+.pro-practice-btn.primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+  box-shadow: 0 6px 18px rgba(99, 102, 241, 0.5);
+}
+
+.pro-practice-btn.gold {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #0f172a;
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.35);
+}
+
+.pro-practice-btn.gold:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(245, 158, 11, 0.5);
+}
+
+.pro-generic-content {
+  font-size: 15px;
+  line-height: 1.8;
+  color: #e2e8f0;
+  white-space: pre-wrap;
+}
+
+/* --------------------------------------------------------------------------
+   11. LIGHT / DAY MODE COMPATIBILITY
+   -------------------------------------------------------------------------- */
+body.day-mode .pro-academy-banner {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+}
+
+body.day-mode .pro-topic-title {
+  color: #0f172a;
+  background: none;
+  -webkit-text-fill-color: initial;
+}
+
+body.day-mode .pro-brand-left {
+  color: #334155;
+}
+
+body.day-mode .pro-level-badge {
+  background: rgba(0, 0, 0, 0.06);
+  border-color: rgba(0, 0, 0, 0.1);
+  color: #0f172a;
+}
+
+body.day-mode .pro-section-block {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+}
+
+body.day-mode .pro-section-title {
+  color: #1e293b;
+}
+
+body.day-mode .pro-def-paragraph,
+body.day-mode .pro-en-text,
+body.day-mode .pro-generic-content,
+body.day-mode .pro-practice-content {
+  color: #1e293b;
+}
+
+body.day-mode .pro-bilingual-card {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+body.day-mode .pro-bilingual-card:hover {
+  background: #ffffff;
+  border-color: #6366f1;
+  box-shadow: 0 6px 18px rgba(99, 102, 241, 0.15);
+}
+
+body.day-mode .pro-rule-item {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  color: #1e293b;
+}
+
+body.day-mode .rule-en-key {
+  color: #0f172a;
+}
+
+body.day-mode .pro-phonics-card {
+  background: #fdf2f8;
+  border-color: #fbcfe8;
+}
+
+body.day-mode .pro-phonics-letter-hero {
+  background: linear-gradient(135deg, #fce7f3, #fae8ff);
+  border-color: #f472b6;
+}
+
+body.day-mode .phonics-letter-desc {
+  color: #475569;
+}
+
+body.day-mode .spelling-token-btn {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+
+body.day-mode .pro-dialogue-bubble {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+body.day-mode .pro-dialogue-turn.speaker-b .pro-dialogue-bubble {
+  background: #ecfdf5;
+}
+
+body.day-mode .tutor-tip-content {
+  color: #451a03;
+}
+
+body.day-mode .tutor-tip-title {
+  color: #78350f;
+}
+
+/* --------------------------------------------------------------------------
+   12. MOBILE RESPONSIVENESS
+   -------------------------------------------------------------------------- */
+@media (max-width: 768px) {
+  .pro-academy-banner {
+    padding: 16px;
+    gap: 12px;
+  }
+
+  .pro-topic-title {
+    font-size: 17.5px;
+  }
+
+  .pro-context-row {
+    padding-left: 0;
+  }
+
+  .pro-section-block {
+    padding: 16px;
+  }
+
+  .pro-bilingual-card {
+    padding: 12px 14px;
+  }
+
+  .pro-kh-row {
+    padding-left: 0;
+  }
+
+  .pro-vocab-sub-example {
+    margin-left: 0;
+  }
+
+  .pro-dialogue-turn {
+    max-width: 95%;
+  }
+
+  .pro-practice-btn {
+    width: 100%;
+    justify-content: center;
+  }
 }
 
 .lesson-actions-bar {

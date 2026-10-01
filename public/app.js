@@ -2018,77 +2018,301 @@ function renderProfessionalLessonHTML(rawText) {
 
   let html = `<div class="pro-lesson-container">`;
 
-  // Header banner
+  // 1. ACADEMY HERO BANNER (Section 0)
   if (sections.length > 0) {
     const headerLines = sections[0].split('\n').map(l => l.trim()).filter(Boolean);
-    const bannerTitle = headerLines[0] || '📚 វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេសអនឡាញ StudyAI';
+    const bannerTitle = headerLines[0] || '📚 វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេសអនឡាញ Teacher SSOnline';
     const levelInfo = headerLines.find(l => l.startsWith('📌')) || '';
     const topicInfo = headerLines.find(l => l.startsWith('🎯') || l.startsWith('🗣️') || l.startsWith('📖') || l.startsWith('🔥') || l.startsWith('✨')) || '';
     const situationInfo = headerLines.find(l => l.startsWith('📍')) || '';
 
+    // Determine course theme & teacher badge
+    const isBeginner = levelInfo.includes('ថ្នាក់ដំបូង') || levelInfo.includes('Children');
+    const isElementary = levelInfo.includes('ថ្នាក់បឋមសិក្សា') || levelInfo.includes('Elementary');
+    const tutorBadge = (isBeginner || isElementary || situationInfo.includes('ពិសិដ្ឋ'))
+      ? `<span class="pro-tutor-pill tutor-piseth">👩‍🏫 អ្នកគ្រូ ពិសិដ្ឋ (Teacher Piseth AI)</span>`
+      : `<span class="pro-tutor-pill tutor-sorn">👨‍🏫 គ្រូសន (Teacher Sorn AI)</span>`;
+
+    const levelBadgeClass = isBeginner ? 'badge-beginner' : (isElementary ? 'badge-elementary' : 'badge-general');
+    const cleanLevel = levelInfo.replace(/^📌\s*(កម្រិត៖\s*)?/, '');
+    const cleanTopic = topicInfo.replace(/^[🎯🗣️📖🔥✨]\s*(ប្រធានបទ៖\s*)?/, '');
+
     html += `
-      <div class="pro-academy-banner">
-        <div class="pro-banner-left">
-          <span>🎓 ${bannerTitle.replace(/^📚\s*/, '')}</span>
+      <div class="pro-academy-banner ${levelBadgeClass}">
+        <div class="pro-banner-top-row">
+          <div class="pro-brand-left">
+            <span class="pro-brand-icon">🎓</span>
+            <span class="pro-brand-name">${bannerTitle.replace(/^📚\s*/, '')}</span>
+          </div>
+          <div class="pro-level-badge">${cleanLevel || 'មេរៀនស្តង់ដា'}</div>
         </div>
-        <div class="pro-banner-badge">${levelInfo.replace(/^📌\s*/, '')}</div>
+
+        <div class="pro-topic-hero">
+          <div class="pro-topic-title-row">
+            <span class="pro-topic-icon">🎯</span>
+            <h2 class="pro-topic-title">${cleanTopic || 'ខ្លឹមសារមេរៀន'}</h2>
+          </div>
+          ${situationInfo ? `<div class="pro-context-row"><span class="pro-context-icon">📍</span><span class="pro-context-text">${situationInfo.replace(/^📍\s*/, '')}</span></div>` : ''}
+        </div>
+
+        <div class="pro-banner-toolbar">
+          <div class="pro-tutor-badge-box">${tutorBadge}</div>
+          <div class="pro-banner-quick-actions">
+            <button class="pro-quick-btn" onclick="toggleLessonAudio()" title="ស្តាប់សំឡេងមេរៀន">
+              <span>🔊 ស្តាប់មេរៀន</span>
+            </button>
+            <button class="pro-quick-btn gold" onclick="startCurrentLessonQuiz()" title="ចូលប្រឡង Quiz">
+              <span>📝 ប្រឡង Quiz</span>
+            </button>
+          </div>
+        </div>
       </div>
     `;
-
-    if (topicInfo || situationInfo) {
-      html += `
-        <div class="pro-section-block" style="border-left-color: #06b6d4;">
-          <div class="pro-section-title" style="color: #38bdf8;">${topicInfo}</div>
-          ${situationInfo ? `<div style="font-size: 13.5px; color: #cbd5e1;">${situationInfo}</div>` : ''}
-        </div>
-      `;
-    }
   }
 
-  // Process remaining sections
+  // 2. PROCESS SECTIONS
   for (let sIdx = 1; sIdx < sections.length; sIdx++) {
     const sec = sections[sIdx];
-    const lines = sec.split('\n');
+    const lines = sec.split('\n').map(l => l.trim()).filter(Boolean);
+    const firstLine = lines[0] || '';
 
-    // Section 1: Definition or Rules
-    if (sec.includes('📖 និយមន័យ') || sec.includes('📐 រូបមន្ត') || sec.includes('Formulas')) {
+    // ==========================================
+    // MODULE A: PHONICS & ALPHABET (Beginner)
+    // ==========================================
+    if (sec.includes('📐 តួអក្សរ') || sec.includes('Phonics') || sec.includes('សូរសព្ទ')) {
+      let letter = '';
+      let sound = '';
+      let spelling = '';
+      let note = '';
+
+      lines.forEach(l => {
+        if (l.includes('តួអក្សរ៖')) letter = l.replace(/^•?\s*តួអក្សរ៖\s*/, '');
+        else if (l.includes('សូរសំឡេង') || l.includes('Phonics៖')) sound = l.replace(/^•?\s*សូរសំឡេង.*?[៖:]\s*/, '');
+        else if (l.includes('ការប្រកប') || l.includes('Spelling')) spelling = l.replace(/^•?\s*ការប្រកប.*?[៖:]\s*/, '');
+        else if (l.includes('ចំណាំ Phonics') || l.includes('ចំណាំ')) note = l.replace(/^•?\s*ចំណាំ.*?[៖:]\s*/, '');
+      });
+
+      const spellingTokens = spelling ? spelling.split(/[-–—•\s]+/).filter(Boolean) : [];
+      const letterMonogram = letter.split(/[\s(]/)[0] || 'Aa';
+
       html += `
-        <div class="pro-section-block" style="border-left-color: #6366f1;">
-          <div class="pro-section-title">📐 រូបមន្ត និងក្បួនវេយ្យាករណ៍ (Formulas & Rules)</div>
-          <div class="pro-formula-box">${sec.replace(/^[📖📐].*?\n/g, '').trim()}</div>
+        <div class="pro-section-block pro-phonics-block">
+          <div class="pro-section-title">
+            <span class="pro-sec-icon">📐</span>
+            <span>តួអក្សរ និងសូរសព្ទ Phonics (Alphabet & Phonics Studio)</span>
+          </div>
+
+          <div class="pro-phonics-card">
+            <div class="pro-phonics-hero-row">
+              <div class="pro-phonics-letter-hero">
+                <span class="phonics-giant-letter">${letterMonogram}</span>
+                <span class="phonics-letter-desc">${letter.replace(letterMonogram, '').replace(/[()]/g, '').trim()}</span>
+              </div>
+
+              <div class="pro-phonics-details">
+                ${sound ? `
+                  <div class="pro-phonics-sound-box">
+                    <span class="phonics-tag">សូរសំឡេង (Sound)</span>
+                    <div class="phonics-ipa-row">
+                      <span class="phonics-ipa-text">${sound}</span>
+                      <button class="pro-speak-btn" onclick="speakEnglish('${escapeAttr(letterMonogram.charAt(0))}', this)" title="ស្តាប់សូរសំឡេង Phonics">🔊</button>
+                    </div>
+                  </div>
+                ` : ''}
+
+                ${spellingTokens.length > 0 ? `
+                  <div class="pro-phonics-spelling-box">
+                    <span class="phonics-tag">ការប្រកបពាក្យ (Spelling)</span>
+                    <div class="phonics-tokens-rail">
+                      ${spellingTokens.map(tok => `
+                        <button class="spelling-token-btn" onclick="speakEnglish('${escapeAttr(tok)}', this)" title="ចុចស្តាប់អក្សរ ${tok}">
+                          <span class="token-letter">${tok}</span>
+                          <span class="token-sound">🔊</span>
+                        </button>
+                      `).join('')}
+                    </div>
+                  </div>
+                ` : ''}
+              </div>
+            </div>
+
+            ${note ? `
+              <div class="pro-phonics-note-banner">
+                <span class="note-icon">💡</span>
+                <span class="note-text"><strong>ចំណាំ Phonics៖</strong> ${note}</span>
+              </div>
+            ` : ''}
+          </div>
         </div>
       `;
       continue;
     }
 
-    // Section 2: Key Vocabulary list
-    if (sec.includes('🔑 វាក្យសព្ទ') || (sec.includes('📝 បញ្ជី') && !sec.includes('ឧទាហរណ៍ជាក់ស្តែង'))) {
-      const vocabLines = lines.filter(l => /^\d+\.\s*/.test(l.trim()));
+    // ==========================================
+    // MODULE B: GRAMMAR, FORMULAS & DEFINITIONS
+    // ==========================================
+    if (sec.includes('📖 និយមន័យ') || sec.includes('📐 រូបមន្ត') || sec.includes('📖 មូលដ្ឋានវេយ្យាករណ៍') || sec.includes('Formulas') || sec.includes('Grammar Rules') || sec.includes('Sentence Formulas')) {
+      const titleLine = firstLine.replace(/^[📖📐\s]+/, '').replace(/៖$/, '');
+      const contentLines = lines.slice(1);
+
+      // Separate definition explanation, formula, and rules
+      let defParagraphs = [];
+      let formulaBox = '';
+      let ruleItems = [];
+
+      contentLines.forEach(l => {
+        if (/រូបមន្ត|Formulas|S\s*\+\s*V|Subject\s*\+/i.test(l) || /^[A-Z\s+()\[\]/]+\s*=\s*/.test(l)) {
+          formulaBox += (formulaBox ? '\n' : '') + l;
+        } else if (/^[•\-\*]|^\d+[\.\)]|^[១-៩]+[\.\)]/.test(l)) {
+          ruleItems.push(l);
+        } else if (l.trim()) {
+          defParagraphs.push(l);
+        }
+      });
+
       html += `
-        <div class="pro-section-block" style="border-left-color: #10b981;">
-          <div class="pro-section-title">🔑 វាក្យសព្ទគន្លឹះប្រចាំមេរៀន (Key Vocabulary)</div>
-          <div class="pro-bilingual-grid">
-            ${vocabLines.map(vl => {
-              const cleaned = vl.replace(/^\d+\.\s*/, '');
-              const parts = cleaned.split(' = ');
-              const en = (parts[0] || '').replace(/^[🇬🇧\s]+/, '').trim();
-              const kh = (parts[1] || '').replace(/^[🇰🇭\s]+/, '').trim();
-              const logo = getWordVisualLogo(en, kh);
-              return `
-                <div class="pro-bilingual-card">
-                  <div class="pro-en-row">
-                    <div class="pro-en-left">
-                      <span class="pro-word-logo-badge" title="${escapeAttr(en)}">${logo}</span>
-                      <span class="pro-en-text">${en}</span>
+        <div class="pro-section-block pro-grammar-block">
+          <div class="pro-section-title">
+            <span class="pro-sec-icon">📐</span>
+            <span>${titleLine || 'រូបមន្ត និងក្បួនវេយ្យាករណ៍ (Formulas & Grammar Rules)'}</span>
+          </div>
+
+          ${defParagraphs.length > 0 ? `
+            <div class="pro-definition-box">
+              ${defParagraphs.map(p => `<p class="pro-def-paragraph">${p}</p>`).join('')}
+            </div>
+          ` : ''}
+
+          ${formulaBox ? `
+            <div class="pro-formula-box">
+              <div class="formula-badge-label">⚡ រូបមន្តគន្លឹះ (Formula)</div>
+              <div class="formula-code">${formulaBox}</div>
+            </div>
+          ` : ''}
+
+          ${ruleItems.length > 0 ? `
+            <div class="pro-rules-list">
+              ${ruleItems.map(r => {
+                const cleaned = r.replace(/^[•\-\*]\s*|^\d+[\.\)]\s*|^[១-៩]+[\.\)]\s*/, '');
+                const parts = cleaned.split(' = ');
+                if (parts.length === 2) {
+                  return `
+                    <div class="pro-rule-item bilingual">
+                      <div class="rule-en-side">
+                        <span class="rule-bullet">✦</span>
+                        <span class="rule-en-key">${parts[0].trim()}</span>
+                        <button class="pro-speak-btn sm" onclick="speakEnglish('${escapeAttr(parts[0].trim())}', this)" title="ស្តាប់សំឡេង">🔊</button>
+                      </div>
+                      <div class="rule-kh-side">
+                        <span class="rule-arrow">➔</span>
+                        <span class="rule-kh-val">${parts[1].trim()}</span>
+                      </div>
                     </div>
-                    <button class="pro-speak-btn" onclick="speakEnglish('${escapeAttr(en)}', this)" title="ស្តាប់ការបញ្ចេញសំឡេង">🔊</button>
+                  `;
+                }
+                return `
+                  <div class="pro-rule-item">
+                    <span class="rule-bullet">✦</span>
+                    <span class="rule-text">${cleaned}</span>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          ` : ''}
+        </div>
+      `;
+      continue;
+    }
+
+    // ==========================================
+    // MODULE C: DIALOGUES
+    // ==========================================
+    if (sec.includes('💬 កិច្ចសន្ទនា') || sec.includes('Dialogue')) {
+      html += `
+        <div class="pro-section-block pro-dialogue-block">
+          <div class="pro-section-title">
+            <span class="pro-sec-icon">💬</span>
+            <span>កិច្ចសន្ទនាគំរូពេញលេញ (Full Dialogue with Audio)</span>
+          </div>
+          <div class="pro-dialogue-thread">
+      `;
+
+      let currentSpeaker = '';
+      let turnEn = '';
+      let turnKh = '';
+      let isSpeakerB = false;
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (line.startsWith('👤')) {
+          currentSpeaker = line.replace(/^👤\s*/, '').replace(/:$/, '').trim();
+          isSpeakerB = /B$|Student|David|Waiter|Clerk|Landlord|Doctor|Interviewer|Candidate|Chantha|You/i.test(currentSpeaker);
+        } else if (line.includes('🇬🇧')) {
+          turnEn = line.replace(/^[•\s]*🇬🇧\s*/, '').replace(/^"|"$/g, '').trim();
+        } else if (line.includes('🇰🇭')) {
+          turnKh = line.replace(/^[•\s]*🇰🇭\s*/, '').replace(/^\(|\)$/g, '').trim();
+
+          if (currentSpeaker && turnEn && turnKh) {
+            const avatar = /Piseth/i.test(currentSpeaker) ? '👩‍🏫' : (/Sorn/i.test(currentSpeaker) ? '👨‍🏫' : (isSpeakerB ? '🧑‍🎓' : '👤'));
+            html += `
+              <div class="pro-dialogue-turn ${isSpeakerB ? 'speaker-b' : 'speaker-a'}">
+                <div class="pro-speaker-name">
+                  <span class="pro-speaker-avatar">${avatar}</span>
+                  <span>${currentSpeaker}</span>
+                </div>
+                <div class="pro-dialogue-bubble">
+                  <div class="pro-en-row">
+                    <span class="pro-en-text">"${turnEn}"</span>
+                    <button class="pro-speak-btn" onclick="speakEnglish('${escapeAttr(turnEn)}', this)" title="ស្តាប់សំឡេង">🔊</button>
                   </div>
                   <div class="pro-kh-row">
-                    <span class="pro-flag">🇰🇭</span>
-                    <span class="pro-kh-text">${kh}</span>
+                    <span class="pro-kh-text">${turnKh}</span>
                   </div>
                 </div>
-              `;
+              </div>
+            `;
+            turnEn = '';
+            turnKh = '';
+          }
+        }
+      }
+
+      html += `
+          </div>
+        </div>
+      `;
+      continue;
+    }
+
+    // ==========================================
+    // MODULE D: COMMON MISTAKES
+    // ==========================================
+    if (sec.includes('⚠️ កំហុសញឹកញាប់') || sec.includes('Common Mistakes')) {
+      html += `
+        <div class="pro-section-block pro-mistakes-block">
+          <div class="pro-section-title mistake-title">
+            <span class="pro-sec-icon">⚠️</span>
+            <span>កំហុសញឹកញាប់ដែលត្រូវចៀសវាង (Common Mistakes to Avoid)</span>
+          </div>
+          <div class="pro-mistakes-container">
+            ${lines.slice(1).map(l => {
+              if (l.startsWith('❌')) {
+                return `
+                  <div class="pro-mistake-row wrong">
+                    <span class="mistake-badge wrong">❌ ខុស</span>
+                    <span class="mistake-text">${l.replace(/^❌\s*/, '')}</span>
+                  </div>
+                `;
+              }
+              if (l.startsWith('✅')) {
+                return `
+                  <div class="pro-mistake-row correct">
+                    <span class="mistake-badge correct">✅ ត្រូវ</span>
+                    <span class="mistake-text">${l.replace(/^✅\s*/, '')}</span>
+                  </div>
+                `;
+              }
+              return `<div class="pro-mistake-note">${l}</div>`;
             }).join('')}
           </div>
         </div>
@@ -2096,11 +2320,160 @@ function renderProfessionalLessonHTML(rawText) {
       continue;
     }
 
-    // Section 3: Bilingual Examples
-    if (sec.includes('💡 ឧទាហរណ៍ជាក់ស្តែង') || sec.includes('Practical Examples') || sec.includes('📝 បញ្ជីវាក្យសព្ទសំខាន់ៗ & ឧទាហរណ៍') || sec.includes('Verb Forms & Practical Examples') || sec.includes('Comparison Degrees & Examples')) {
+    // ==========================================
+    // MODULE E: AI TUTOR PRO TIPS & MEMORY TRICKS
+    // ==========================================
+    if (sec.includes('💡 គន្លឹះរៀនឱ្យឆាប់ចេះពីគ្រូ AI') || sec.includes('🎯 គន្លឹះនៃការនិយាយ') || sec.includes('💡 វិធីសាស្ត្រចងចាំ') || sec.includes('Pro Memory Tip') || sec.includes('Speaking & Pronunciation Tip')) {
+      const tipTitle = firstLine.replace(/^[💡🎯\s]+/, '').replace(/៖$/, '');
+      const tipContent = lines.slice(1).join('\n').trim();
+
       html += `
-        <div class="pro-section-block" style="border-left-color: #38bdf8;">
-          <div class="pro-section-title">💡 ឧទាហរណ៍ជាក់ស្តែង & ការបកប្រែ (Practical Examples with Khmer Translation)</div>
+        <div class="pro-section-block pro-tutor-tip-block">
+          <div class="pro-tutor-tip-card">
+            <div class="tutor-tip-header">
+              <div class="tutor-tip-badge-row">
+                <span class="tutor-tip-sparkle">✨</span>
+                <span class="tutor-tip-badge">PRO TUTOR TIP</span>
+              </div>
+              <h4 class="tutor-tip-title">${tipTitle || 'គន្លឹះរៀនឱ្យឆាប់ចេះពីគ្រូ AI'}</h4>
+            </div>
+            <div class="tutor-tip-body">
+              <div class="tutor-tip-avatar">👨‍🏫</div>
+              <div class="tutor-tip-content">${tipContent || sec.replace(/^.*?\n/, '').trim()}</div>
+            </div>
+          </div>
+        </div>
+      `;
+      continue;
+    }
+
+    // ==========================================
+    // MODULE F: PRACTICE EXERCISE
+    // ==========================================
+    if (sec.includes('✍️ លំហាត់អនុវត្ត') || sec.includes('Daily Practice') || sec.includes('Practice Exercise')) {
+      const practiceContent = lines.slice(1).join('\n').trim();
+      html += `
+        <div class="pro-section-block pro-practice-block">
+          <div class="pro-practice-box">
+            <div class="pro-practice-header">
+              <span class="pro-practice-icon">✍️</span>
+              <span class="pro-practice-title">លំហាត់អនុវត្តជាក់ស្តែង (Daily Practice Exercise)</span>
+            </div>
+            <div class="pro-practice-content">${practiceContent || sec.replace(/^✍️.*?\n/, '').trim()}</div>
+            <div class="pro-practice-action-bar">
+              <button class="pro-practice-btn primary" onclick="fillPracticeChat('${escapeAttr(practiceContent)}')">
+                <span>💬 ផ្ញើចម្លើយទៅគ្រូ AI ដើម្បីកែ</span>
+              </button>
+              <button class="pro-practice-btn gold" onclick="startCurrentLessonQuiz()">
+                <span>📝 ចូលប្រឡង Quiz មេរៀននេះ ➔</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+      continue;
+    }
+
+    // ==========================================
+    // MODULE G: KEY VOCABULARY & EXTRA WORDS
+    // ==========================================
+    if (sec.includes('🔑 វាក្យសព្ទ') || sec.includes('🌟 ពាក្យបន្ថែម') || (sec.includes('More ') && sec.includes('-Words')) || sec.includes('📝 បញ្ជីកិរិយាសព្ទគោល') || sec.includes('📝 បញ្ជីគុណនាមសំខាន់ៗ') || sec.includes('Key Verbs List') || sec.includes('Key Adjectives List') || (sec.includes('Key Vocabulary') && !sec.includes('ឧទាហរណ៍ជាក់ស្តែង'))) {
+      const titleLine = firstLine.replace(/^[🔑🌟📝\s]+/, '').replace(/៖$/, '');
+      html += `
+        <div class="pro-section-block pro-vocab-block">
+          <div class="pro-section-title">
+            <span class="pro-sec-icon">🔑</span>
+            <span>${titleLine || 'វាក្យសព្ទគន្លឹះប្រចាំមេរៀន (Key Vocabulary)'}</span>
+          </div>
+          <div class="pro-bilingual-grid">
+      `;
+
+      let currentItem = null;
+      const vocabItems = [];
+
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i];
+        if (line.includes(' = ')) {
+          if (currentItem) vocabItems.push(currentItem);
+          const parts = line.replace(/^\d+[\.\)]\s*|^\•\s*/, '').split(' = ');
+          const rawEn = (parts[0] || '').replace(/^[🇬🇧\s]+/, '').trim();
+          const rawKh = (parts[1] || '').replace(/^[🇰🇭\s]+/, '').trim();
+
+          let en = rawEn;
+          let ipa = '';
+          const ipaMatch = rawEn.match(/\((.*?\/.*?\/.*?|\/.*?\/)\)/);
+          if (ipaMatch) {
+            ipa = ipaMatch[1];
+            en = rawEn.replace(ipaMatch[0], '').trim();
+          }
+
+          currentItem = { en, ipa, kh: rawKh, subEn: '', subKh: '' };
+        } else if (line.includes('↳ ឧទាហរណ៍៖') || line.includes('ឧទាហរណ៍៖')) {
+          if (currentItem) {
+            currentItem.subEn = line.replace(/^.*?ឧទាហរណ៍៖\s*/, '').replace(/^[•🇬🇧\s]+/, '').trim();
+          }
+        } else if (line.includes('↳ បកប្រែ៖') || line.includes('បកប្រែ៖')) {
+          if (currentItem) {
+            currentItem.subKh = line.replace(/^.*?បកប្រែ៖\s*/, '').replace(/^[•🇰🇭\s]+/, '').replace(/^\(|\)$/g, '').trim();
+          }
+        }
+      }
+      if (currentItem) vocabItems.push(currentItem);
+
+      vocabItems.forEach(item => {
+        const logo = getWordVisualLogo(item.en, item.kh);
+        html += `
+          <div class="pro-bilingual-card">
+            <div class="pro-en-row">
+              <div class="pro-en-left">
+                <span class="pro-word-logo-badge" title="${escapeAttr(item.en)}">${logo}</span>
+                <div class="pro-en-word-box">
+                  <span class="pro-en-text">${item.en}</span>
+                  ${item.ipa ? `<span class="pro-ipa-pill">${item.ipa}</span>` : ''}
+                </div>
+              </div>
+              <button class="pro-speak-btn" onclick="speakEnglish('${escapeAttr(item.en)}', this)" title="ស្តាប់ការបញ្ចេញសំឡេង">🔊</button>
+            </div>
+            <div class="pro-kh-row">
+              <span class="pro-flag">🇰🇭</span>
+              <span class="pro-kh-text">${item.kh}</span>
+            </div>
+            ${item.subEn ? `
+              <div class="pro-vocab-sub-example">
+                <div class="sub-ex-en-row">
+                  <span class="sub-ex-label">↳ ឧទាហរណ៍៖</span>
+                  <span class="sub-ex-en-text">"${item.subEn}"</span>
+                  <button class="pro-speak-btn sm" onclick="speakEnglish('${escapeAttr(item.subEn)}', this)" title="ស្តាប់ឧទាហរណ៍">🔊</button>
+                </div>
+                ${item.subKh ? `
+                  <div class="sub-ex-kh-row">
+                    <span class="sub-ex-kh-text">(${item.subKh})</span>
+                  </div>
+                ` : ''}
+              </div>
+            ` : ''}
+          </div>
+        `;
+      });
+
+      html += `
+          </div>
+        </div>
+      `;
+      continue;
+    }
+
+    // ==========================================
+    // MODULE H: PRACTICAL SENTENCES & EXAMPLES
+    // ==========================================
+    if (sec.includes('💡 ឧទាហរណ៍ជាក់ស្តែង') || sec.includes('💡 ល្បះគំរូ') || sec.includes('📝 ល្បះបន្ថែម') || sec.includes('Practical Examples') || sec.includes('Sample Sentences') || sec.includes('Verb Forms & Practical Examples') || sec.includes('Comparison Degrees & Examples') || (sec.includes('More ') && sec.includes('-Sentences')) || sec.includes('📝 បញ្ជីវាក្យសព្ទសំខាន់ៗ & ឧទាហរណ៍')) {
+      const titleLine = firstLine.replace(/^[💡📝\s]+/, '').replace(/៖$/, '');
+      html += `
+        <div class="pro-section-block pro-sentences-block">
+          <div class="pro-section-title">
+            <span class="pro-sec-icon">💡</span>
+            <span>${titleLine || 'ឧទាហរណ៍ជាក់ស្តែង & ការបកប្រែ (Practical Sentences)'}</span>
+          </div>
           <div class="pro-bilingual-grid">
       `;
 
@@ -2111,22 +2484,26 @@ function renderProfessionalLessonHTML(rawText) {
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
 
-        if (line.startsWith('🔹') || line.startsWith('1.') || line.startsWith('2.') || line.startsWith('3.') || line.startsWith('4.') || line.startsWith('5.') || line.startsWith('6.') || line.startsWith('7.') || line.startsWith('8.') || line.startsWith('9.') || line.startsWith('10.')) {
+        if (line.startsWith('🔹') || /^\d+[\.\)]\s*[A-Za-z]/.test(line)) {
           if (line.includes(' = ') && !line.includes('🇬🇧')) {
             currentItemTitle = line;
           }
         }
 
-        if (line.includes('🇬🇧') || line.includes('↳ ឧទាហរណ៍៖')) {
-          currentEn = line.replace(/^[•\d.\s]*🇬🇧\s*/, '').replace(/^[↳\s]*ឧទាហរណ៍៖\s*/, '').trim();
-        } else if (line.includes('🇰🇭') || line.includes('↳ បកប្រែ៖')) {
+        if (line.includes('🇬🇧') || line.includes('↳ ឧទាហរណ៍៖') || ((line.startsWith('1.') || line.startsWith('2.') || line.startsWith('3.') || line.startsWith('4.') || line.startsWith('5.')) && !line.includes(' = '))) {
+          if (!line.includes('🇰🇭')) {
+            currentEn = line.replace(/^[•\d.\s]*🇬🇧\s*/, '').replace(/^[↳\s]*ឧទាហរណ៍៖\s*/, '').replace(/^\d+[\.\)]\s*/, '').trim();
+          }
+        }
+        
+        if (line.includes('🇰🇭') || line.includes('↳ បកប្រែ៖')) {
           currentKh = line.replace(/^[•\d.\s]*🇰🇭\s*/, '').replace(/^[↳\s]*បកប្រែ៖\s*/, '').replace(/^\(|\)$/g, '').trim();
 
           if (currentEn && currentKh) {
             const logo = getWordVisualLogo(currentItemTitle || currentEn, currentKh);
             html += `
-              <div class="pro-bilingual-card">
-                ${currentItemTitle ? `<div style="font-size: 13px; font-weight: 700; color: #a78bfa; margin-bottom: 4px;">${currentItemTitle}</div>` : ''}
+              <div class="pro-bilingual-card pro-sentence-card">
+                ${currentItemTitle ? `<div class="pro-sentence-header-tag">${currentItemTitle}</div>` : ''}
                 <div class="pro-en-row">
                   <div class="pro-en-left">
                     <span class="pro-word-logo-badge" title="${escapeAttr(currentEn)}">${logo}</span>
@@ -2154,93 +2531,12 @@ function renderProfessionalLessonHTML(rawText) {
       continue;
     }
 
-    // Section 4: Dialogue
-    if (sec.includes('💬 កិច្ចសន្ទនាគំរូ') || sec.includes('Full Dialogue')) {
-      html += `
-        <div class="pro-section-block" style="border-left-color: #a855f7;">
-          <div class="pro-section-title">💬 កិច្ចសន្ទនាគំរូពេញលេញ (Full Dialogue with Audio)</div>
-          <div class="pro-dialogue-thread">
-      `;
-
-      let currentSpeaker = '';
-      let turnEn = '';
-      let turnKh = '';
-      let isSpeakerB = false;
-
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim();
-        if (line.startsWith('👤')) {
-          currentSpeaker = line.replace(/^👤\s*/, '').replace(/:$/, '').trim();
-          isSpeakerB = /B$|David|Waiter|Clerk|Landlord|Doctor|Interviewer|Candidate|Chantha/i.test(currentSpeaker);
-        } else if (line.includes('🇬🇧')) {
-          turnEn = line.replace(/^[•\s]*🇬🇧\s*/, '').replace(/^"|"$/g, '').trim();
-        } else if (line.includes('🇰🇭')) {
-          turnKh = line.replace(/^[•\s]*🇰🇭\s*/, '').replace(/^\(|\)$/g, '').trim();
-
-          if (currentSpeaker && turnEn && turnKh) {
-            html += `
-              <div class="pro-dialogue-turn ${isSpeakerB ? 'speaker-b' : 'speaker-a'}">
-                <div class="pro-speaker-name">👤 ${currentSpeaker}</div>
-                <div class="pro-dialogue-bubble">
-                  <div class="pro-en-row">
-                    <span class="pro-en-text">"${turnEn}"</span>
-                    <button class="pro-speak-btn" onclick="speakEnglish('${escapeAttr(turnEn)}', this)" title="ស្តាប់សំឡេង">🔊</button>
-                  </div>
-                  <div class="pro-kh-row">
-                    <span class="pro-kh-text">${turnKh}</span>
-                  </div>
-                </div>
-              </div>
-            `;
-            turnEn = '';
-            turnKh = '';
-          }
-        }
-      }
-
-      html += `
-          </div>
-        </div>
-      `;
-      continue;
-    }
-
-    // Section 5: Common Mistakes
-    if (sec.includes('⚠️ កំហុសញឹកញាប់') || sec.includes('Common Mistakes')) {
-      html += `
-        <div class="pro-section-block" style="border-left-color: #ef4444;">
-          <div class="pro-section-title" style="color: #f87171;">⚠️ កំហុសញឹកញាប់ដែលត្រូវចៀសវាង (Common Mistakes)</div>
-          <div class="pro-mistake-box">
-            ${sec.replace(/^⚠️.*?\n/, '').split('\n').map(l => {
-              if (l.trim().startsWith('❌')) return `<span class="pro-wrong">${l.trim()}</span>`;
-              if (l.trim().startsWith('✅')) return `<span class="pro-correct">${l.trim()}</span>`;
-              return `<div>${l}</div>`;
-            }).join('')}
-          </div>
-        </div>
-      `;
-      continue;
-    }
-
-    // Section 6: Practice
-    if (sec.includes('✍️ លំហាត់អនុវត្ត') || sec.includes('Practice Exercise')) {
-      const practiceContent = sec.replace(/^✍️.*?\n/, '').trim();
-      html += `
-        <div class="pro-practice-box">
-          <div class="pro-practice-header">✍️ លំហាត់អនុវត្តជាក់ស្តែង (Practice Exercise)</div>
-          <div class="pro-practice-content">${practiceContent}</div>
-          <button class="pro-practice-btn" onclick="fillPracticeChat('${escapeAttr(practiceContent)}')">
-            <span>💬 ផ្ញើចម្លើយទៅគ្រូ AI ដើម្បីកែ</span>
-          </button>
-        </div>
-      `;
-      continue;
-    }
-
-    // Generic fallback block
+    // ==========================================
+    // GENERIC FALLBACK (Clean formatting)
+    // ==========================================
     html += `
       <div class="pro-section-block">
-        <div style="font-size: 14.5px; line-height: 1.8; color: #e2e8f0; white-space: pre-wrap;">${sec}</div>
+        <div class="pro-generic-content">${sec}</div>
       </div>
     `;
   }
