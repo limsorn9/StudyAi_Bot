@@ -137,6 +137,7 @@ try {
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const defaultWebUrl = process.env.WEBAPP_URL || process.env.RENDER_EXTERNAL_URL || 'https://studyai-bot-wmha.onrender.com/';
 
 try {
   if (bot) {
@@ -152,18 +153,27 @@ try {
       console.warn('⚠️ deleteMyCommands note:', e.message);
     });
 
-    // Set Menu Button at bottom-left of Telegram chat to ONLY launch the Web App directly!
-    const defaultWebUrl = process.env.WEBAPP_URL || process.env.RENDER_EXTERNAL_URL || 'https://studyai-bot-wmha.onrender.com/';
+    // Set Menu Button at bottom-left of Telegram chat to ONLY launch the Mini Web App directly!
+    const miniWebMenuButton = {
+      type: 'web_app',
+      text: '🌐 Mini Web',
+      web_app: { url: defaultWebUrl }
+    };
+
+    // 1. Set via Telegraf method (camelCase: menuButton)
     bot.telegram.setChatMenuButton({
-      menu_button: {
-        type: 'web_app',
-        text: '🌐 បើក Web App',
-        web_app: { url: defaultWebUrl }
-      }
+      menuButton: miniWebMenuButton
     }).then(() => {
-      console.log('✅ Telegram Chat Menu Button set to Web App:', defaultWebUrl);
+      console.log('✅ Telegram Chat Menu Button set globally to Mini Web:', defaultWebUrl);
     }).catch(e => {
       console.warn('⚠️ setChatMenuButton note:', e.message);
+    });
+
+    // 2. Direct Telegram Bot API call (snake_case: menu_button)
+    bot.telegram.callApi('setChatMenuButton', {
+      menu_button: miniWebMenuButton
+    }).catch(e => {
+      console.warn('⚠️ direct callApi setChatMenuButton note:', e.message);
     });
   }
 } catch (e) {
@@ -514,10 +524,35 @@ bot.action(/tg_auth_deny_(.+)/, async (ctx) => {
 // Apply Group Admin Guard as global middleware (runs before every command/message)
 bot.use(groupAdminGuard);
 
+// Automatically set Mini Web chat menu button at bottom-left for private chats
+bot.use(async (ctx, next) => {
+  if (ctx.chat?.type === 'private') {
+    try {
+      ctx.setChatMenuButton({
+        type: 'web_app',
+        text: '🌐 Mini Web',
+        web_app: { url: defaultWebUrl }
+      }).catch(() => {});
+    } catch (_) {}
+  }
+  return next();
+});
+
 // Start Command & Curriculum Menu
 bot.start(async (ctx) => {
   const userId = ctx.from.id;
   const username = ctx.from.first_name || 'Student';
+
+  // Ensure bottom-left chat menu button is set to Mini Web App
+  if (ctx.chat?.type === 'private') {
+    try {
+      await ctx.setChatMenuButton({
+        type: 'web_app',
+        text: '🌐 Mini Web',
+        web_app: { url: defaultWebUrl }
+      });
+    } catch (_) {}
+  }
 
   // Handle QR verification link: e.g. /start verify_ABC123
   const payload = ctx.startPayload || (ctx.message && ctx.message.text && ctx.message.text.split(' ')[1]);
@@ -3825,11 +3860,18 @@ bot.action(/verbs_(.+)/, (ctx) => {
 const WEBAPP_DEFAULT_URL = process.env.WEBAPP_URL || process.env.RENDER_EXTERNAL_URL || 'https://studyai-bot-wmha.onrender.com/';
 
 // Open Web App Command
-bot.command(['app', 'webapp', 'web', 'online'], async (ctx) => {
-  const webUrl = WEBAPP_DEFAULT_URL;
+bot.command(['app', 'webapp', 'web', 'online', 'miniweb', 'miniapp'], async (ctx) => {
+  const webUrl = defaultWebUrl || WEBAPP_DEFAULT_URL;
+  if (ctx.chat?.type === 'private') {
+    ctx.setChatMenuButton({
+      type: 'web_app',
+      text: '🌐 Mini Web',
+      web_app: { url: webUrl }
+    }).catch(() => {});
+  }
   return ctx.reply(
-    `🌐 *វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline (Web App)* 🌐\n\n` +
-    `លោកអ្នកអាចបើកប្រព័ន្ធសិក្សាពេញលេញលើ Telegram Web App ឬលើ Google Chrome បានភ្លាមៗ!\n\n` +
+    `🌐 *វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline (Mini Web App)* 🌐\n\n` +
+    `លោកអ្នកអាចចុចប៊ូតុង *«🌐 Mini Web»* នៅខាងឆ្វេងដៃកន្លែងសរសេរឆាត (Chat Input) ឬចុចប៊ូតុងខាងក្រោមដើម្បីបើកប្រព័ន្ធសិក្សាភ្លាមៗ!\n\n` +
     `✨ *មុខងារពិសេសៗលើ Web App៖*\n` +
     `• មើលមេរៀន និងស្តាប់សំឡេងអានមេរៀនច្បាស់ល្អ 🔊\n` +
     `• ឆាតសួរគ្រូ AI (Teacher Sorn) ផ្ទាល់ 🤖\n` +
