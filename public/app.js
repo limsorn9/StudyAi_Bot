@@ -39,6 +39,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initTelegramWebApp();
   initFirebaseClient();
   loadSavedUserSession();
+  updateUserInterface(); // Ensure UI permissions applied immediately on load
   await loadCurriculum();
   await loadVerbsData();
   setupEventListeners();
@@ -274,12 +275,18 @@ function updateUserInterface() {
     if (heroTgBtn) heroTgBtn.style.display = 'inline-flex';
   }
 
-  // Toggle Admin Portal Buttons
-  const isAdmin = !!(STATE.currentUser?.isAdmin || STATE.currentUser?.id === '240224709' || STATE.currentUser?.telegramId === 240224709);
+  // Toggle Admin Portal Buttons (Strict: Only verified Admin can see)
+  const isAdmin = verifyIsAdmin();
   const headerAdminBtn = document.getElementById('headerAdminBtn');
   const adminNavBtn = document.getElementById('adminNavBtn');
-  if (headerAdminBtn) headerAdminBtn.classList.toggle('hidden', !isAdmin);
-  if (adminNavBtn) adminNavBtn.classList.toggle('hidden', !isAdmin);
+  if (headerAdminBtn) {
+    headerAdminBtn.classList.toggle('hidden', !isAdmin);
+    headerAdminBtn.style.display = isAdmin ? 'inline-flex' : 'none';
+  }
+  if (adminNavBtn) {
+    adminNavBtn.classList.toggle('hidden', !isAdmin);
+    adminNavBtn.style.display = isAdmin ? 'flex' : 'none';
+  }
 }
 
 async function refreshUserProfile() {
@@ -298,7 +305,7 @@ async function refreshUserProfile() {
       STATE.currentUser.completedLessons = p.completedLessons;
       STATE.currentUser.subjectCerts = p.subjectCerts;
       if (p.isAdmin !== undefined) STATE.currentUser.isAdmin = !!p.isAdmin;
-      if (STATE.currentUser.id === '240224709' || STATE.currentUser.telegramId === 240224709) STATE.currentUser.isAdmin = true;
+      updateUserInterface();
 
       // Update Dashboard Counters
       const cLessons = document.getElementById('statCompletedLessons');
@@ -376,6 +383,15 @@ async function refreshUserProfile() {
 // ==========================================
 
 function navigateTo(tabName) {
+  // STRICT SECURITY GUARD: Only authorized Admin can open School Management
+  if (tabName === 'admin') {
+    if (!verifyIsAdmin()) {
+      showToast('⛔ សិទ្ធិត្រូវបានបដិសេធ! ផ្ទាំងគ្រប់គ្រងសាលាសម្រាប់តែ Admin ប៉ុណ្ណោះ។', 'error', 3500);
+      navigateTo('dashboard');
+      return;
+    }
+  }
+
   STATE.activeTab = tabName;
 
   // Update navbar active states
@@ -2628,7 +2644,7 @@ async function openLesson(monthId, weekId, lessonId) {
     updateLessonNavButtons();
 
     // Toggle Admin Video controls & Load YouTube Video
-    const isUserAdmin = !!(STATE.currentUser?.isAdmin || STATE.currentUser?.id === '240224709' || STATE.currentUser?.telegramId === 240224709);
+    const isUserAdmin = verifyIsAdmin();
     const adminControls = document.getElementById('videoAdminControls');
     const adminQuickAdd = document.getElementById('adminQuickAddBox');
     if (adminControls) adminControls.classList.toggle('hidden', !isUserAdmin);
@@ -5943,32 +5959,29 @@ STATE.adminData = {
 };
 
 function getAdminId() {
-  if (STATE.currentUser?.id && (STATE.currentUser.id.toString() === '240224709' || STATE.currentUser.isAdmin)) {
-    return STATE.currentUser.id.toString();
-  }
+  if (!verifyIsAdmin()) return '';
+  if (STATE.currentUser?.id) return STATE.currentUser.id.toString();
   if (STATE.currentUser?.telegramId) return STATE.currentUser.telegramId.toString();
   if (STATE.currentUser?.linkedTelegramId) return STATE.currentUser.linkedTelegramId.toString();
-  if (STATE.currentUser?.id) return STATE.currentUser.id.toString();
-  return '240224709';
+  return '';
 }
 
 function verifyIsAdmin() {
   if (!STATE.currentUser) return false;
-  if (STATE.currentUser.isAdmin) return true;
-  const uid = (STATE.currentUser.id || '').toString();
-  const tgId = (STATE.currentUser.telegramId || '').toString();
-  const linkedTg = (STATE.currentUser.linkedTelegramId || '').toString();
-  const username = (STATE.currentUser.username || '').toLowerCase();
-  const name = (STATE.currentUser.name || '').toLowerCase();
-  const khName = (STATE.currentUser.khmerName || '').toLowerCase();
+  if (STATE.currentUser.isAdmin === true) return true;
+  if (STATE.currentUser.role === 'admin') return true;
+
+  const uid = (STATE.currentUser.id || '').toString().trim();
+  const tgId = (STATE.currentUser.telegramId || '').toString().trim();
+  const linkedTg = (STATE.currentUser.linkedTelegramId || '').toString().trim();
+  const username = (STATE.currentUser.username || '').toLowerCase().replace('@', '').trim();
+
+  const SUPER_ADMINS = ['240224709', '7160751939'];
   return (
-    uid === '240224709' ||
-    tgId === '240224709' ||
-    linkedTg === '240224709' ||
-    username === 'limsorn' ||
-    name.includes('lim sorn') ||
-    khName.includes('លីម សន') ||
-    STATE.currentUser.role === 'admin'
+    SUPER_ADMINS.includes(uid) ||
+    SUPER_ADMINS.includes(tgId) ||
+    SUPER_ADMINS.includes(linkedTg) ||
+    username === 'limsorn'
   );
 }
 

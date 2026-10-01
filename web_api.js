@@ -172,7 +172,6 @@ function createWebAPIRouter({ db, auth, curriculum, bot, SUPER_ADMIN_IDS, checkV
         if (prof.role === 'admin' || prof.isAdmin === true) return true;
         if (prof.linkedTelegramId && SUPER_ADMIN_IDS && SUPER_ADMIN_IDS.some(id => id.toString().trim() === prof.linkedTelegramId.toString().trim())) return true;
         if (prof.username && prof.username.toLowerCase() === 'limsorn') return true;
-        if (prof.name && prof.name.toUpperCase().includes('LIM SORN')) return true;
 
         if (strId.startsWith('web_')) {
           const uSnap = await db.ref(`web_users/${strId.replace('web_', '')}`).once('value');
@@ -603,6 +602,7 @@ Provide practical English pronunciation coaching:
 
       const session = await createDeviceSession(userId, deviceId, userAgent || req.headers['user-agent'], req.ip);
       const resolvedName = resolveStudentDisplayName(profile, userData);
+      const isAdmin = await isUserAdmin(userId);
 
       return res.json({
         success: true,
@@ -616,6 +616,8 @@ Provide practical English pronunciation coaching:
           photoUrl: profile.photoUrl || profile.avatar || null,
           phone: profile.phone || null,
           isTelegram: true,
+          isAdmin,
+          role: isAdmin ? 'admin' : (profile.role || 'student'),
           isVIP,
           yearlyEligible: yearly.eligible,
           vipDetails: yearly,

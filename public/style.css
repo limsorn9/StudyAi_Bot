@@ -4200,6 +4200,17 @@ body.day-mode .tutor-tip-title {
   display: none !important;
 }
 
+#adminNavBtn.hidden,
+#headerAdminBtn.hidden,
+.mobile-bottom-nav #adminNavBtn.hidden,
+.mobile-bottom-nav .m-nav-item#adminNavBtn.hidden,
+.header-right-actions #headerAdminBtn.hidden {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
 /* Floating Collapsible Chat Drawer */
 .floating-chat-drawer {
   position: absolute;

@@ -49,8 +49,8 @@
       </div>
 
       <div class="header-right-actions">
-        <!-- School Admin Dashboard Portal Button (Shown for Admins) -->
-        <button id="headerAdminBtn" class="header-action-icon-btn hidden" onclick="navigateTo('admin')" title="ផ្ទាំងគ្រប់គ្រងសាលារៀន (School Admin Portal)">
+        <!-- School Admin Dashboard Portal Button (Strictly restricted to verified Admins) -->
+        <button id="headerAdminBtn" class="header-action-icon-btn hidden" style="display: none !important;" onclick="navigateTo('admin')" title="ផ្ទាំងគ្រប់គ្រងសាលារៀន (School Admin Portal)">
           <span class="action-icon">🏫</span>
         </button>
 
@@ -1417,8 +1417,8 @@
         <span class="m-icon">👤</span>
         <span class="m-label">ប្រវត្តិរូប</span>
       </button>
-      <!-- School Admin Bottom Nav Button (Visible for Admins) -->
-      <button id="adminNavBtn" class="m-nav-item hidden" data-tab="admin" onclick="navigateTo('admin')">
+      <!-- School Admin Bottom Nav Button (Strictly restricted to verified Admins) -->
+      <button id="adminNavBtn" class="m-nav-item hidden" style="display: none !important;" data-tab="admin" onclick="navigateTo('admin')">
         <span class="m-icon">🏫</span>
         <span class="m-label">គ្រប់គ្រងសាលា</span>
       </button>
