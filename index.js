@@ -3787,10 +3787,13 @@ bot.on('photo', async (ctx) => {
     return ctx.reply("⚠️ វិក្កយបត្រនេះត្រូវបានផ្ញើម្ដងរួចមកហើយ! សូមកុំផ្ញើស្ទួន។");
   }
 
-  // Save to prevent duplicate
+  // Save to prevent duplicate & track receipt details
   await db.ref(`receipts/${fileUniqueId}`).set({
     userId: userId,
-    timestamp: Date.now()
+    fileId: photo.file_id,
+    fileUniqueId: fileUniqueId,
+    timestamp: Date.now(),
+    status: 'pending'
   });
 
   await ctx.reply("✅ វិក្កយបត្ររបស់អ្នកត្រូវបានបញ្ជូនទៅកាន់ Admin រួចរាល់! សូមរង់ចាំការពិនិត្យយល់ព្រមបន្តិចណា៎។");

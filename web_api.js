@@ -4049,6 +4049,84 @@ Provide practical English pronunciation coaching:
     }
   });
 
+  // 7.1 Receipt Photo URL Proxy
+  router.get('/admin/receipts/photo/:fileId', async (req, res) => {
+    try {
+      const adminId = await requireAdminAuth(req, res);
+      if (!adminId) return;
+      const { fileId } = req.params;
+      if (!fileId || !bot) return res.status(400).json({ error: 'Missing fileId' });
+      const link = await bot.telegram.getFileLink(fileId);
+      res.redirect(link.href || link);
+    } catch (err) {
+      console.error('Get receipt photo error:', err);
+      res.status(500).json({ error: 'Failed to retrieve photo link' });
+    }
+  });
+
+  // 7.2 1-Click Receipt Action (Approve / Reject)
+  router.post('/admin/receipts/action', async (req, res) => {
+    try {
+      const adminId = await requireAdminAuth(req, res);
+      if (!adminId) return;
+      if (!db) return res.status(500).json({ error: 'Database disconnected' });
+
+      const { receiptId, studentId, action, duration } = req.body;
+      if (!receiptId || !studentId) return res.status(400).json({ error: 'Missing receiptId or studentId' });
+
+      if (action === 'approve') {
+        const dur = duration || '1m';
+        const vipRes = await setDirectLicense(db, adminId, studentId, dur);
+        await db.ref(`receipts/${receiptId}`).update({
+          status: 'approved',
+          approvedBy: adminId.toString(),
+          approvedAt: Date.now(),
+          planGranted: vipRes.label || dur
+        });
+
+        // Notify student on Telegram if valid Telegram ID
+        if (bot && /^\d{6,12}$/.test(studentId)) {
+          try {
+            await bot.telegram.sendMessage(
+              studentId,
+              `🎉 *វិក្កយបត្ររបស់អ្នកត្រូវបានអនុម័តជោគជ័យ!* ✅\n\n` +
+              `សាលាបានបើកដំណើរការកញ្ចប់សិក្សា *VIP ${vipRes.label || dur}* ជូនប្អូនរួចរាល់ហើយ!\n` +
+              `សូមរីករាយជាមួយការរៀនសូត្រភាសាអង់គ្លេសដោយគ្មានដែនកំណត់ 📚💎`,
+              { parse_mode: 'Markdown' }
+            );
+          } catch (_) {}
+        }
+
+        return res.json({ success: true, message: `បានអនុម័តវិក្កយបត្រ និងបើក VIP ${vipRes.label || dur} ជោគជ័យ!` });
+      } else if (action === 'reject') {
+        await db.ref(`receipts/${receiptId}`).update({
+          status: 'rejected',
+          rejectedBy: adminId.toString(),
+          rejectedAt: Date.now()
+        });
+
+        if (bot && /^\d{6,12}$/.test(studentId)) {
+          try {
+            await bot.telegram.sendMessage(
+              studentId,
+              `⚠️ *ដំណឹងអំពីវិក្កយបត្របង់ប្រាក់* 🧾\n\n` +
+              `វិក្កយបត្រដែលប្អូនបានផ្ញើមិនទាន់ត្រឹមត្រូវ ឬមិនទាន់អាចផ្ទៀងផ្ទាត់បានឡើយ។\n` +
+              `សូមទាក់ទងលោកគ្រូ ឬផ្ញើវិក្កយបត្រច្បាស់លាស់ម្តងទៀតណា៎!`,
+              { parse_mode: 'Markdown' }
+            );
+          } catch (_) {}
+        }
+
+        return res.json({ success: true, message: 'បានបដិសេធវិក្កយបត្ររួចរាល់!' });
+      } else {
+        return res.status(400).json({ error: 'Invalid action (approve | reject)' });
+      }
+    } catch (err) {
+      console.error('Receipt action error:', err);
+      res.status(500).json({ error: 'Server error processing receipt' });
+    }
+  });
+
   // 8. License Management: List keys
   router.get('/admin/licenses', async (req, res) => {
     try {

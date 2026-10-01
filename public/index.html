@@ -413,6 +413,11 @@
           Month 1 > Week 1 > Lesson 1
         </div>
 
+        <!-- Sticky Reading Progress Bar -->
+        <div id="lessonReadingProgressBar" class="lesson-reading-progress">
+          <div class="lesson-reading-progress-fill" id="lessonReadingProgressFill"></div>
+        </div>
+
         <div class="lesson-layout">
           <!-- Left: Lesson Content & Audio -->
           <div class="lesson-card glass-panel">
@@ -478,7 +483,7 @@
               </div>
             </div>
 
-            <!-- Audio TTS Player -->
+            <!-- Audio TTS Player with Animated Equalizer Waveform -->
             <div class="audio-player-box glass-panel">
               <div class="audio-info">
                 <div class="audio-icon-pulse" id="audioPulseIcon">🔊</div>
@@ -488,6 +493,17 @@
                 </div>
               </div>
               <div class="audio-controls">
+                <!-- Dynamic Waveform Equalizer -->
+                <div class="audio-waveform-bars" id="audioWaveformVisualizer" title="Waveform Equalizer">
+                  <span class="wave-bar"></span>
+                  <span class="wave-bar"></span>
+                  <span class="wave-bar"></span>
+                  <span class="wave-bar"></span>
+                  <span class="wave-bar"></span>
+                  <span class="wave-bar"></span>
+                  <span class="wave-bar"></span>
+                  <span class="wave-bar"></span>
+                </div>
                 <button id="playAudioBtn" class="btn btn-primary" onclick="toggleLessonAudio()">
                   <span id="playAudioIcon">▶️</span> <span id="playAudioText">ចាក់សំឡេង (Play Audio)</span>
                 </button>
@@ -1180,6 +1196,36 @@
 
         <!-- 4. PAYMENTS & RECEIPTS PANEL -->
         <div id="admin-panel-payments" class="admin-subpanel">
+          
+          <!-- Receipts Verification Section -->
+          <div class="admin-section-box glass-panel mb-4">
+            <div class="section-box-header">
+              <div class="flex items-center gap-2">
+                <h3 class="text-base font-bold text-white">🧾 វិក្កយបត្រដែលសិស្សផ្ញើមក (Submitted Receipts)</h3>
+                <span id="admReceiptsPendingBadge" class="badge badge-warning text-[10px]">0 រង់ចាំពិនិត្យ</span>
+              </div>
+              <button class="btn btn-outline btn-xs" onclick="loadAdminPayments()">🔄 Refresh</button>
+            </div>
+            <p class="text-xs text-slate-400 mt-1 mb-3">ផ្ទៀងផ្ទាត់រូបវិក្កយបត្រដែលសិស្សបានផ្ញើតាម Telegram Bot ដើម្បីបើក VIP ដោយស្វ័យប្រវត្តក្នុង 1-Click</p>
+
+            <div class="admin-table-responsive">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>កាលបរិច្ឆេទ</th>
+                    <th>សិស្ស</th>
+                    <th>រូបវិក្កយបត្រ</th>
+                    <th>ស្ថានភាព</th>
+                    <th class="text-right">សកម្មភាព (1-Click VIP)</th>
+                  </tr>
+                </thead>
+                <tbody id="admReceiptsTableBody">
+                  <tr><td colspan="5" class="text-center py-6 text-slate-400">កំពុងផ្ទុកបញ្ជីវិក្កយបត្រ...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
           <div class="admin-section-box glass-panel">
             <div class="section-box-header">
               <div>
@@ -1646,6 +1692,12 @@
         <button class="btn btn-cyan" onclick="downloadCertificateHtml()">
           <span>📥 ទាញយកឯកសារ HTML</span>
         </button>
+        <button class="btn btn-outline" onclick="shareCertificateToTelegram()">
+          <span>✈️ ចែករំលែក Telegram</span>
+        </button>
+        <button class="btn btn-outline" onclick="copyCertificateShareLink()">
+          <span>🔗 ចម្លង Link</span>
+        </button>
         <button class="btn btn-primary" onclick="triggerCertRefresh()">
           <span>🔄 Refresh វិញ្ញាបនបត្រ</span>
         </button>
@@ -1923,8 +1975,9 @@
         <input type="hidden" id="editStudentId">
 
         <div class="flex items-center gap-3 p-3 bg-slate-800/80 rounded-xl border border-slate-700/80 mb-4">
-          <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-xl font-bold text-white shadow-lg" id="editStudentAvatar">
-            S
+          <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-xl font-bold text-white shadow-lg overflow-hidden flex-shrink-0" id="editStudentAvatar">
+            <img id="editStudentAvatarImg" class="w-full h-full object-cover hidden" alt="Avatar">
+            <span id="editStudentAvatarInitial">S</span>
           </div>
           <div>
             <div class="text-sm font-bold text-white" id="editStudentHeaderName">Student Name</div>
@@ -2033,13 +2086,69 @@
           <textarea id="inviteModalMessageText" class="form-input text-xs font-mono bg-slate-900/90 text-slate-200" rows="6" readonly></textarea>
         </div>
 
-        <div class="flex flex-col sm:flex-row items-center gap-2">
-          <button type="button" class="btn btn-gold flex-1 py-3 font-bold w-full" onclick="copyInviteMessageText(this)">
-            <span>📋 ចម្លងសារអញ្ជើញ (Copy)</span>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <button type="button" class="btn btn-gold py-3 font-bold" onclick="copyInviteMessageText(this)">
+            <span>📋 ចម្លងសារ (Copy)</span>
           </button>
-          <button type="button" class="btn btn-outline py-3 px-4 w-full sm:w-auto" onclick="closeModal('adminInviteModal')">
-            <span>រួចរាល់</span>
+          <button type="button" class="btn btn-cyan py-3 font-bold" onclick="shareInviteToTelegram()">
+            <span class="flex items-center justify-center gap-1">✈️ ផ្ញើ Telegram</span>
           </button>
+          <button type="button" class="btn btn-success py-3 font-bold" onclick="shareInviteToWhatsApp()">
+            <span class="flex items-center justify-center gap-1">💬 WhatsApp</span>
+          </button>
+        </div>
+        <button type="button" class="btn btn-outline py-2.5 px-4 w-full mt-2" onclick="closeModal('adminInviteModal')">
+          <span>រួចរាល់</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RECEIPT HIGH-RES LIGHTBOX MODAL -->
+  <div id="receiptLightboxModal" class="modal-overlay hidden">
+    <div class="modal-card glass-panel lightbox-modal-card">
+      <div class="modal-header">
+        <div class="modal-title flex items-center gap-2">
+          <span>🧾 ពិនិត្យវិក្កយបត្រលម្អិត</span>
+          <span id="lightboxStatusBadge" class="badge badge-sm badge-warning">Pending</span>
+        </div>
+        <button class="modal-close" onclick="closeModal('receiptLightboxModal')">✕</button>
+      </div>
+
+      <div class="p-4">
+        <!-- Student Info Header -->
+        <div class="flex items-center justify-between p-3 rounded-xl bg-slate-800/80 border border-slate-700/80 mb-3">
+          <div>
+            <div class="font-bold text-white text-sm" id="lightboxStudentName">Student Name</div>
+            <div class="text-xs text-slate-400" id="lightboxStudentInfo">ID: ...</div>
+          </div>
+          <div class="text-right text-xs text-slate-400 font-mono" id="lightboxDate">
+            2026-10-01
+          </div>
+        </div>
+
+        <!-- High-res Image Box -->
+        <div class="lightbox-image-container">
+          <img id="lightboxImg" src="" alt="Receipt Photo" class="lightbox-img" onerror="this.src='/school_logo.png'">
+        </div>
+
+        <!-- 1-Click Action Controls in Lightbox -->
+        <div class="p-3 rounded-xl bg-slate-800/90 border border-amber-500/30 mt-3" id="lightboxActionBox">
+          <div class="text-xs font-bold text-amber-300 mb-2">⚡ ជ្រើសរើសកញ្ចប់ VIP ដើម្បីអនុម័ត (Approve VIP Plan):</div>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2">
+            <button type="button" class="btn btn-outline btn-sm font-bold" onclick="handleLightboxApprove('1m')">✅ 1 ខែ (30 ថ្ងៃ)</button>
+            <button type="button" class="btn btn-outline btn-sm font-bold" onclick="handleLightboxApprove('3m')">✅ 3 ខែ (90 ថ្ងៃ)</button>
+            <button type="button" class="btn btn-outline btn-sm font-bold" onclick="handleLightboxApprove('6m')">✅ 6 ខែ (180 ថ្ងៃ)</button>
+            <button type="button" class="btn btn-gold btn-sm font-bold" onclick="handleLightboxApprove('1y')">👑 1 ឆ្នាំ (VIP ពេញ)</button>
+          </div>
+          <div class="flex items-center justify-between pt-2 border-t border-slate-700/60">
+            <button type="button" class="btn btn-danger btn-sm" onclick="handleLightboxReject()">
+              <span>❌ បដិសេធវិក្កយបត្រ (Reject)</span>
+            </button>
+            <button type="button" class="btn btn-outline btn-sm" onclick="closeModal('receiptLightboxModal')">
+              <span>បិទ</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

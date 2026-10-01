@@ -3180,6 +3180,7 @@ async function toggleLessonAudio() {
   const icon = document.getElementById('playAudioIcon');
   const text = document.getElementById('playAudioText');
   const status = document.getElementById('audioStatusText');
+  const wave = document.getElementById('audioWaveformVisualizer');
 
   if (STATE.audioPlaying) {
     audio.pause();
@@ -3187,6 +3188,7 @@ async function toggleLessonAudio() {
     icon.textContent = '▶️';
     text.textContent = 'ចាក់សំឡេង (Play Audio)';
     status.textContent = 'បានផ្អាកសំឡេង';
+    if (wave) wave.classList.remove('playing');
     return;
   }
 
@@ -3196,6 +3198,7 @@ async function toggleLessonAudio() {
     icon.textContent = '⏸️';
     text.textContent = 'ផ្អាកសំឡេង (Pause)';
     status.textContent = 'កំពុងចាក់សំឡេងអានមេរៀន...';
+    if (wave) wave.classList.add('playing');
     return;
   }
 
@@ -3231,18 +3234,21 @@ async function toggleLessonAudio() {
     icon.textContent = '⏸️';
     text.textContent = 'ផ្អាកសំឡេង (Pause)';
     status.textContent = '🔊 កំពុងចាក់ការបញ្ចេញសំឡេងច្បាស់ល្អ...';
+    if (wave) wave.classList.add('playing');
 
     audio.onended = () => {
       STATE.audioPlaying = false;
       icon.textContent = '▶️';
       text.textContent = 'ចាក់ឡើងវិញ (Replay)';
       status.textContent = 'ការចាក់សំឡេងបានបញ្ចប់';
+      if (wave) wave.classList.remove('playing');
     };
   } catch (err) {
     console.error('Audio play error:', err);
     icon.textContent = '▶️';
     text.textContent = 'ចាក់សំឡេង (Play Audio)';
     status.textContent = '⚠️ មានបញ្ហាក្នុងការបង្កើតសំឡេង';
+    if (wave) wave.classList.remove('playing');
     showToast('បរាជ័យក្នុងការចាក់សំឡេង', 'error');
   }
 }
@@ -3257,10 +3263,31 @@ function resetAudioPlayer() {
   const icon = document.getElementById('playAudioIcon');
   const text = document.getElementById('playAudioText');
   const status = document.getElementById('audioStatusText');
+  const wave = document.getElementById('audioWaveformVisualizer');
   if (icon) icon.textContent = '▶️';
   if (text) text.textContent = 'ចាក់សំឡេង (Play Audio)';
   if (status) status.textContent = 'ចុចប៊ូតុងខាងក្រោមដើម្បីចាក់សំឡេងមេរៀន';
+  if (wave) wave.classList.remove('playing');
 }
+
+// Lesson Reading Progress Bar calculation
+function updateLessonReadingProgress() {
+  const lessonTab = document.getElementById('tab-lesson');
+  if (!lessonTab || !lessonTab.classList.contains('active')) return;
+  const fill = document.getElementById('lessonReadingProgressFill');
+  if (!fill) return;
+
+  const docEl = document.documentElement;
+  const scrollTop = window.pageYOffset || docEl.scrollTop || document.body.scrollTop || 0;
+  const scrollHeight = (docEl.scrollHeight || document.body.scrollHeight || 0) - (window.innerHeight || docEl.clientHeight);
+  if (scrollHeight <= 0) {
+    fill.style.width = '100%';
+    return;
+  }
+  const pct = Math.min(100, Math.max(0, Math.round((scrollTop / scrollHeight) * 100)));
+  fill.style.width = pct + '%';
+}
+window.addEventListener('scroll', updateLessonReadingProgress, { passive: true });
 
 // ==========================================
 // 5. AI TUTOR CHAT & UNIVERSAL AI SUITE
@@ -4686,6 +4713,24 @@ function printCertificateIframe() {
 function downloadCertificateHtml() {
   if (!STATE.currentCertPreviewId) return;
   window.open(`/api/certificates/html/${STATE.currentCertPreviewId}`, '_blank');
+}
+
+function shareCertificateToTelegram() {
+  if (!STATE.currentCertPreviewId) return showToast('⚠️ មិនមានវិញ្ញាបនបត្រដើម្បីចែករំលែកឡើយ', 'warning');
+  const certUrl = `${window.location.origin}/api/certificates/html/${STATE.currentCertPreviewId}`;
+  const text = `🎓 ខ្ញុំទើបតែប្រឡងជាប់ និងទទួលបានវិញ្ញាបនបត្រភាសាអង់គ្លេសពី Teacher SSOnline! សូមមើលវិញ្ញាបនបត្ររបស់ខ្ញុំនៅទីនេះ៖`;
+  const tgUrl = `https://t.me/share/url?url=${encodeURIComponent(certUrl)}&text=${encodeURIComponent(text)}`;
+  window.open(tgUrl, '_blank');
+}
+
+function copyCertificateShareLink() {
+  if (!STATE.currentCertPreviewId) return showToast('⚠️ មិនមានវិញ្ញាបនបត្រដើម្បីចម្លងឡើយ', 'warning');
+  const certUrl = `${window.location.origin}/api/certificates/html/${STATE.currentCertPreviewId}`;
+  navigator.clipboard.writeText(certUrl).then(() => {
+    showToast('🔗 បានចម្លង Link វិញ្ញាបនបត្រទៅកាន់ Clipboard រួចរាល់!', 'success');
+  }).catch(() => {
+    prompt('Link វិញ្ញាបនបត្រ៖', certUrl);
+  });
 }
 
 async function triggerCertRefresh() {
@@ -6143,12 +6188,15 @@ function renderAdminStudentsTable(students) {
     const initial = (s.name || s.phone || 'S').charAt(0).toUpperCase();
     const isVip = !!s.isVIP;
     const phoneDisplay = s.phone ? `<a href="tel:${escapeHtml(s.phone)}" class="text-cyan-400 font-mono hover:underline">📞 ${escapeHtml(s.phone)}</a>` : '<span class="text-slate-500">គ្មាន</span>';
+    const avatarHtml = s.photoUrl
+      ? `<img src="${escapeHtml(s.photoUrl)}" class="student-table-avatar-img" alt="${escapeHtml(s.name)}" onerror="this.outerHTML='<div class=\\'student-table-avatar\\'>${initial}</div>'">`
+      : `<div class="student-table-avatar">${initial}</div>`;
 
     return `
       <tr class="${s.isBlocked ? 'opacity-60 bg-red-950/20' : ''}">
         <td>
           <div class="student-table-item">
-            <div class="student-table-avatar">${initial}</div>
+            ${avatarHtml}
             <div>
               <div class="student-name-main font-semibold">${escapeHtml(s.name)} ${s.khmerName && s.khmerName !== s.name ? `<span class="text-xs text-slate-400">(${escapeHtml(s.khmerName)})</span>` : ''}</div>
               <div class="student-name-sub flex items-center gap-2 flex-wrap">
@@ -6296,6 +6344,36 @@ function copyInviteMessageText(btn) {
   });
 }
 
+function shareInviteToTelegram() {
+  const msgInput = document.getElementById('inviteModalMessageText');
+  const text = msgInput ? msgInput.value : '';
+  if (!text) return showToast('⚠️ គ្មានខ្លឹមសារសារសម្រាប់ផ្ញើឡើយ!', 'warning');
+  
+  const tgUrl = `https://t.me/share/url?url=${encodeURIComponent(window.location.origin)}&text=${encodeURIComponent(text)}`;
+  window.open(tgUrl, '_blank');
+}
+
+function shareInviteToWhatsApp() {
+  const msgInput = document.getElementById('inviteModalMessageText');
+  const text = msgInput ? msgInput.value : '';
+  const phoneEl = document.getElementById('inviteModalStudentPhone');
+  let rawPhone = '';
+  if (phoneEl) {
+    const match = phoneEl.textContent.match(/0\d{7,10}/);
+    if (match) rawPhone = match[0];
+  }
+  
+  let formattedPhone = '';
+  if (rawPhone) {
+    formattedPhone = rawPhone.startsWith('0') ? '855' + rawPhone.slice(1) : rawPhone;
+  }
+  
+  const waUrl = formattedPhone 
+    ? `https://api.whatsapp.com/send?phone=${encodeURIComponent(formattedPhone)}&text=${encodeURIComponent(text)}`
+    : `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+  window.open(waUrl, '_blank');
+}
+
 // 4. Edit Student Modal Handlers
 function openAdminEditStudentModal(studentId) {
   const student = (STATE.adminData.students || []).find(s => s.id === studentId);
@@ -6305,7 +6383,8 @@ function openAdminEditStudentModal(studentId) {
   const elId = document.getElementById('editStudentId');
   const elHeaderId = document.getElementById('editStudentHeaderId');
   const elHeaderName = document.getElementById('editStudentHeaderName');
-  const elAvatar = document.getElementById('editStudentAvatar');
+  const elAvatarImg = document.getElementById('editStudentAvatarImg');
+  const elAvatarInit = document.getElementById('editStudentAvatarInitial');
   const elVipBadge = document.getElementById('editStudentVipBadge');
   const elName = document.getElementById('editStudentName');
   const elKhmerName = document.getElementById('editStudentKhmerName');
@@ -6327,7 +6406,22 @@ function openAdminEditStudentModal(studentId) {
       elTg.textContent = '';
     }
   }
-  if (elAvatar) elAvatar.textContent = (student.name || 'S').charAt(0).toUpperCase();
+
+  // Handle Photo Avatar or Initial
+  if (student.photoUrl) {
+    if (elAvatarImg) {
+      elAvatarImg.src = student.photoUrl;
+      elAvatarImg.classList.remove('hidden');
+    }
+    if (elAvatarInit) elAvatarInit.classList.add('hidden');
+  } else {
+    if (elAvatarImg) elAvatarImg.classList.add('hidden');
+    if (elAvatarInit) {
+      elAvatarInit.textContent = (student.name || 'S').charAt(0).toUpperCase();
+      elAvatarInit.classList.remove('hidden');
+    }
+  }
+
   if (elVipBadge) {
     elVipBadge.innerHTML = student.isVIP
       ? `<span class="user-tier-badge vip">💎 VIP (${student.daysRemaining} ថ្ងៃ)</span>`
@@ -6534,23 +6628,177 @@ async function handleAdminDirectRevokeVip() {
   }
 }
 
-// 6. Payments Management Loader
+// 6. Payments & Submitted Receipts Management Loader
 async function loadAdminPayments() {
-  const tbody = document.getElementById('admPaymentsTableBody');
-  if (tbody) tbody.innerHTML = `<tr><td colspan="5" class="text-center py-6 text-slate-400">កំពុងផ្ទុកទិន្នន័យបង់ប្រាក់...</td></tr>`;
+  const tbodyPay = document.getElementById('admPaymentsTableBody');
+  const tbodyRec = document.getElementById('admReceiptsTableBody');
+  if (tbodyPay) tbodyPay.innerHTML = `<tr><td colspan="5" class="text-center py-6 text-slate-400">កំពុងផ្ទុកទិន្នន័យបង់ប្រាក់...</td></tr>`;
+  if (tbodyRec) tbodyRec.innerHTML = `<tr><td colspan="5" class="text-center py-6 text-slate-400">កំពុងផ្ទុកបញ្ជីវិក្កយបត្រ...</td></tr>`;
 
   try {
     const adminId = getAdminId();
     const res = await fetch(`/api/admin/payments?adminId=${encodeURIComponent(adminId)}`);
     const data = await res.json();
 
-    if (data.success && Array.isArray(data.payments)) {
-      STATE.adminData.payments = data.payments;
-      renderAdminPaymentsTable(data.payments);
+    if (data.success) {
+      if (Array.isArray(data.payments)) {
+        STATE.adminData.payments = data.payments;
+        renderAdminPaymentsTable(data.payments);
+      }
+      if (Array.isArray(data.receipts)) {
+        STATE.adminData.receipts = data.receipts;
+        renderAdminReceiptsTable(data.receipts);
+      }
     }
   } catch (err) {
-    console.error('Failed to load payments:', err);
-    if (tbody) tbody.innerHTML = `<tr><td colspan="5" class="text-center py-6 text-red-400">មានបញ្ហាក្នុងការផ្ទុកទិន្នន័យ</td></tr>`;
+    console.error('Failed to load payments & receipts:', err);
+    if (tbodyPay) tbodyPay.innerHTML = `<tr><td colspan="5" class="text-center py-6 text-red-400">មានបញ្ហាក្នុងការផ្ទុកទិន្នន័យ</td></tr>`;
+    if (tbodyRec) tbodyRec.innerHTML = `<tr><td colspan="5" class="text-center py-6 text-red-400">មានបញ្ហាក្នុងការផ្ទុកវិក្កយបត្រ</td></tr>`;
+  }
+}
+
+function renderAdminReceiptsTable(receipts) {
+  const tbody = document.getElementById('admReceiptsTableBody');
+  const badge = document.getElementById('admReceiptsPendingBadge');
+  if (!tbody) return;
+
+  const pendingCount = (receipts || []).filter(r => r.status === 'pending').length;
+  if (badge) {
+    badge.textContent = `${pendingCount} រង់ចាំពិនិត្យ`;
+    badge.className = pendingCount > 0 ? 'badge badge-warning text-[10px]' : 'badge badge-neutral text-[10px]';
+  }
+
+  if (!receipts || receipts.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" class="text-center py-6 text-slate-400">មិនទាន់មានវិក្កយបត្រដែលសិស្សផ្ញើមកទេ</td></tr>`;
+    return;
+  }
+
+  const adminId = getAdminId();
+  tbody.innerHTML = receipts.map(r => {
+    const photoUrl = r.fileId ? `/api/admin/receipts/photo/${encodeURIComponent(r.fileId)}?adminId=${encodeURIComponent(adminId)}` : '/school_logo.png';
+    const isPending = r.status === 'pending';
+    const statusHtml = r.status === 'approved'
+      ? `<span class="badge badge-success text-xs">✅ បានអនុម័ត (${escapeHtml(r.planGranted || 'VIP')})</span>`
+      : (r.status === 'rejected' 
+          ? `<span class="badge badge-danger text-xs">❌ បានបដិសេធ</span>`
+          : `<span class="badge badge-warning text-xs">⏳ រង់ចាំពិនិត្យ</span>`);
+
+    const studentInfo = `
+      <div class="font-bold text-white text-sm">${escapeHtml(r.studentName || r.userId || 'N/A')}</div>
+      ${r.telegramFullName && r.telegramFullName !== r.studentName ? `<div class="text-[11px] text-cyan-300">✈️ ${escapeHtml(r.telegramFullName)}</div>` : ''}
+      <div class="text-[10px] text-slate-400 font-mono">ID: ${escapeHtml(r.userId || '')} ${r.studentPhone ? `| 📞 ${escapeHtml(r.studentPhone)}` : ''}</div>
+    `;
+
+    const actionsHtml = isPending ? `
+      <div class="flex items-center justify-end gap-1.5 flex-wrap">
+        <select id="receiptDur_${escapeHtml(r.id)}" class="form-input text-xs py-1 px-2 w-auto bg-slate-800 text-amber-300 border-slate-600">
+          <option value="1m">1 ខែ</option>
+          <option value="3m">3 ខែ</option>
+          <option value="6m">6 ខែ</option>
+          <option value="1y">1 ឆ្នាំ</option>
+        </select>
+        <button class="btn btn-gold btn-xs font-bold" onclick="const dur = document.getElementById('receiptDur_${escapeHtml(r.id)}').value; handleReceiptAction('${escapeHtml(r.id)}', '${escapeHtml(r.userId)}', 'approve', dur)">
+          <span>✅ អនុម័ត</span>
+        </button>
+        <button class="btn btn-outline btn-xs text-red-400 hover:bg-red-500/20" onclick="if(confirm('បដិសេធវិក្កយបត្រនេះ?')) handleReceiptAction('${escapeHtml(r.id)}', '${escapeHtml(r.userId)}', 'reject')">
+          <span>❌ បដិសេធ</span>
+        </button>
+      </div>
+    ` : `
+      <div class="text-right text-xs text-slate-400">
+        ${r.approvedBy ? `ដោយ: ${escapeHtml(r.approvedBy)}` : (r.rejectedBy ? `ដោយ: ${escapeHtml(r.rejectedBy)}` : '-')}
+      </div>
+    `;
+
+    return `
+      <tr>
+        <td class="text-xs text-slate-400 font-mono">${escapeHtml(r.dateFormatted || new Date(r.timestamp).toLocaleString())}</td>
+        <td>${studentInfo}</td>
+        <td>
+          <div class="receipt-thumb-wrap" onclick="openReceiptLightbox('${escapeHtml(r.fileId || '')}', '${escapeHtml(r.id)}', '${escapeHtml(r.userId)}', '${escapeHtml(r.studentName || '')}', '${escapeHtml(r.dateFormatted || '')}', '${escapeHtml(r.status || 'pending')}')" title="ចុចដើម្បីពង្រីកមើល">
+            <img src="${photoUrl}" class="receipt-thumb-img" alt="Receipt" onerror="this.src='/school_logo.png'">
+            <div class="receipt-thumb-overlay">🔍</div>
+          </div>
+        </td>
+        <td>${statusHtml}</td>
+        <td class="text-right">${actionsHtml}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function openReceiptLightbox(fileId, receiptId, studentId, studentName, dateFormatted, status) {
+  STATE.adminData.activeReceipt = { fileId, receiptId, studentId, studentName, dateFormatted, status };
+  
+  const elName = document.getElementById('lightboxStudentName');
+  const elInfo = document.getElementById('lightboxStudentInfo');
+  const elDate = document.getElementById('lightboxDate');
+  const elImg = document.getElementById('lightboxImg');
+  const elBadge = document.getElementById('lightboxStatusBadge');
+  const elActionBox = document.getElementById('lightboxActionBox');
+
+  if (elName) elName.textContent = studentName || 'សិស្សមិនស្គាល់';
+  if (elInfo) elInfo.textContent = `ID: ${studentId}`;
+  if (elDate) elDate.textContent = dateFormatted || '';
+  if (elBadge) {
+    if (status === 'approved') {
+      elBadge.className = 'badge badge-sm badge-success';
+      elBadge.textContent = '✅ បានអនុម័ត';
+    } else if (status === 'rejected') {
+      elBadge.className = 'badge badge-sm badge-danger';
+      elBadge.textContent = '❌ បានបដិសេធ';
+    } else {
+      elBadge.className = 'badge badge-sm badge-warning';
+      elBadge.textContent = '⏳ រង់ចាំពិនិត្យ';
+    }
+  }
+
+  if (elImg) {
+    const adminId = getAdminId();
+    elImg.src = fileId ? `/api/admin/receipts/photo/${encodeURIComponent(fileId)}?adminId=${encodeURIComponent(adminId)}` : '/school_logo.png';
+  }
+
+  if (elActionBox) {
+    elActionBox.style.display = status === 'pending' ? 'block' : 'none';
+  }
+
+  openModal('receiptLightboxModal');
+}
+
+async function handleLightboxApprove(duration) {
+  const r = STATE.adminData.activeReceipt;
+  if (!r) return;
+  await handleReceiptAction(r.receiptId, r.studentId, 'approve', duration);
+  closeModal('receiptLightboxModal');
+}
+
+async function handleLightboxReject() {
+  const r = STATE.adminData.activeReceipt;
+  if (!r) return;
+  if (!confirm('⚠️ តើអ្នកពិតជាចង់បដិសេធវិក្កយបត្រនេះមែនទេ?')) return;
+  await handleReceiptAction(r.receiptId, r.studentId, 'reject');
+  closeModal('receiptLightboxModal');
+}
+
+async function handleReceiptAction(receiptId, studentId, action, duration) {
+  try {
+    const adminId = getAdminId();
+    const res = await fetch('/api/admin/receipts/action', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminId, receiptId, studentId, action, duration })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(data.message || 'ប្រតិបត្តិការជោគជ័យ!', 'success');
+      loadAdminPayments();
+      loadAdminDashboardData();
+    } else {
+      showToast(`❌ បរាជ័យ៖ ${data.error || 'Server error'}`, 'error');
+    }
+  } catch (err) {
+    console.error('Receipt action failed:', err);
+    showToast('❌ មានបញ្ហាក្នុងការតភ្ជាប់ម៉ាស៊ីនបម្រើ', 'error');
   }
 }
 
