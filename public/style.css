@@ -1842,6 +1842,76 @@ body.day-mode .theme-toggle-btn:hover {
   line-height: 1.5;
 }
 
+/* Clickable English Words & Sentences */
+.clickable-speak {
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  border-radius: 4px;
+}
+
+.clickable-speak:hover {
+  color: #38bdf8 !important;
+  text-decoration: underline dotted #38bdf8;
+  text-underline-offset: 4px;
+  background: rgba(56, 189, 248, 0.08);
+}
+
+.clickable-speak:active {
+  transform: scale(0.98);
+}
+
+/* Floating Selection Pronunciation Tooltip */
+.pro-selection-tts-tooltip {
+  position: absolute;
+  z-index: 99999;
+  transform: translateX(-50%);
+  animation: selTTSFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: auto;
+}
+
+.pro-selection-tts-tooltip.hidden {
+  display: none !important;
+}
+
+.pro-sel-tts-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(56, 189, 248, 0.4);
+  border-radius: 30px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.pro-sel-tts-btn:hover {
+  background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+  transform: translateY(-2px) scale(1.04);
+  box-shadow: 0 12px 28px rgba(14, 165, 233, 0.45);
+}
+
+.pro-sel-tts-btn:active {
+  transform: translateY(0) scale(0.96);
+}
+
+@keyframes selTTSFadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(6px) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
 .pro-ipa-pill {
   font-size: 12px;
   font-weight: 600;

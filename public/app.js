@@ -42,6 +42,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initFirebaseClient();
   loadSavedUserSession();
   updateUserInterface(); // Ensure UI permissions applied immediately on load
+  initSelectionTTSTooltip(); // Enable click & select pronunciation anywhere on page
   await loadCurriculum();
   await loadVerbsData();
   setupEventListeners();
@@ -1858,6 +1859,70 @@ async function speakEnglish(text, btnElement, customTutor) {
   }
 }
 
+// Floating Pronunciation Tooltip for ANY highlighted / selected English text anywhere on the page
+function initSelectionTTSTooltip() {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return;
+  let tooltip = document.getElementById('proSelectionTTSTooltip');
+  if (!tooltip) {
+    tooltip = document.createElement('div');
+    tooltip.id = 'proSelectionTTSTooltip';
+    tooltip.className = 'pro-selection-tts-tooltip hidden';
+    tooltip.innerHTML = `
+      <button class="pro-sel-tts-btn" id="proSelTTSBtn" title="ចុចស្តាប់ការបញ្ចេញសំឡេង">
+        <span class="sel-tts-icon">🔊</span>
+        <span class="sel-tts-label" id="proSelTTSLabel">ស្តាប់</span>
+      </button>
+    `;
+    document.body.appendChild(tooltip);
+
+    tooltip.querySelector('#proSelTTSBtn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const textToSpeak = tooltip.getAttribute('data-speak-text');
+      if (textToSpeak) {
+        speakEnglish(textToSpeak, tooltip.querySelector('#proSelTTSBtn'));
+      }
+    });
+
+    document.addEventListener('mousedown', (e) => {
+      if (!tooltip.contains(e.target)) {
+        tooltip.classList.add('hidden');
+      }
+    });
+  }
+
+  document.addEventListener('selectionchange', () => {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || sel.rangeCount === 0) {
+      if (tooltip) tooltip.classList.add('hidden');
+      return;
+    }
+
+    const selectedText = sel.toString().trim();
+    // Only trigger if selection is between 1 and 160 characters and contains English letters
+    if (!selectedText || selectedText.length > 160 || !/[a-zA-Z]/.test(selectedText)) {
+      if (tooltip) tooltip.classList.add('hidden');
+      return;
+    }
+
+    try {
+      const range = sel.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+      if (rect.width === 0 && rect.height === 0) return;
+
+      tooltip.setAttribute('data-speak-text', selectedText);
+      const label = tooltip.querySelector('#proSelTTSLabel');
+      if (label) {
+        const displayTxt = selectedText.length > 20 ? selectedText.slice(0, 18) + '...' : selectedText;
+        label.textContent = `🔊 "${displayTxt}"`;
+      }
+
+      tooltip.style.top = `${window.scrollY + rect.top - 46}px`;
+      tooltip.style.left = `${window.scrollX + rect.left + (rect.width / 2)}px`;
+      tooltip.classList.remove('hidden');
+    } catch (err) {}
+  });
+}
+
 function fillPracticeChat(text) {
   const input = document.getElementById('chatInput');
   if (input) {
@@ -2355,7 +2420,7 @@ function renderProfessionalLessonHTML(rawText) {
                     <div class="pro-rule-item bilingual">
                       <div class="rule-en-side">
                         <span class="rule-bullet">✦</span>
-                        <span class="rule-en-key">${parts[0].trim()}</span>
+                        <span class="rule-en-key clickable-speak" onclick="speakEnglish('${escapeAttr(parts[0].trim())}', this)" title="ចុចស្តាប់ការបញ្ចេញសំឡេង">${parts[0].trim()}</span>
                         <button class="pro-speak-btn sm" onclick="speakEnglish('${escapeAttr(parts[0].trim())}', this)" title="ស្តាប់សំឡេង">🔊</button>
                       </div>
                       <div class="rule-kh-side">
@@ -2417,7 +2482,7 @@ function renderProfessionalLessonHTML(rawText) {
                 </div>
                 <div class="pro-dialogue-bubble">
                   <div class="pro-en-row">
-                    <span class="pro-en-text">"${turnEn}"</span>
+                    <span class="pro-en-text clickable-speak" onclick="speakEnglish('${escapeAttr(turnEn)}', this)" title="ចុចស្តាប់ការបញ្ចេញសំឡេង">"${turnEn}"</span>
                     <button class="pro-speak-btn" onclick="speakEnglish('${escapeAttr(turnEn)}', this)" title="ស្តាប់សំឡេង">🔊</button>
                   </div>
                   <div class="pro-kh-row">
@@ -2583,7 +2648,7 @@ function renderProfessionalLessonHTML(rawText) {
               <div class="pro-en-left">
                 <span class="pro-word-logo-badge" title="${escapeAttr(item.en)}">${logo}</span>
                 <div class="pro-en-word-box">
-                  <span class="pro-en-text">${item.en}</span>
+                  <span class="pro-en-text clickable-speak" onclick="speakEnglish('${escapeAttr(item.en)}', this)" title="ចុចស្តាប់ការបញ្ចេញសំឡេង">${item.en}</span>
                   ${item.ipa ? `<span class="pro-ipa-pill">${item.ipa}</span>` : ''}
                 </div>
               </div>
@@ -2597,7 +2662,7 @@ function renderProfessionalLessonHTML(rawText) {
               <div class="pro-vocab-sub-example">
                 <div class="sub-ex-en-row">
                   <span class="sub-ex-label">↳ ឧទាហរណ៍៖</span>
-                  <span class="sub-ex-en-text">"${item.subEn}"</span>
+                  <span class="sub-ex-en-text clickable-speak" onclick="speakEnglish('${escapeAttr(item.subEn)}', this)" title="ចុចស្តាប់ឧទាហរណ៍">"${item.subEn}"</span>
                   <button class="pro-speak-btn sm" onclick="speakEnglish('${escapeAttr(item.subEn)}', this)" title="ស្តាប់ឧទាហរណ៍">🔊</button>
                 </div>
                 ${item.subKh ? `
@@ -2662,7 +2727,7 @@ function renderProfessionalLessonHTML(rawText) {
                 <div class="pro-en-row">
                   <div class="pro-en-left">
                     <span class="pro-word-logo-badge" title="${escapeAttr(currentEn)}">${logo}</span>
-                    <span class="pro-en-text">${currentEn}</span>
+                    <span class="pro-en-text clickable-speak" onclick="speakEnglish('${escapeAttr(currentEn)}', this)" title="ចុចស្តាប់ការបញ្ចេញសំឡេង">${currentEn}</span>
                   </div>
                   <button class="pro-speak-btn" onclick="speakEnglish('${escapeAttr(currentEn)}', this)" title="ស្តាប់ការបញ្ចេញសំឡេង">🔊</button>
                 </div>
