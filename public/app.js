@@ -5943,8 +5943,12 @@ STATE.adminData = {
 };
 
 function getAdminId() {
-  if (STATE.currentUser?.id) return STATE.currentUser.id.toString();
+  if (STATE.currentUser?.id && (STATE.currentUser.id.toString() === '240224709' || STATE.currentUser.isAdmin)) {
+    return STATE.currentUser.id.toString();
+  }
   if (STATE.currentUser?.telegramId) return STATE.currentUser.telegramId.toString();
+  if (STATE.currentUser?.linkedTelegramId) return STATE.currentUser.linkedTelegramId.toString();
+  if (STATE.currentUser?.id) return STATE.currentUser.id.toString();
   return '240224709';
 }
 
@@ -5953,7 +5957,19 @@ function verifyIsAdmin() {
   if (STATE.currentUser.isAdmin) return true;
   const uid = (STATE.currentUser.id || '').toString();
   const tgId = (STATE.currentUser.telegramId || '').toString();
-  return uid === '240224709' || tgId === '240224709';
+  const linkedTg = (STATE.currentUser.linkedTelegramId || '').toString();
+  const username = (STATE.currentUser.username || '').toLowerCase();
+  const name = (STATE.currentUser.name || '').toLowerCase();
+  const khName = (STATE.currentUser.khmerName || '').toLowerCase();
+  return (
+    uid === '240224709' ||
+    tgId === '240224709' ||
+    linkedTg === '240224709' ||
+    username === 'limsorn' ||
+    name.includes('lim sorn') ||
+    khName.includes('លីម សន') ||
+    STATE.currentUser.role === 'admin'
+  );
 }
 
 async function initAdminDashboard() {
