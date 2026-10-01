@@ -273,6 +273,13 @@ function updateUserInterface() {
     const heroTgBtn = document.getElementById('heroLinkTelegramBtn');
     if (heroTgBtn) heroTgBtn.style.display = 'inline-flex';
   }
+
+  // Toggle Admin Portal Buttons
+  const isAdmin = !!(STATE.currentUser?.isAdmin || STATE.currentUser?.id === '240224709' || STATE.currentUser?.telegramId === 240224709);
+  const headerAdminBtn = document.getElementById('headerAdminBtn');
+  const adminNavBtn = document.getElementById('adminNavBtn');
+  if (headerAdminBtn) headerAdminBtn.classList.toggle('hidden', !isAdmin);
+  if (adminNavBtn) adminNavBtn.classList.toggle('hidden', !isAdmin);
 }
 
 async function refreshUserProfile() {
@@ -412,6 +419,8 @@ function navigateTo(tabName) {
     loadUserCertificates();
   } else if (tabName === 'verbs') {
     renderVerbsTable();
+  } else if (tabName === 'admin') {
+    initAdminDashboard();
   }
 }
 
@@ -5918,3 +5927,873 @@ function setupEventListeners() {
     });
   });
 }
+
+// ===================================================
+// SCHOOL MANAGEMENT DASHBOARD (ADMIN SUITE) CONTROLLER
+// ===================================================
+
+STATE.adminData = {
+  overview: null,
+  students: [],
+  payments: [],
+  licenses: [],
+  schoolInfo: null,
+  activeAdminTab: 'overview',
+  searchDebounceTimer: null
+};
+
+function getAdminId() {
+  if (STATE.currentUser?.id) return STATE.currentUser.id.toString();
+  if (STATE.currentUser?.telegramId) return STATE.currentUser.telegramId.toString();
+  return '240224709';
+}
+
+function verifyIsAdmin() {
+  if (!STATE.currentUser) return false;
+  if (STATE.currentUser.isAdmin) return true;
+  const uid = (STATE.currentUser.id || '').toString();
+  const tgId = (STATE.currentUser.telegramId || '').toString();
+  return uid === '240224709' || tgId === '240224709';
+}
+
+async function initAdminDashboard() {
+  if (!verifyIsAdmin()) {
+    showToast('⛔ គណនីរបស់អ្នកមិនមានសិទ្ធិជា Admin ឡើយ!', 'error', 3500);
+    navigateTo('dashboard');
+    return;
+  }
+
+  switchAdminTab(STATE.adminData.activeAdminTab || 'overview');
+  await loadAdminDashboardData();
+}
+
+function switchAdminTab(tabKey) {
+  STATE.adminData.activeAdminTab = tabKey;
+
+  // Update pill buttons
+  document.querySelectorAll('.admin-tab-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.admintab === tabKey);
+  });
+
+  // Switch subpanels
+  document.querySelectorAll('.admin-subpanel').forEach(panel => {
+    panel.classList.remove('active');
+  });
+
+  const activePanel = document.getElementById(`admin-panel-${tabKey}`);
+  if (activePanel) {
+    activePanel.classList.add('active');
+  }
+
+  // Hook data loaders
+  if (tabKey === 'overview') {
+    loadAdminDashboardData();
+  } else if (tabKey === 'students') {
+    loadAdminStudents();
+  } else if (tabKey === 'payments') {
+    loadAdminPayments();
+  } else if (tabKey === 'licenses') {
+    loadAdminLicenses();
+  } else if (tabKey === 'settings') {
+    loadAdminSchoolInfo();
+  }
+}
+
+// 1. Overview Loader
+async function loadAdminDashboardData() {
+  try {
+    const adminId = getAdminId();
+    const res = await fetch(`/api/admin/overview?adminId=${encodeURIComponent(adminId)}`);
+    const data = await res.json();
+
+    if (data.success && data.stats) {
+      STATE.adminData.overview = data;
+      const s = data.stats;
+
+      const elTotal = document.getElementById('admStatTotalStudents');
+      const elVip = document.getElementById('admStatVipStudents');
+      const elFree = document.getElementById('admStatFreeStudents');
+      const elCerts = document.getElementById('admStatCerts');
+      const elGrad = document.getElementById('admStatGraduated');
+      const elGradSub = document.getElementById('admStatGradSub');
+      const elPhone = document.getElementById('admStatPhoneCount');
+      const elActiveLic = document.getElementById('admStatActiveLicenses');
+      const elUsedLic = document.getElementById('admStatUsedLicenses');
+      const elSchool = document.getElementById('adminHeaderSchoolName');
+
+      if (elTotal) elTotal.textContent = s.totalStudents.toLocaleString();
+      if (elVip) elVip.textContent = s.vipStudents.toLocaleString();
+      if (elFree) elFree.textContent = s.freeStudents.toLocaleString();
+      if (elCerts) elCerts.textContent = s.certificatesIssued.toLocaleString();
+      if (elGrad) elGrad.textContent = (s.beginnerGraduated + s.elementaryGraduated).toLocaleString();
+      if (elGradSub) elGradSub.textContent = `Beg: ${s.beginnerGraduated} • Elem: ${s.elementaryGraduated}`;
+      if (elPhone) elPhone.textContent = `📱 តាមទូរស័ព្ទ: ${s.phoneRegisteredCount} នាក់`;
+      if (elActiveLic) elActiveLic.textContent = s.activeLicenses.toLocaleString();
+      if (elUsedLic) elUsedLic.textContent = `បានប្រើ: ${s.usedLicenses}`;
+      if (elSchool && data.schoolInfo?.schoolName) elSchool.textContent = data.schoolInfo.schoolName;
+
+      // Render recent payments table in overview
+      renderAdminOverviewPayments(data.recentPayments || []);
+    }
+  } catch (err) {
+    console.error('Failed to load admin overview data:', err);
+  }
+}
+
+function renderAdminOverviewPayments(payments) {
+  const tbody = document.getElementById('admOverviewPaymentsBody');
+  if (!tbody) return;
+
+  if (!payments || payments.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-slate-400">មិនទាន់មានប្រតិបត្តិការថ្មីៗឡើយ</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = payments.map(p => `
+    <tr>
+      <td class="text-xs text-slate-400 font-mono">${escapeHtml(p.dateFormatted || new Date(p.timestamp).toLocaleDateString())}</td>
+      <td class="font-bold text-white">${escapeHtml(p.userId || 'N/A')}</td>
+      <td>
+        <span class="badge-level">${escapeHtml(p.action || (p.licenseKey ? 'បញ្ចូល License Key' : 'បង់ប្រាក់'))}</span>
+      </td>
+      <td class="text-amber-300 font-semibold">${escapeHtml(p.durationLabel || (p.monthsAdded ? `${p.monthsAdded} ខែ` : (p.daysAdded ? `${p.daysAdded} ថ្ងៃ` : 'VIP')))}</td>
+      <td class="text-xs text-slate-400 font-mono">${escapeHtml(p.adminId || 'System')}</td>
+    </tr>
+  `).join('');
+}
+
+// 2. Student Directory Loader & Filters
+async function loadAdminStudents() {
+  const tbody = document.getElementById('admStudentsTableBody');
+  if (tbody) {
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center py-6 text-slate-400">កំពុងផ្ទុកបញ្ជីសិស្ស...</td></tr>`;
+  }
+
+  try {
+    const adminId = getAdminId();
+    const search = (document.getElementById('admStudentSearchInput')?.value || '').trim();
+    const status = document.getElementById('admFilterStatus')?.value || 'all';
+    const level = document.getElementById('admFilterLevel')?.value || 'all';
+
+    const url = `/api/admin/students?adminId=${encodeURIComponent(adminId)}&search=${encodeURIComponent(search)}&status=${encodeURIComponent(status)}&level=${encodeURIComponent(level)}`;
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (data.success && Array.isArray(data.students)) {
+      STATE.adminData.students = data.students;
+      const countEl = document.getElementById('admStudentsCount');
+      if (countEl) countEl.textContent = data.students.length;
+
+      renderAdminStudentsTable(data.students);
+    } else {
+      if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="text-center py-6 text-red-400">មិនអាចផ្ទុកបញ្ជីសិស្សបានឡើយ: ${escapeHtml(data.error || 'Server error')}</td></tr>`;
+    }
+  } catch (err) {
+    console.error('Failed to load students:', err);
+    if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="text-center py-6 text-red-400">មានបញ្ហាក្នុងការតភ្ជាប់អ៊ីនធឺណិត</td></tr>`;
+  }
+}
+
+function renderAdminStudentsTable(students) {
+  const tbody = document.getElementById('admStudentsTableBody');
+  if (!tbody) return;
+
+  if (students.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="7" class="text-center py-8 text-slate-400">
+          <div class="text-3xl mb-2">📂</div>
+          <p>រកមិនឃើញសិស្សដែលត្រូវនឹងលក្ខខណ្ឌស្វែងរកឡើយ</p>
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = students.map(s => {
+    const initial = (s.name || s.phone || 'S').charAt(0).toUpperCase();
+    const isVip = !!s.isVIP;
+    const phoneDisplay = s.phone ? `<a href="tel:${escapeHtml(s.phone)}" class="text-cyan-400 font-mono hover:underline">📞 ${escapeHtml(s.phone)}</a>` : '<span class="text-slate-500">គ្មាន</span>';
+
+    return `
+      <tr class="${s.isBlocked ? 'opacity-60 bg-red-950/20' : ''}">
+        <td>
+          <div class="student-table-item">
+            <div class="student-table-avatar">${initial}</div>
+            <div>
+              <div class="student-name-main">${escapeHtml(s.name)} ${s.khmerName ? `<span class="text-xs text-slate-400">(${escapeHtml(s.khmerName)})</span>` : ''}</div>
+              <div class="student-name-sub font-mono">ID: ${escapeHtml(s.id)}</div>
+            </div>
+          </div>
+        </td>
+        <td>${phoneDisplay}</td>
+        <td>
+          <span class="badge-level">${escapeHtml(s.courseLevel || 'beginner')}</span>
+        </td>
+        <td>
+          ${isVip 
+            ? `<span class="badge-vip">💎 ${escapeHtml(s.plan || 'VIP')} (${s.daysRemaining} ថ្ងៃ)</span><div class="text-[10px] text-slate-400 mt-0.5">ផុត: ${escapeHtml(s.expireDateFormatted)}</div>` 
+            : `<span class="badge-free">⚪ Free</span>`
+          }
+        </td>
+        <td>
+          <div class="text-xs text-white">📚 ${s.completedLessonsCount || 0} មេរៀន</div>
+          <div class="text-[11px] text-purple-400 font-semibold">📜 ${s.certificatesCount || 0} វិញ្ញាបនបត្រ</div>
+        </td>
+        <td class="text-xs text-slate-300 max-w-xs truncate" title="${escapeHtml(s.notes || '')}">
+          ${s.isBlocked ? '<span class="text-red-400 font-bold">🚫 បានចាក់សោ</span> ' : ''}
+          ${escapeHtml(s.notes || '-')}
+        </td>
+        <td class="text-right">
+          <div class="inline-flex items-center gap-1.5">
+            <button class="btn btn-outline btn-xs" onclick="openAdminEditStudentModal('${escapeHtml(s.id)}')" title="កែប្រែ / គ្រប់គ្រង">
+              <span>✏️ កែប្រែ</span>
+            </button>
+            <button class="btn btn-gold btn-xs font-bold" onclick="quickGrantVipPrompt('${escapeHtml(s.id)}')" title="ដំឡើង VIP">
+              <span>💎 VIP</span>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function handleAdminStudentSearch() {
+  if (STATE.adminData.searchDebounceTimer) clearTimeout(STATE.adminData.searchDebounceTimer);
+  STATE.adminData.searchDebounceTimer = setTimeout(() => {
+    loadAdminStudents();
+  }, 350);
+}
+
+function handleAdminStudentFilter() {
+  loadAdminStudents();
+}
+
+// 3. Create Student by Phone Number
+async function handleAdminCreateStudentByPhone(e) {
+  if (e && e.preventDefault) e.preventDefault();
+
+  const phoneInput = document.getElementById('admNewStudentPhone');
+  const nameInput = document.getElementById('admNewStudentName');
+  const levelInput = document.getElementById('admNewStudentLevel');
+  const planInput = document.getElementById('admNewStudentPlan');
+  const notesInput = document.getElementById('admNewStudentNotes');
+  const submitBtn = document.getElementById('admCreateStudentSubmitBtn');
+
+  const phone = phoneInput?.value?.trim();
+  const name = nameInput?.value?.trim();
+  const courseLevel = levelInput?.value || 'beginner';
+  const vipPlan = planInput?.value || '1m';
+  const notes = notesInput?.value?.trim() || '';
+
+  if (!phone || !name) {
+    showToast('⚠️ សូមបញ្ចូលលេខទូរស័ព្ទ និងឈ្មោះសិស្សឱ្យបានត្រឹមត្រូវ!', 'warning');
+    return;
+  }
+
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `<span>⏳ កំពុងបង្កើតគណនី...</span>`;
+  }
+
+  try {
+    const adminId = getAdminId();
+    const res = await fetch('/api/admin/students/create-by-phone', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminId, phone, name, courseLevel, vipPlan, notes })
+    });
+
+    const data = await res.json();
+    if (data.success && data.student) {
+      showToast('🎉 បានបង្កើតគណនីសិស្ស និងបង្កើតកូដចូលរៀនជោគជ័យ!', 'success', 4000);
+
+      // Open Invitation Modal
+      openAdminInviteModal(data.student, data.inviteMessage);
+
+      // Reset form
+      if (phoneInput) phoneInput.value = '';
+      if (nameInput) nameInput.value = '';
+      if (notesInput) notesInput.value = '';
+
+      // Reload directory & overview
+      loadAdminDashboardData();
+    } else {
+      showToast(`❌ បរាជ័យ៖ ${data.error || 'Server error'}`, 'error', 4500);
+    }
+  } catch (err) {
+    console.error('Create student error:', err);
+    showToast('❌ មានបញ្ហាក្នុងការតភ្ជាប់ម៉ាស៊ីនបម្រើ', 'error');
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = `<span>⚡ បង្កើតគណនី និងបង្កើតកូដចូលរៀន (Create Account)</span>`;
+    }
+  }
+}
+
+function openAdminInviteModal(student, inviteMessage) {
+  const modal = document.getElementById('adminInviteModal');
+  const elName = document.getElementById('inviteModalStudentName');
+  const elPhone = document.getElementById('inviteModalStudentPhone');
+  const elCode = document.getElementById('inviteModalLoginCode');
+  const elMsg = document.getElementById('inviteModalMessageText');
+
+  if (elName) elName.textContent = student.name;
+  if (elPhone) elPhone.textContent = `លេខទូរស័ព្ទ: ${student.phone} (ID: ${student.id})`;
+  if (elCode) elCode.textContent = student.loginCode;
+  if (elMsg) elMsg.value = inviteMessage || '';
+
+  if (modal) modal.classList.remove('hidden');
+}
+
+function copyInviteMessageText(btn) {
+  const msgInput = document.getElementById('inviteModalMessageText');
+  if (!msgInput) return;
+
+  navigator.clipboard.writeText(msgInput.value).then(() => {
+    const orig = btn.innerHTML;
+    btn.innerHTML = `<span>✓ បានចម្លងរួចរាល់!</span>`;
+    setTimeout(() => { btn.innerHTML = orig; }, 2000);
+    showToast('📋 បានចម្លងសារអញ្ជើញទៅ Clipboard រួចរាល់! អ្នកអាចផ្ញើជូនសិស្សតាម Telegram ឬ SMS ភ្លាមៗ', 'success', 4000);
+  }).catch(() => {
+    msgInput.select();
+    document.execCommand('copy');
+    showToast('📋 បានចម្លងសារអញ្ជើញរួចរាល់!', 'success');
+  });
+}
+
+// 4. Edit Student Modal Handlers
+function openAdminEditStudentModal(studentId) {
+  const student = (STATE.adminData.students || []).find(s => s.id === studentId);
+  if (!student) return;
+
+  const modal = document.getElementById('adminStudentEditModal');
+  const elId = document.getElementById('editStudentId');
+  const elHeaderId = document.getElementById('editStudentHeaderId');
+  const elHeaderName = document.getElementById('editStudentHeaderName');
+  const elAvatar = document.getElementById('editStudentAvatar');
+  const elVipBadge = document.getElementById('editStudentVipBadge');
+  const elName = document.getElementById('editStudentName');
+  const elKhmerName = document.getElementById('editStudentKhmerName');
+  const elPhone = document.getElementById('editStudentPhone');
+  const elLevel = document.getElementById('editStudentLevel');
+  const elNotes = document.getElementById('editStudentNotes');
+  const elBlocked = document.getElementById('editStudentBlockedCheck');
+
+  if (elId) elId.value = student.id;
+  if (elHeaderId) elHeaderId.textContent = `ID: ${student.id}`;
+  if (elHeaderName) elHeaderName.textContent = student.name;
+  if (elAvatar) elAvatar.textContent = (student.name || 'S').charAt(0).toUpperCase();
+  if (elVipBadge) {
+    elVipBadge.innerHTML = student.isVIP
+      ? `<span class="user-tier-badge vip">💎 VIP (${student.daysRemaining} ថ្ងៃ)</span>`
+      : `<span class="user-tier-badge free">Free Account</span>`;
+  }
+  if (elName) elName.value = student.name || '';
+  if (elKhmerName) elKhmerName.value = student.khmerName || '';
+  if (elPhone) elPhone.value = student.phone || '';
+  if (elLevel) elLevel.value = student.courseLevel || 'beginner';
+  if (elNotes) elNotes.value = student.notes || '';
+  if (elBlocked) elBlocked.checked = !!student.isBlocked;
+
+  if (modal) modal.classList.remove('hidden');
+}
+
+async function handleSaveStudentInfoFromModal() {
+  const studentId = document.getElementById('editStudentId')?.value;
+  if (!studentId) return;
+
+  const name = document.getElementById('editStudentName')?.value?.trim();
+  const khmerName = document.getElementById('editStudentKhmerName')?.value?.trim();
+  const phone = document.getElementById('editStudentPhone')?.value?.trim();
+  const courseLevel = document.getElementById('editStudentLevel')?.value;
+  const notes = document.getElementById('editStudentNotes')?.value?.trim();
+  const isBlocked = !!document.getElementById('editStudentBlockedCheck')?.checked;
+
+  try {
+    const adminId = getAdminId();
+    const res = await fetch('/api/admin/students/update-info', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminId, studentId, name, khmerName, phone, courseLevel, notes, isBlocked })
+    });
+
+    const data = await res.json();
+    if (data.success) {
+      showToast('💾 បានកែប្រែព័ត៌មានសិស្សដោយជោគជ័យ!', 'success');
+      closeModal('adminStudentEditModal');
+      loadAdminStudents();
+    } else {
+      showToast(`❌ បរាជ័យ៖ ${data.error || 'Server error'}`, 'error');
+    }
+  } catch (err) {
+    showToast('❌ មានបញ្ហាក្នុងការតភ្ជាប់', 'error');
+  }
+}
+
+async function handleDeleteStudentFromModal() {
+  const studentId = document.getElementById('editStudentId')?.value;
+  if (!studentId) return;
+
+  if (!confirm(`⚠️ តើអ្នកពិតជាចង់លុបគណនីសិស្ស #${studentId} នេះមែនទេ? សកម្មភាពនេះមិនអាចត្រឡប់ក្រោយវិញបានឡើយ!`)) {
+    return;
+  }
+
+  try {
+    const adminId = getAdminId();
+    const res = await fetch('/api/admin/students/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminId, studentId })
+    });
+
+    const data = await res.json();
+    if (data.success) {
+      showToast(data.message || 'បានលុបគណនីសិស្សដោយជោគជ័យ!', 'info');
+      closeModal('adminStudentEditModal');
+      loadAdminStudents();
+      loadAdminDashboardData();
+    } else {
+      showToast(`❌ បរាជ័យ៖ ${data.error || 'Server error'}`, 'error');
+    }
+  } catch (err) {
+    showToast('❌ មានបញ្ហាក្នុងការតភ្ជាប់', 'error');
+  }
+}
+
+async function handleAdminGrantVipFromEdit(duration) {
+  const studentId = document.getElementById('editStudentId')?.value;
+  if (!studentId) return;
+
+  try {
+    const adminId = getAdminId();
+    const res = await fetch('/api/admin/students/update-vip', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminId, studentId, action: 'grant', duration })
+    });
+
+    const data = await res.json();
+    if (data.success) {
+      showToast(data.message || 'បានបន្ថែម VIP ជោគជ័យ!', 'success');
+      closeModal('adminStudentEditModal');
+      loadAdminStudents();
+      loadAdminDashboardData();
+    } else {
+      showToast(`❌ ${data.error || 'បរាជ័យ'}`, 'error');
+    }
+  } catch (err) {
+    showToast('❌ មានបញ្ហាក្នុងការតភ្ជាប់', 'error');
+  }
+}
+
+async function handleAdminRevokeVipFromEdit() {
+  const studentId = document.getElementById('editStudentId')?.value;
+  if (!studentId) return;
+
+  if (!confirm(`⚠️ តើអ្នកពិតជាចង់ដកហូត VIP របស់សិស្ស #${studentId} នេះមែនទេ?`)) return;
+
+  try {
+    const adminId = getAdminId();
+    const res = await fetch('/api/admin/students/update-vip', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminId, studentId, action: 'revoke' })
+    });
+
+    const data = await res.json();
+    if (data.success) {
+      showToast(data.message || 'បានដកហូត VIP រួចរាល់!', 'info');
+      closeModal('adminStudentEditModal');
+      loadAdminStudents();
+      loadAdminDashboardData();
+    } else {
+      showToast(`❌ ${data.error || 'បរាជ័យ'}`, 'error');
+    }
+  } catch (err) {
+    showToast('❌ មានបញ្ហាក្នុងការតភ្ជាប់', 'error');
+  }
+}
+
+function quickGrantVipPrompt(studentId) {
+  openAdminEditStudentModal(studentId);
+}
+
+// 5. Direct VIP Tool
+async function handleAdminDirectGrantVip() {
+  const input = document.getElementById('admDirectUserId');
+  const durSelect = document.getElementById('admDirectDuration');
+  const rawId = input?.value?.trim();
+  const duration = durSelect?.value || '1m';
+
+  if (!rawId) {
+    showToast('⚠️ សូមបញ្ចូល ID សិស្ស ឬលេខទូរស័ព្ទ!', 'warning');
+    return;
+  }
+
+  // Format ID
+  let targetId = rawId;
+  if (/^0\d{7,10}$/.test(rawId)) {
+    targetId = `p_${rawId}`;
+  }
+
+  try {
+    const adminId = getAdminId();
+    const res = await fetch('/api/admin/students/update-vip', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminId, studentId: targetId, action: 'grant', duration })
+    });
+
+    const data = await res.json();
+    if (data.success) {
+      showToast(data.message || 'បានបើក VIP ជូនសិស្សដោយជោគជ័យ!', 'success');
+      if (input) input.value = '';
+      loadAdminPayments();
+      loadAdminDashboardData();
+    } else {
+      showToast(`❌ ${data.error || 'បរាជ័យ'}`, 'error');
+    }
+  } catch (err) {
+    showToast('❌ មានបញ្ហាក្នុងការតភ្ជាប់', 'error');
+  }
+}
+
+async function handleAdminDirectRevokeVip() {
+  const input = document.getElementById('admDirectUserId');
+  const rawId = input?.value?.trim();
+  if (!rawId) return showToast('⚠️ សូមបញ្ចូល ID សិស្ស!', 'warning');
+
+  let targetId = rawId;
+  if (/^0\d{7,10}$/.test(rawId)) targetId = `p_${rawId}`;
+
+  if (!confirm(`⚠️ តើអ្នកពិតជាចង់ដកហូត VIP របស់ #${targetId} មែនទេ?`)) return;
+
+  try {
+    const adminId = getAdminId();
+    const res = await fetch('/api/admin/students/update-vip', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminId, studentId: targetId, action: 'revoke' })
+    });
+
+    const data = await res.json();
+    if (data.success) {
+      showToast('បានដកហូត VIP រួចរាល់!', 'info');
+      loadAdminPayments();
+      loadAdminDashboardData();
+    } else {
+      showToast(`❌ ${data.error || 'បរាជ័យ'}`, 'error');
+    }
+  } catch (err) {
+    showToast('❌ មានបញ្ហាក្នុងការតភ្ជាប់', 'error');
+  }
+}
+
+// 6. Payments Management Loader
+async function loadAdminPayments() {
+  const tbody = document.getElementById('admPaymentsTableBody');
+  if (tbody) tbody.innerHTML = `<tr><td colspan="5" class="text-center py-6 text-slate-400">កំពុងផ្ទុកទិន្នន័យបង់ប្រាក់...</td></tr>`;
+
+  try {
+    const adminId = getAdminId();
+    const res = await fetch(`/api/admin/payments?adminId=${encodeURIComponent(adminId)}`);
+    const data = await res.json();
+
+    if (data.success && Array.isArray(data.payments)) {
+      STATE.adminData.payments = data.payments;
+      renderAdminPaymentsTable(data.payments);
+    }
+  } catch (err) {
+    console.error('Failed to load payments:', err);
+    if (tbody) tbody.innerHTML = `<tr><td colspan="5" class="text-center py-6 text-red-400">មានបញ្ហាក្នុងការផ្ទុកទិន្នន័យ</td></tr>`;
+  }
+}
+
+function renderAdminPaymentsTable(payments) {
+  const tbody = document.getElementById('admPaymentsTableBody');
+  if (!tbody) return;
+
+  if (payments.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" class="text-center py-6 text-slate-400">មិនទាន់មានប្រវត្តិបង់ប្រាក់ឡើយ</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = payments.map(p => `
+    <tr>
+      <td class="text-xs text-slate-400 font-mono">${escapeHtml(p.dateFormatted || new Date(p.timestamp).toLocaleString())}</td>
+      <td class="font-bold text-white font-mono">${escapeHtml(p.userId || 'N/A')}</td>
+      <td>
+        <span class="badge-level">${escapeHtml(p.action || (p.licenseKey ? 'បញ្ចូល Key' : 'បង់ប្រាក់'))}</span>
+      </td>
+      <td class="text-amber-300 font-semibold font-mono">
+        ${escapeHtml(p.durationLabel || (p.licenseKey ? p.licenseKey : (p.monthsAdded ? `${p.monthsAdded} ខែ` : 'VIP')))}
+      </td>
+      <td class="text-xs text-slate-400 font-mono">${escapeHtml(p.adminId || 'System')}</td>
+    </tr>
+  `).join('');
+}
+
+// 7. License Key Management Loader & Batch Generator
+async function loadAdminLicenses() {
+  const tbody = document.getElementById('admLicensesTableBody');
+  if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="text-center py-6 text-slate-400">កំពុងផ្ទុកបញ្ជី License Keys...</td></tr>`;
+
+  try {
+    const adminId = getAdminId();
+    const res = await fetch(`/api/admin/licenses?adminId=${encodeURIComponent(adminId)}`);
+    const data = await res.json();
+
+    if (data.success && Array.isArray(data.licenses)) {
+      STATE.adminData.licenses = data.licenses;
+      renderAdminLicensesTable(data.licenses);
+    }
+  } catch (err) {
+    console.error('Failed to load licenses:', err);
+    if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="text-center py-6 text-red-400">មានបញ្ហាក្នុងការផ្ទុកទិន្នន័យ</td></tr>`;
+  }
+}
+
+function renderAdminLicensesTable(licenses) {
+  const tbody = document.getElementById('admLicensesTableBody');
+  if (!tbody) return;
+
+  if (licenses.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center py-6 text-slate-400">មិនទាន់មាន License Keys ឡើយ</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = licenses.map(lic => {
+    const isActive = lic.status === 'active';
+    const isUsed = lic.status === 'used';
+
+    return `
+      <tr>
+        <td class="font-mono font-bold text-amber-300 select-all">${escapeHtml(lic.key)}</td>
+        <td><span class="badge-vip font-bold">${escapeHtml(lic.label || lic.durationStr)}</span></td>
+        <td>
+          ${isActive 
+            ? '<span class="badge-vip bg-emerald-500/20 text-emerald-400 border-emerald-500/40">🟢 នៅទំនេរ (Active)</span>' 
+            : (isUsed ? '<span class="badge-free">⚪ ប្រើប្រាស់រួច</span>' : '<span class="badge-free text-red-400">❌ Revoked</span>')
+          }
+        </td>
+        <td class="text-xs text-slate-400">${escapeHtml(lic.createdDateFormatted || '-')}</td>
+        <td class="font-mono text-xs text-slate-300">${escapeHtml(lic.usedBy || '-')}</td>
+        <td class="text-xs text-slate-400 truncate max-w-[150px]">${escapeHtml(lic.note || '-')}</td>
+        <td class="text-right">
+          <button class="btn btn-outline btn-xs font-bold" onclick="copySingleLicenseKey('${escapeHtml(lic.key)}', this)">
+            <span>📋 ចម្លង</span>
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function copySingleLicenseKey(key, btn) {
+  navigator.clipboard.writeText(key).then(() => {
+    const orig = btn.innerHTML;
+    btn.innerHTML = `<span>✓</span>`;
+    setTimeout(() => { btn.innerHTML = orig; }, 1500);
+    showToast(`📋 បានចម្លង License Key: ${key}`, 'success');
+  });
+}
+
+function openBatchKeyModal() {
+  const modal = document.getElementById('adminBatchKeyModal');
+  const box = document.getElementById('batchKeyOutputBox');
+  if (box) box.classList.add('hidden');
+  if (modal) modal.classList.remove('hidden');
+}
+
+async function handleAdminGenerateKeys(e) {
+  if (e && e.preventDefault) e.preventDefault();
+
+  const dur = document.getElementById('batchKeyDuration')?.value || '1y';
+  const count = document.getElementById('batchKeyCount')?.value || 5;
+  const note = document.getElementById('batchKeyNote')?.value?.trim() || '';
+  const btn = document.getElementById('batchKeySubmitBtn');
+  const outBox = document.getElementById('batchKeyOutputBox');
+  const outText = document.getElementById('batchKeyOutputText');
+
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<span>⏳ កំពុងបង្កើត...</span>`;
+  }
+
+  try {
+    const adminId = getAdminId();
+    const res = await fetch('/api/admin/licenses/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminId, duration: dur, count, note })
+    });
+
+    const data = await res.json();
+    if (data.success && Array.isArray(data.keys)) {
+      showToast(data.message || 'បានបង្កើត Keys ជោគជ័យ!', 'success');
+      const keyStrings = data.keys.map(k => k.key).join('\n');
+      if (outText) outText.value = keyStrings;
+      if (outBox) outBox.classList.remove('hidden');
+
+      loadAdminLicenses();
+      loadAdminDashboardData();
+    } else {
+      showToast(`❌ បរាជ័យ៖ ${data.error || 'Server error'}`, 'error');
+    }
+  } catch (err) {
+    showToast('❌ មានបញ្ហាក្នុងការតភ្ជាប់', 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = `<span>⚡ បង្កើត Keys ភ្លាមៗ</span>`;
+    }
+  }
+}
+
+function copyBatchKeysText(btn) {
+  const textEl = document.getElementById('batchKeyOutputText');
+  if (!textEl) return;
+  navigator.clipboard.writeText(textEl.value).then(() => {
+    showToast('📋 បានចម្លង Keys ទាំងអស់ទៅ Clipboard!', 'success');
+  });
+}
+
+// 8. School Info Management
+async function loadAdminSchoolInfo() {
+  try {
+    const res = await fetch('/api/admin/school-info');
+    const data = await res.json();
+
+    if (data.success && data.schoolInfo) {
+      const info = data.schoolInfo;
+      STATE.adminData.schoolInfo = info;
+
+      const elName = document.getElementById('admSchoolNameInput');
+      const elDir = document.getElementById('admDirectorNameInput');
+      const elPhone = document.getElementById('admSchoolPhoneInput');
+      const elTg = document.getElementById('admTelegramContactInput');
+      const elLoc = document.getElementById('admLocationInput');
+      const elTag = document.getElementById('admTaglineInput');
+      const elNotice = document.getElementById('admBannerNoticeInput');
+      const elNoticeCheck = document.getElementById('admEnableNoticeCheck');
+
+      if (elName) elName.value = info.schoolName || '';
+      if (elDir) elDir.value = info.directorName || '';
+      if (elPhone) elPhone.value = info.phone || '';
+      if (elTg) elTg.value = info.telegramContact || '';
+      if (elLoc) elLoc.value = info.location || '';
+      if (elTag) elTag.value = info.tagline || '';
+      if (elNotice) elNotice.value = info.bannerNotice || '';
+      if (elNoticeCheck) elNoticeCheck.checked = !!info.enableNotice;
+    }
+  } catch (err) {
+    console.error('Failed to load school info:', err);
+  }
+}
+
+async function handleAdminSaveSchoolInfo(e) {
+  if (e && e.preventDefault) e.preventDefault();
+
+  const schoolName = document.getElementById('admSchoolNameInput')?.value;
+  const directorName = document.getElementById('admDirectorNameInput')?.value;
+  const phone = document.getElementById('admSchoolPhoneInput')?.value;
+  const telegramContact = document.getElementById('admTelegramContactInput')?.value;
+  const location = document.getElementById('admLocationInput')?.value;
+  const tagline = document.getElementById('admTaglineInput')?.value;
+  const bannerNotice = document.getElementById('admBannerNoticeInput')?.value;
+  const enableNotice = !!document.getElementById('admEnableNoticeCheck')?.checked;
+  const btn = document.getElementById('admSaveSchoolInfoBtn');
+
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<span>⏳ កំពុងរក្សាទុក...</span>`;
+  }
+
+  try {
+    const adminId = getAdminId();
+    const res = await fetch('/api/admin/school-info', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        adminId,
+        schoolName,
+        directorName,
+        phone,
+        telegramContact,
+        location,
+        tagline,
+        bannerNotice,
+        enableNotice
+      })
+    });
+
+    const data = await res.json();
+    if (data.success) {
+      showToast('💾 បានរក្សាទុកព័ត៌មានសាលារៀនជោគជ័យ!', 'success');
+      const hdrTitle = document.getElementById('adminHeaderSchoolName');
+      if (hdrTitle && schoolName) hdrTitle.textContent = schoolName;
+    } else {
+      showToast(`❌ បរាជ័យ៖ ${data.error || 'Server error'}`, 'error');
+    }
+  } catch (err) {
+    showToast('❌ មានបញ្ហាក្នុងការតភ្ជាប់', 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = `<span>💾 រក្សាទុកព័ត៌មានសាលារៀន (Save School Settings)</span>`;
+    }
+  }
+}
+
+// 9. Broadcast Announcement
+async function handleAdminSendBroadcast(e) {
+  if (e && e.preventDefault) e.preventDefault();
+
+  const titleInput = document.getElementById('admBroadcastTitle');
+  const msgInput = document.getElementById('admBroadcastMessage');
+  const tgCheck = document.getElementById('admBroadcastTelegramCheck');
+  const btn = document.getElementById('admBroadcastSubmitBtn');
+
+  const title = titleInput?.value?.trim();
+  const message = msgInput?.value?.trim();
+  const sendTelegram = !!tgCheck?.checked;
+
+  if (!title || !message) {
+    showToast('⚠️ សូមបំពេញចំណងជើង និងខ្លឹមសារសេចក្តីប្រកាស!', 'warning');
+    return;
+  }
+
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<span>⏳ កំពុងផ្សព្វផ្សាយដំណឹង...</span>`;
+  }
+
+  try {
+    const adminId = getAdminId();
+    const res = await fetch('/api/admin/broadcast', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminId, title, message, sendTelegram })
+    });
+
+    const data = await res.json();
+    if (data.success) {
+      showToast(`📢 ${data.message || 'បានផ្សព្វផ្សាយដំណឹងជោគជ័យ!'}`, 'success', 5000);
+      if (titleInput) titleInput.value = '';
+      if (msgInput) msgInput.value = '';
+    } else {
+      showToast(`❌ បរាជ័យ៖ ${data.error || 'Server error'}`, 'error');
+    }
+  } catch (err) {
+    showToast('❌ មានបញ្ហាក្នុងការតភ្ជាប់', 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = `<span>📢 ចុចផ្សាយដំណឹងជាផ្លូវការ (Send Broadcast)</span>`;
+    }
+  }
+}
+

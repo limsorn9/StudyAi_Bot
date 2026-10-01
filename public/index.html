@@ -49,6 +49,11 @@
       </div>
 
       <div class="header-right-actions">
+        <!-- School Admin Dashboard Portal Button (Shown for Admins) -->
+        <button id="headerAdminBtn" class="header-action-icon-btn hidden" onclick="navigateTo('admin')" title="ផ្ទាំងគ្រប់គ្រងសាលារៀន (School Admin Portal)">
+          <span class="action-icon">🏫</span>
+        </button>
+
         <!-- Quick Search -->
         <button class="header-action-icon-btn" onclick="openSearchModal()" title="ស្វែងរកមេរៀន">
           <span class="action-icon">🔍</span>
@@ -897,11 +902,496 @@
             <img src="/khqr.png" alt="Bakong KHQR" class="khqr-img" onerror="this.style.display='none'">
           </div>
         </div>
+      <!-- ==============================================
+           6. SCHOOL MANAGEMENT DASHBOARD (ADMIN SUITE)
+      ============================================== -->
+      <section id="tab-admin" class="tab-pane">
+        <div class="admin-portal-header">
+          <div class="admin-portal-badge">
+            <span class="badge-dot"></span>
+            <span>🛡️ ប្រព័ន្ធគ្រប់គ្រងសាលារៀនកម្រិតខ្ពស់ • School Management Suite</span>
+          </div>
+          <div class="admin-portal-title-row">
+            <div>
+              <h1 class="admin-portal-title" id="adminHeaderSchoolName">វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline</h1>
+              <p class="admin-portal-sub">គ្រប់គ្រងសិស្ស • ការងាររដ្ឋបាល • ការបង់ប្រាក់ • បង្កើតគណនីតាមលេខទូរស័ព្ទ • ព័ត៌មានសាលា</p>
+            </div>
+            <div class="admin-header-actions">
+              <button class="btn btn-gold btn-sm" onclick="switchAdminTab('register')">
+                <span>➕ ចុះឈ្មោះសិស្សតាមទូរស័ព្ទ</span>
+              </button>
+              <button class="btn btn-outline btn-sm" onclick="loadAdminDashboardData()">
+                <span>🔄 Refresh</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Admin Sub-Navigation Pills -->
+        <div class="admin-nav-bar">
+          <button class="admin-tab-btn active" data-admintab="overview" onclick="switchAdminTab('overview')">
+            <span>📊 ទិដ្ឋភាពទូទៅ</span>
+          </button>
+          <button class="admin-tab-btn" data-admintab="students" onclick="switchAdminTab('students')">
+            <span>👥 បញ្ជីសិស្សទាំងអស់</span>
+          </button>
+          <button class="admin-tab-btn" data-admintab="register" onclick="switchAdminTab('register')">
+            <span>📱 បង្កើតគណនីតាមលេខទូរស័ព្ទ</span>
+          </button>
+          <button class="admin-tab-btn" data-admintab="payments" onclick="switchAdminTab('payments')">
+            <span>💳 គ្រប់គ្រងការបង់ប្រាក់</span>
+          </button>
+          <button class="admin-tab-btn" data-admintab="licenses" onclick="switchAdminTab('licenses')">
+            <span>🔑 License Keys</span>
+          </button>
+          <button class="admin-tab-btn" data-admintab="settings" onclick="switchAdminTab('settings')">
+            <span>🏫 ព័ត៌មានសាលារៀន</span>
+          </button>
+          <button class="admin-tab-btn" data-admintab="broadcast" onclick="switchAdminTab('broadcast')">
+            <span>📢 ផ្សព្វផ្សាយដំណឹង</span>
+          </button>
+        </div>
+
+        <!-- 1. OVERVIEW PANEL -->
+        <div id="admin-panel-overview" class="admin-subpanel active">
+          <!-- Stat Cards Grid -->
+          <div class="admin-stat-grid">
+            <div class="admin-stat-card glass-panel stat-cyan">
+              <div class="stat-card-icon">👥</div>
+              <div class="stat-card-val" id="admStatTotalStudents">0</div>
+              <div class="stat-card-lbl">សិស្សសរុបទាំងអស់</div>
+              <div class="stat-card-foot" id="admStatPhoneCount">📱 តាមទូរស័ព្ទ: 0 នាក់</div>
+            </div>
+
+            <div class="admin-stat-card glass-panel stat-gold">
+              <div class="stat-card-icon">💎</div>
+              <div class="stat-card-val" id="admStatVipStudents">0</div>
+              <div class="stat-card-lbl">សិស្ស VIP សកម្ម</div>
+              <div class="stat-card-foot text-gold">ចូលរៀនបានគ្រប់មេរៀន</div>
+            </div>
+
+            <div class="admin-stat-card glass-panel stat-slate">
+              <div class="stat-card-icon">⚪</div>
+              <div class="stat-card-val" id="admStatFreeStudents">0</div>
+              <div class="stat-card-lbl">សិស្សទូទៅ (Free)</div>
+              <div class="stat-card-foot">គណនីឥតគិតថ្លៃ</div>
+            </div>
+
+            <div class="admin-stat-card glass-panel stat-purple">
+              <div class="stat-card-icon">📜</div>
+              <div class="stat-card-val" id="admStatCerts">0</div>
+              <div class="stat-card-lbl">វិញ្ញាបនបត្របានចេញ</div>
+              <div class="stat-card-foot">ទម្រង់ A4 Landscape</div>
+            </div>
+
+            <div class="admin-stat-card glass-panel stat-emerald">
+              <div class="stat-card-icon">🎓</div>
+              <div class="stat-card-val" id="admStatGraduated">0</div>
+              <div class="stat-card-lbl">សិស្សបញ្ចប់វគ្គ</div>
+              <div class="stat-card-foot" id="admStatGradSub">Beginner / Elem</div>
+            </div>
+
+            <div class="admin-stat-card glass-panel stat-amber">
+              <div class="stat-card-icon">🔑</div>
+              <div class="stat-card-val" id="admStatActiveLicenses">0</div>
+              <div class="stat-card-lbl">License Keys សកម្ម</div>
+              <div class="stat-card-foot" id="admStatUsedLicenses">បានប្រើ: 0</div>
+            </div>
+          </div>
+
+          <!-- Quick Shortcuts Row -->
+          <div class="admin-quick-actions-bar glass-panel mt-4">
+            <h4 class="text-sm font-bold text-white mb-2">⚡ សកម្មភាពរហ័ស (Quick Actions)</h4>
+            <div class="admin-quick-btn-group">
+              <button class="btn btn-cyan btn-sm" onclick="switchAdminTab('register')">
+                <span>📱 ចុះឈ្មោះសិស្សថ្មីតាមលេខទូរស័ព្ទ</span>
+              </button>
+              <button class="btn btn-gold btn-sm" onclick="openBatchKeyModal()">
+                <span>🔑 បង្កើត License Keys ជាកញ្ចប់</span>
+              </button>
+              <button class="btn btn-purple btn-sm" onclick="switchAdminTab('broadcast')">
+                <span>📢 ផ្សាយដំណឹងបន្ទាន់លើ Web & Telegram</span>
+              </button>
+              <button class="btn btn-glass btn-sm" onclick="switchAdminTab('settings')">
+                <span>⚙️ កែប្រែព័ត៌មានសាលារៀន</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Recent Payments / Transactions in Overview -->
+          <div class="admin-section-box glass-panel mt-4">
+            <div class="section-box-header">
+              <h3 class="text-base font-bold text-white">💳 ប្រវត្តិប្រតិបត្តិការថ្មីៗ (Recent Transactions)</h3>
+              <button class="btn btn-outline btn-xs" onclick="switchAdminTab('payments')">មើលទាំងអស់ →</button>
+            </div>
+            <div class="admin-table-responsive mt-3">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>កាលបរិច្ឆេទ</th>
+                    <th>សិស្ស ID</th>
+                    <th>ប្រតិបត្តិការ</th>
+                    <th>រយៈពេល / កញ្ចប់</th>
+                    <th>អនុវត្តដោយ</th>
+                  </tr>
+                </thead>
+                <tbody id="admOverviewPaymentsBody">
+                  <tr><td colspan="5" class="text-center py-4 text-slate-400">កំពុងផ្ទុកទិន្នន័យ...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. STUDENTS DIRECTORY PANEL -->
+        <div id="admin-panel-students" class="admin-subpanel">
+          <div class="admin-filter-bar glass-panel">
+            <div class="admin-search-input-wrap">
+              <span class="search-icon">🔍</span>
+              <input type="text" id="admStudentSearchInput" class="admin-input" placeholder="ស្វែងរកតាម ឈ្មោះ, លេខទូរស័ព្ទ, ID ឬ Email..." oninput="handleAdminStudentSearch()">
+            </div>
+            <div class="admin-filters-row">
+              <select id="admFilterStatus" class="admin-select" onchange="handleAdminStudentFilter()">
+                <option value="all">ស្ថានភាព VIP: ទាំងអស់</option>
+                <option value="vip">💎 សិស្ស VIP</option>
+                <option value="free">⚪ សិស្ស Free</option>
+              </select>
+
+              <select id="admFilterLevel" class="admin-select" onchange="handleAdminStudentFilter()">
+                <option value="all">កម្រិតសិក្សា: ទាំងអស់</option>
+                <option value="beginner">ថ្នាក់ដំបូង (Beginner)</option>
+                <option value="elementary">ថ្នាក់បឋម (Elementary)</option>
+                <option value="standard">ថ្នាក់ទូទៅ (Standard)</option>
+              </select>
+
+              <button class="btn btn-primary btn-sm" onclick="loadAdminStudents()">
+                <span>🔄 ផ្ទុកបញ្ជីឡើងវិញ</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Students Table -->
+          <div class="admin-section-box glass-panel mt-3">
+            <div class="section-box-header">
+              <div class="text-sm text-slate-300">
+                បង្ហាញសិស្សចំនួន <strong id="admStudentsCount" class="text-white">0</strong> នាក់
+              </div>
+              <button class="btn btn-gold btn-xs" onclick="switchAdminTab('register')">
+                <span>➕ បន្ថែមសិស្សថ្មី</span>
+              </button>
+            </div>
+
+            <div class="admin-table-responsive mt-2">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>សិស្ស</th>
+                    <th>លេខទូរស័ព្ទ</th>
+                    <th>កម្រិតថ្នាក់</th>
+                    <th>ស្ថានភាព VIP</th>
+                    <th>ការសិក្សា</th>
+                    <th>កំណត់សម្គាល់</th>
+                    <th class="text-right">សកម្មភាព</th>
+                  </tr>
+                </thead>
+                <tbody id="admStudentsTableBody">
+                  <tr><td colspan="7" class="text-center py-6 text-slate-400">កំពុងផ្ទុកបញ្ជីសិស្ស...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. CREATE STUDENT BY PHONE PANEL -->
+        <div id="admin-panel-register" class="admin-subpanel">
+          <div class="max-w-2xl mx-auto">
+            <div class="admin-section-box glass-panel">
+              <div class="section-box-header border-b border-slate-700/80 pb-3 mb-4">
+                <div>
+                  <h3 class="text-lg font-bold text-white">📱 បង្កើតគណនីសិស្សថ្មីតាមលេខទូរស័ព្ទ (Phone Registration)</h3>
+                  <p class="text-xs text-slate-400 mt-1">
+                    Admin បញ្ចូលត្រឹមតែលេខទូរស័ព្ទ និងឈ្មោះសិស្ស ប្រព័ន្ធនឹងបង្កើត ID សិស្ស និងលេខកូដ Sync Code ៦ ខ្ទង់ឱ្យភ្លាមៗ!
+                  </p>
+                </div>
+              </div>
+
+              <form id="admCreateStudentForm" onsubmit="handleAdminCreateStudentByPhone(event)">
+                <div class="form-grid-2">
+                  <div class="form-group mb-3">
+                    <label class="form-label font-bold text-slate-200">
+                      📞 លេខទូរស័ព្ទសិស្ស <span class="text-red-400">*</span>
+                    </label>
+                    <input type="tel" id="admNewStudentPhone" class="form-input text-base font-semibold tracking-wide" placeholder="ឧទាហរណ៍៖ 012345678 ឬ 098765432" required>
+                    <div class="text-[11px] text-slate-400 mt-1">គាំទ្រលេខខ្មែរគ្រប់ប្រព័ន្ធ (Smart, Cellcard, Metfone...)</div>
+                  </div>
+
+                  <div class="form-group mb-3">
+                    <label class="form-label font-bold text-slate-200">
+                      👤 ឈ្មោះសិស្ស (English/Khmer Name) <span class="text-red-400">*</span>
+                    </label>
+                    <input type="text" id="admNewStudentName" class="form-input text-base font-semibold" placeholder="ឧទាហរណ៍៖ Chantha Sok ឬ សុខ ចាន់ថា" required>
+                  </div>
+                </div>
+
+                <div class="form-grid-2">
+                  <div class="form-group mb-3">
+                    <label class="form-label font-bold text-slate-200">
+                      📚 កម្រិតថ្នាក់សិក្សា (Course Level)
+                    </label>
+                    <select id="admNewStudentLevel" class="form-input">
+                      <option value="beginner">ថ្នាក់ដំបូង (English for Children - Beginner 26 ថ្ងៃ)</option>
+                      <option value="elementary">ថ្នាក់បឋម (Elementary Course 72 ថ្ងៃ)</option>
+                      <option value="standard">ថ្នាក់ទូទៅ (Standard Full Curriculum)</option>
+                    </select>
+                  </div>
+
+                  <div class="form-group mb-3">
+                    <label class="form-label font-bold text-slate-200">
+                      💎 កញ្ចប់ VIP សិក្សា (Subscription Plan)
+                    </label>
+                    <select id="admNewStudentPlan" class="form-input font-semibold text-amber-300">
+                      <option value="free">⚪ ឥតគិតថ្លៃ (Free Account - មិនទាន់បើក VIP)</option>
+                      <option value="1m" selected>💎 VIP 1 ខែ (30 ថ្ងៃ)</option>
+                      <option value="3m">💎 VIP 3 ខែ (90 ថ្ងៃ)</option>
+                      <option value="6m">💎 VIP 6 ខែ (180 ថ្ងៃ)</option>
+                      <option value="1y">👑 VIP 1 ឆ្នាំ (365 ថ្ងៃ - មានសិទ្ធិប្រឡងយកវិញ្ញាបនបត្រ A4)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="form-group mb-4">
+                  <label class="form-label font-bold text-slate-200">
+                    📝 កំណត់សម្គាល់រដ្ឋបាល (Admin / Teacher Notes)
+                  </label>
+                  <textarea id="admNewStudentNotes" class="form-input" rows="2" placeholder="ឧ. បានបង់ប្រាក់ 3$ តាម ABA ថ្ងៃ 01/10/2026, រៀនថ្នាក់យប់..."></textarea>
+                </div>
+
+                <div class="pt-2">
+                  <button type="submit" id="admCreateStudentSubmitBtn" class="btn btn-gold btn-block btn-lg">
+                    <span>⚡ បង្កើតគណនី និងបង្កើតកូដចូលរៀន (Create Account)</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. PAYMENTS & RECEIPTS PANEL -->
+        <div id="admin-panel-payments" class="admin-subpanel">
+          <div class="admin-section-box glass-panel">
+            <div class="section-box-header">
+              <div>
+                <h3 class="text-base font-bold text-white">💳 ប្រវត្តិប្រតិបត្តិការបង់ប្រាក់ និងការបើកសិទ្ធិ VIP</h3>
+                <p class="text-xs text-slate-400">កត់ត្រារាល់ការបញ្ចូល License Key និងការបើក VIP ដោយផ្ទាល់ពី Admin</p>
+              </div>
+              <button class="btn btn-outline btn-xs" onclick="loadAdminPayments()">🔄 Refresh</button>
+            </div>
+
+            <!-- Manual VIP Grant Tool -->
+            <div class="manual-vip-grant-box p-3 bg-slate-800/80 rounded-xl border border-slate-700/80 mt-3 mb-4">
+              <h4 class="text-xs font-bold text-cyan-400 uppercase tracking-wider mb-2">⚡ ឧបករណ៍បើក VIP ដោយផ្ទាល់ជូនសិស្ស (Direct VIP Grant)</h4>
+              <div class="grid grid-cols-1 sm:grid-cols-4 gap-2">
+                <input type="text" id="admDirectUserId" class="form-input text-xs" placeholder="បញ្ចូល ID សិស្ស ឬលេខទូរស័ព្ទ (ឧ. p_012345678)">
+                <select id="admDirectDuration" class="form-input text-xs">
+                  <option value="1m">VIP 1 ខែ (30 ថ្ងៃ)</option>
+                  <option value="3m">VIP 3 ខែ (90 ថ្ងៃ)</option>
+                  <option value="6m">VIP 6 ខែ (180 ថ្ងៃ)</option>
+                  <option value="1y">VIP 1 ឆ្នាំ (365 ថ្ងៃ)</option>
+                </select>
+                <button class="btn btn-cyan btn-sm font-bold" onclick="handleAdminDirectGrantVip()">
+                  <span>✅ បើក VIP ជូនសិស្ស</span>
+                </button>
+                <button class="btn btn-danger btn-sm" onclick="handleAdminDirectRevokeVip()">
+                  <span>❌ ដកហូត VIP</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="admin-table-responsive">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>កាលបរិច្ឆេទ</th>
+                    <th>សិស្ស ID</th>
+                    <th>សកម្មភាព</th>
+                    <th>រយៈពេល / Key</th>
+                    <th>អនុវត្តដោយ</th>
+                  </tr>
+                </thead>
+                <tbody id="admPaymentsTableBody">
+                  <tr><td colspan="5" class="text-center py-6 text-slate-400">កំពុងផ្ទុកទិន្នន័យបង់ប្រាក់...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5. LICENSE KEYS PANEL -->
+        <div id="admin-panel-licenses" class="admin-subpanel">
+          <div class="admin-section-box glass-panel">
+            <div class="section-box-header">
+              <div>
+                <h3 class="text-base font-bold text-white">🔑 គ្រប់គ្រង License Keys</h3>
+                <p class="text-xs text-slate-400">បង្កើតកូដ VIP លក់ជូនសិស្ស និងត្រួតពិនិត្យ Key ដែលនៅសល់</p>
+              </div>
+              <button class="btn btn-gold btn-sm" onclick="openBatchKeyModal()">
+                <span>➕ បង្កើត License Key ថ្មី</span>
+              </button>
+            </div>
+
+            <div class="admin-table-responsive mt-3">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>License Key</th>
+                    <th>កញ្ចប់</th>
+                    <th>ស្ថានភាព</th>
+                    <th>កាលបរិច្ឆេទទទួល</th>
+                    <th>អ្នកប្រើប្រាស់</th>
+                    <th>កំណត់សម្គាល់</th>
+                    <th class="text-right">សកម្មភាព</th>
+                  </tr>
+                </thead>
+                <tbody id="admLicensesTableBody">
+                  <tr><td colspan="7" class="text-center py-6 text-slate-400">កំពុងផ្ទុកបញ្ជី License Keys...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- 6. SCHOOL SETTINGS PANEL -->
+        <div id="admin-panel-settings" class="admin-subpanel">
+          <div class="max-w-2xl mx-auto">
+            <div class="admin-section-box glass-panel">
+              <div class="section-box-header border-b border-slate-700/80 pb-3 mb-4">
+                <div>
+                  <h3 class="text-lg font-bold text-white">🏫 គ្រប់គ្រងព័ត៌មានសាលារៀន (School Information)</h3>
+                  <p class="text-xs text-slate-400 mt-1">ព័ត៌មាននេះនឹងបង្ហាញលើវិញ្ញាបនបត្រផ្លូវការ ទំព័រដើម និងកន្លែងទំនាក់ទំនង</p>
+                </div>
+              </div>
+
+              <form id="admSchoolInfoForm" onsubmit="handleAdminSaveSchoolInfo(event)">
+                <div class="form-group mb-3">
+                  <label class="form-label font-bold text-slate-200">
+                    🏫 ឈ្មោះសាលារៀន (School Name)
+                  </label>
+                  <input type="text" id="admSchoolNameInput" class="form-input font-bold" required>
+                </div>
+
+                <div class="form-grid-2">
+                  <div class="form-group mb-3">
+                    <label class="form-label font-bold text-slate-200">
+                      👨‍🏫 នាយកសាលា / គ្រូបង្រៀន (Director / Head Teacher)
+                    </label>
+                    <input type="text" id="admDirectorNameInput" class="form-input font-semibold" required>
+                  </div>
+
+                  <div class="form-group mb-3">
+                    <label class="form-label font-bold text-slate-200">
+                      📞 លេខទូរស័ព្ទទំនាក់ទំនង (Phone Contact)
+                    </label>
+                    <input type="text" id="admSchoolPhoneInput" class="form-input" placeholder="012 345 678 / 098 765 432">
+                  </div>
+                </div>
+
+                <div class="form-grid-2">
+                  <div class="form-group mb-3">
+                    <label class="form-label font-bold text-slate-200">
+                      ✈️ Telegram Bot / Channel
+                    </label>
+                    <input type="text" id="admTelegramContactInput" class="form-input" placeholder="@StudyAiEngKH_bot">
+                  </div>
+
+                  <div class="form-group mb-3">
+                    <label class="form-label font-bold text-slate-200">
+                      📍 ទីតាំង / អាសយដ្ឋាន (Location)
+                    </label>
+                    <input type="text" id="admLocationInput" class="form-input" placeholder="រាជធានីភ្នំពេញ, កម្ពុជា">
+                  </div>
+                </div>
+
+                <div class="form-group mb-3">
+                  <label class="form-label font-bold text-slate-200">
+                    💬 ពាក្យស្លោកសាលា (School Tagline)
+                  </label>
+                  <input type="text" id="admTaglineInput" class="form-input" placeholder="ចំណេះដឹងភាសាអង់គ្លេសកម្រិតស្តង់ដារអន្តរជាតិ...">
+                </div>
+
+                <div class="form-group mb-4">
+                  <div class="flex items-center justify-between mb-1">
+                    <label class="form-label font-bold text-amber-300">
+                      📢 សេចក្តីជូនដំណឹងបន្ទាន់លើ Web App (Urgent Banner Notice)
+                    </label>
+                    <label class="inline-flex items-center gap-2 cursor-pointer text-xs text-slate-300">
+                      <input type="checkbox" id="admEnableNoticeCheck" class="checkbox-input">
+                      <span>បង្ហាញលើ Web App</span>
+                    </label>
+                  </div>
+                  <textarea id="admBannerNoticeInput" class="form-input" rows="2" placeholder="សេចក្តីជូនដំណឹងបន្ទាន់នឹងរត់នៅផ្នែកខាងលើនៃ Web App..."></textarea>
+                </div>
+
+                <div class="pt-2">
+                  <button type="submit" id="admSaveSchoolInfoBtn" class="btn btn-primary btn-block btn-lg font-bold">
+                    <span>💾 រក្សាទុកព័ត៌មានសាលារៀន (Save School Settings)</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <!-- 7. BROADCAST ANNOUNCEMENT PANEL -->
+        <div id="admin-panel-broadcast" class="admin-subpanel">
+          <div class="max-w-2xl mx-auto">
+            <div class="admin-section-box glass-panel">
+              <div class="section-box-header border-b border-slate-700/80 pb-3 mb-4">
+                <div>
+                  <h3 class="text-lg font-bold text-white">📢 ផ្សព្វផ្សាយដំណឹងជាផ្លូវការ (Broadcast Announcement)</h3>
+                  <p class="text-xs text-slate-400 mt-1">ផ្ញើសារជូនដំណឹងទៅកាន់សិស្សទាំងអស់លើ Web App និង Telegram Bot</p>
+                </div>
+              </div>
+
+              <form id="admBroadcastForm" onsubmit="handleAdminSendBroadcast(event)">
+                <div class="form-group mb-3">
+                  <label class="form-label font-bold text-slate-200">
+                    📌 ចំណងជើងសេចក្តីប្រកាស (Title) <span class="text-red-400">*</span>
+                  </label>
+                  <input type="text" id="admBroadcastTitle" class="form-input font-bold" placeholder="ឧទាហរណ៍៖ ការប្រឡងបញ្ចប់វគ្គឆ្នាំ២០២៦ ឬ ការបញ្ចុះតម្លៃ VIP" required>
+                </div>
+
+                <div class="form-group mb-3">
+                  <label class="form-label font-bold text-slate-200">
+                    📝 ខ្លឹមសារលម្អិតនៃសេចក្តីប្រកាស (Message Content) <span class="text-red-400">*</span>
+                  </label>
+                  <textarea id="admBroadcastMessage" class="form-input" rows="5" placeholder="សូមគោរពជម្រាបជូនសិស្សានុសិស្សទាំងអស់..." required></textarea>
+                </div>
+
+                <div class="p-3 bg-slate-800/80 rounded-xl border border-slate-700/80 mb-4">
+                  <label class="inline-flex items-center gap-2 cursor-pointer text-sm font-semibold text-white">
+                    <input type="checkbox" id="admBroadcastTelegramCheck" checked class="checkbox-input">
+                    <span>🚀 ផ្ញើសារដំណឹងទៅកាន់ Telegram របស់សិស្សទាំងអស់ផងដែរ</span>
+                  </label>
+                  <div class="text-[11px] text-slate-400 mt-1">
+                    Telegram Bot នឹងផ្ញើសារដោយស្វ័យប្រវត្តទៅកាន់សិស្សដែលធ្លាប់បានឆាត ឬចុះឈ្មោះជាមួយ Bot
+                  </div>
+                </div>
+
+                <div class="pt-2">
+                  <button type="submit" id="admBroadcastSubmitBtn" class="btn btn-purple btn-block btn-lg font-bold">
+                    <span>📢 ចុចផ្សាយដំណឹងជាផ្លូវការ (Send Broadcast)</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+
       </section>
 
     </main>
 
-    <!-- Fixed Bottom Navigation Bar (Home, Courses, AI, Quiz, Profile) -->
+    <!-- Fixed Bottom Navigation Bar (Home, Courses, AI, Quiz, Profile, Admin) -->
     <nav class="mobile-bottom-nav">
       <button class="m-nav-item active" data-tab="dashboard" onclick="navigateTo('dashboard')">
         <span class="m-icon">🏠</span>
@@ -924,6 +1414,11 @@
       <button class="m-nav-item" data-tab="profile" onclick="handleProfileNavClick()">
         <span class="m-icon">👤</span>
         <span class="m-label">ប្រវត្តិរូប</span>
+      </button>
+      <!-- School Admin Bottom Nav Button (Visible for Admins) -->
+      <button id="adminNavBtn" class="m-nav-item hidden" data-tab="admin" onclick="navigateTo('admin')">
+        <span class="m-icon">🏫</span>
+        <span class="m-label">គ្រប់គ្រងសាលា</span>
       </button>
     </nav>
 
@@ -1409,6 +1904,201 @@
   </div>
 
 
+
+  <!-- ==============================================
+       ADMIN MODALS (STUDENT EDIT, INVITE, BATCH KEYS)
+  ============================================== -->
+
+  <!-- 1. ADMIN EDIT STUDENT MODAL -->
+  <div id="adminStudentEditModal" class="modal-overlay hidden">
+    <div class="modal-card glass-panel max-w-lg">
+      <div class="modal-header">
+        <div class="modal-title">✏️ កែប្រែព័ត៌មាន & ការងារសិស្ស</div>
+        <button class="modal-close" onclick="closeModal('adminStudentEditModal')">✕</button>
+      </div>
+
+      <div class="admin-modal-body p-4">
+        <input type="hidden" id="editStudentId">
+
+        <div class="flex items-center gap-3 p-3 bg-slate-800/80 rounded-xl border border-slate-700/80 mb-4">
+          <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-xl font-bold text-white shadow-lg" id="editStudentAvatar">
+            S
+          </div>
+          <div>
+            <div class="text-sm font-bold text-white" id="editStudentHeaderName">Student Name</div>
+            <div class="text-xs text-slate-400" id="editStudentHeaderId">ID: ...</div>
+          </div>
+          <div class="ml-auto" id="editStudentVipBadge">
+            <span class="user-tier-badge free">Free</span>
+          </div>
+        </div>
+
+        <div class="form-grid-2">
+          <div class="form-group mb-3">
+            <label class="form-label font-bold text-slate-200">ឈ្មោះសិស្ស (Name)</label>
+            <input type="text" id="editStudentName" class="form-input text-sm">
+          </div>
+          <div class="form-group mb-3">
+            <label class="form-label font-bold text-slate-200">ឈ្មោះខ្មែរ (Khmer Name)</label>
+            <input type="text" id="editStudentKhmerName" class="form-input text-sm">
+          </div>
+        </div>
+
+        <div class="form-grid-2">
+          <div class="form-group mb-3">
+            <label class="form-label font-bold text-slate-200">លេខទូរស័ព្ទ (Phone)</label>
+            <input type="text" id="editStudentPhone" class="form-input text-sm">
+          </div>
+          <div class="form-group mb-3">
+            <label class="form-label font-bold text-slate-200">កម្រិតថ្នាក់ (Course Level)</label>
+            <select id="editStudentLevel" class="form-input text-sm">
+              <option value="beginner">ថ្នាក់ដំបូង (Beginner)</option>
+              <option value="elementary">ថ្នាក់បឋម (Elementary)</option>
+              <option value="standard">ថ្នាក់ទូទៅ (Standard)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- VIP Management Box -->
+        <div class="p-3 bg-slate-800/80 rounded-xl border border-amber-500/30 mb-3">
+          <div class="text-xs font-bold text-amber-400 mb-2">💎 គ្រប់គ្រង VIP & សុពលភាព៖</div>
+          <div class="flex flex-wrap items-center gap-2">
+            <button type="button" class="btn btn-outline btn-xs" onclick="handleAdminGrantVipFromEdit('1m')">+1 ខែ</button>
+            <button type="button" class="btn btn-outline btn-xs" onclick="handleAdminGrantVipFromEdit('3m')">+3 ខែ</button>
+            <button type="button" class="btn btn-outline btn-xs" onclick="handleAdminGrantVipFromEdit('6m')">+6 ខែ</button>
+            <button type="button" class="btn btn-gold btn-xs font-bold" onclick="handleAdminGrantVipFromEdit('1y')">+1 ឆ្នាំ</button>
+            <button type="button" class="btn btn-danger btn-xs ml-auto" onclick="handleAdminRevokeVipFromEdit()">ដកហូត VIP</button>
+          </div>
+        </div>
+
+        <div class="form-group mb-3">
+          <label class="form-label font-bold text-slate-200">កំណត់សម្គាល់រដ្ឋបាល (Admin Notes)</label>
+          <textarea id="editStudentNotes" class="form-input text-sm" rows="2" placeholder="កំណត់ត្រាស្តីពីការសិក្សា ការបង់ប្រាក់ ឬការណែនាំ..."></textarea>
+        </div>
+
+        <div class="p-3 bg-slate-800/80 rounded-xl border border-slate-700/80 mb-4">
+          <label class="inline-flex items-center gap-2 cursor-pointer text-xs text-red-300 font-semibold">
+            <input type="checkbox" id="editStudentBlockedCheck" class="checkbox-input">
+            <span>🚫 ផ្អាក / ចាក់សោគណនីសិស្សនេះបណ្តោះអាសន្ន (Block Account)</span>
+          </label>
+        </div>
+
+        <div class="flex items-center gap-2 pt-2">
+          <button type="button" class="btn btn-primary flex-1 py-2.5 font-bold" onclick="handleSaveStudentInfoFromModal()">
+            <span>💾 រក្សាទុក (Save)</span>
+          </button>
+          <button type="button" class="btn btn-danger py-2.5 px-3 font-bold" onclick="handleDeleteStudentFromModal()" title="លុបគណនីសិស្ស">
+            <span>🗑️ លុប</span>
+          </button>
+          <button type="button" class="btn btn-outline py-2.5 px-3" onclick="closeModal('adminStudentEditModal')">
+            <span>បោះបង់</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. ADMIN STUDENT CREATED / INVITATION MODAL -->
+  <div id="adminInviteModal" class="modal-overlay hidden">
+    <div class="modal-card glass-panel max-w-lg">
+      <div class="modal-header">
+        <div class="modal-title">🎉 បង្កើតគណនីសិស្សជោគជ័យ!</div>
+        <button class="modal-close" onclick="closeModal('adminInviteModal')">✕</button>
+      </div>
+
+      <div class="p-4 text-center">
+        <div class="w-14 h-14 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center mx-auto mb-3 text-2xl">
+          ✓
+        </div>
+        <h3 class="text-lg font-bold text-white mb-1" id="inviteModalStudentName">Chantha Sok</h3>
+        <p class="text-xs text-slate-300 mb-3" id="inviteModalStudentPhone">លេខទូរស័ព្ទ: 012345678</p>
+
+        <!-- Big Sync Code Box -->
+        <div class="p-4 rounded-2xl bg-gradient-to-br from-amber-500/20 to-amber-600/10 border-2 border-amber-400/50 mb-4 shadow-xl">
+          <div class="text-xs text-amber-300 font-bold uppercase tracking-wider mb-1">🔑 លេខកូដចូលរៀន (Sync / Login Code)</div>
+          <div class="text-3xl sm:text-4xl font-black text-amber-400 tracking-widest font-mono select-all py-1" id="inviteModalLoginCode">
+            123456
+          </div>
+          <div class="text-[11px] text-slate-300 mt-1">
+            សិស្សអាចយកកូដនេះទៅចុចចូលរៀនលើ Web App ឬផ្ញើទៅ Telegram Bot បានភ្លាមៗ
+          </div>
+        </div>
+
+        <!-- Monospace Invitation Message -->
+        <div class="text-left mb-4">
+          <div class="text-xs font-bold text-slate-300 mb-1">📋 ខ្លឹមសារសារអញ្ជើញត្រៀមផ្ញើជូនសិស្ស (Ready to send):</div>
+          <textarea id="inviteModalMessageText" class="form-input text-xs font-mono bg-slate-900/90 text-slate-200" rows="6" readonly></textarea>
+        </div>
+
+        <div class="flex flex-col sm:flex-row items-center gap-2">
+          <button type="button" class="btn btn-gold flex-1 py-3 font-bold w-full" onclick="copyInviteMessageText(this)">
+            <span>📋 ចម្លងសារអញ្ជើញ (Copy)</span>
+          </button>
+          <button type="button" class="btn btn-outline py-3 px-4 w-full sm:w-auto" onclick="closeModal('adminInviteModal')">
+            <span>រួចរាល់</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. ADMIN BATCH LICENSE KEYS MODAL -->
+  <div id="adminBatchKeyModal" class="modal-overlay hidden">
+    <div class="modal-card glass-panel max-w-md">
+      <div class="modal-header">
+        <div class="modal-title">🔑 បង្កើត License Keys ថ្មី</div>
+        <button class="modal-close" onclick="closeModal('adminBatchKeyModal')">✕</button>
+      </div>
+
+      <div class="p-4">
+        <form id="admBatchKeyForm" onsubmit="handleAdminGenerateKeys(event)">
+          <div class="form-group mb-3">
+            <label class="form-label font-bold text-slate-200">💎 រយៈពេលសុពលភាព (Duration)</label>
+            <select id="batchKeyDuration" class="form-input font-bold text-amber-300">
+              <option value="1m">1 ខែ (30 ថ្ងៃ)</option>
+              <option value="3m">3 ខែ (90 ថ្ងៃ)</option>
+              <option value="6m">6 ខែ (180 ថ្ងៃ)</option>
+              <option value="1y" selected>1 ឆ្នាំ (365 ថ្ងៃ - A4 Certificate)</option>
+            </select>
+          </div>
+
+          <div class="form-group mb-3">
+            <label class="form-label font-bold text-slate-200">🔢 ចំនួន License Keys ដែលត្រូវបង្កើត</label>
+            <select id="batchKeyCount" class="form-input">
+              <option value="1">1 Key</option>
+              <option value="3">3 Keys</option>
+              <option value="5" selected>5 Keys</option>
+              <option value="10">10 Keys</option>
+              <option value="20">20 Keys</option>
+            </select>
+          </div>
+
+          <div class="form-group mb-4">
+            <label class="form-label font-bold text-slate-200">📝 កំណត់សម្គាល់ (Note / Customer Name)</label>
+            <input type="text" id="batchKeyNote" class="form-input" placeholder="ឧ. លក់ជូនសិស្ស ឬ ប្រូម៉ូសិន...">
+          </div>
+
+          <!-- Output Box if generated -->
+          <div id="batchKeyOutputBox" class="hidden mb-4">
+            <div class="text-xs text-emerald-400 font-bold mb-1">✅ License Keys ដែលបានបង្កើត៖</div>
+            <textarea id="batchKeyOutputText" class="form-input text-xs font-mono bg-slate-900 text-amber-300" rows="4" readonly></textarea>
+            <button type="button" class="btn btn-outline btn-xs mt-2 btn-block" onclick="copyBatchKeysText(this)">
+              <span>📋 ចម្លង Keys ទាំងអស់</span>
+            </button>
+          </div>
+
+          <div class="flex items-center gap-2 pt-2">
+            <button type="submit" id="batchKeySubmitBtn" class="btn btn-gold flex-1 py-3 font-bold">
+              <span>⚡ បង្កើត Keys ភ្លាមៗ</span>
+            </button>
+            <button type="button" class="btn btn-outline py-3 px-4" onclick="closeModal('adminBatchKeyModal')">
+              <span>បិទ</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
 
   <!-- Toast Notification Container -->
   <div id="toastContainer" class="toast-container"></div>

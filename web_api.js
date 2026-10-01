@@ -9,7 +9,17 @@ const OpenAI = require('openai');
 
 const { generateQuiz, generateBeginnerFinalExam, generateElementaryExam, generateElementaryLessonQuiz, generateAnnualSubjectQuiz, SUBJECT_EXAMS } = require('./quiz_generator.js');
 const { generateCertificateCard, generateCertificateHTML, getGradeTitle } = require('./certificate_generator.js');
-const { redeemLicenseKey, getUserLicenseInfo } = require('./license_manager.js');
+const {
+  parseDuration,
+  generateKeyString,
+  formatCambodiaTime,
+  createLicenseKey,
+  redeemLicenseKey,
+  setDirectLicense,
+  revokeUserLicense,
+  getUserLicenseInfo,
+  listUnusedKeys
+} = require('./license_manager.js');
 const irregularVerbs = require('./irregular_verbs.js');
 const { sendOtpEmail, sendConfirmEmail } = require('./mailer.js');
 const beginnerCourse = require('./beginner_curriculum.js');
@@ -2006,12 +2016,16 @@ Provide practical English pronunciation coaching:
         return res.status(400).json({ error: 'លេខកូដនេះបានផុតកំណត់ហើយ! សូមវាយ /link លើ Telegram Bot ដើម្បីយកកូដថ្មី។' });
       }
 
-      const telegramUserId = syncData.telegramId.toString();
+      const targetUserId = (syncData.targetUserId || syncData.telegramId || '').toString();
+      if (!targetUserId) {
+        return res.status(400).json({ error: 'ទិន្នន័យកូដមិនត្រឹមត្រូវ!' });
+      }
 
       if (currentUserId && currentUserId.startsWith('web_')) {
         const username = currentUserId.replace('web_', '');
         await db.ref(`web_users/${username}`).update({
-          linkedTelegramId: telegramUserId,
+          linkedTelegramId: syncData.telegramId ? syncData.telegramId.toString() : null,
+          linkedStudentId: targetUserId,
           linkedAt: Date.now()
         });
       }
@@ -2019,32 +2033,36 @@ Provide practical English pronunciation coaching:
       // Remove used sync code
       await db.ref(`sync_codes/${cleanCode}`).remove();
 
-      const tgSnap = await db.ref(`users/${telegramUserId}`).once('value');
-      const tgData = tgSnap.val() || {};
-      const tgProfile = tgData.profile || {};
+      const userSnap = await db.ref(`users/${targetUserId}`).once('value');
+      const userData = userSnap.val() || {};
+      const userProfile = userData.profile || {};
 
-      const isVIP = checkVIP ? await checkVIP(telegramUserId) : false;
-      const yearly = checkYearlyVIP ? await checkYearlyVIP(telegramUserId) : { eligible: false };
+      const isVIP = checkVIP ? await checkVIP(targetUserId) : false;
+      const yearly = checkYearlyVIP ? await checkYearlyVIP(targetUserId) : { eligible: false };
 
-      const session = await createDeviceSession(telegramUserId, deviceId, userAgent || req.headers['user-agent'], req.ip);
+      const session = await createDeviceSession(targetUserId, deviceId, userAgent || req.headers['user-agent'], req.ip);
 
       return res.json({
         success: true,
-        message: 'ភ្ជាប់គណនី Telegram ដោយជោគជ័យ! ទិន្នន័យទាំងអស់ត្រូវបាន Sync ជាមួយគ្នា។',
+        message: syncData.isPhoneRegistration
+          ? 'ចូលរៀនដោយជោគជ័យតាមរយៈលេខកូដចុះឈ្មោះសិស្ស!'
+          : 'ភ្ជាប់គណនី Telegram ដោយជោគជ័យ! ទិន្នន័យទាំងអស់ត្រូវបាន Sync ជាមួយគ្នា។',
         user: {
-          id: telegramUserId,
-          name: tgProfile.name || syncData.name || `User ${telegramUserId}`,
-          username: syncData.username || tgProfile.username || '',
-          khmerName: tgProfile.khmerName || null,
-          photoUrl: tgProfile.photoUrl || tgProfile.avatar || null,
-          phone: tgProfile.phone || null,
-          isTelegram: true,
+          id: targetUserId,
+          name: userProfile.name || syncData.name || `User ${targetUserId}`,
+          username: syncData.username || userProfile.username || '',
+          khmerName: userProfile.khmerName || null,
+          photoUrl: userProfile.photoUrl || userProfile.avatar || null,
+          phone: userProfile.phone || syncData.phone || null,
+          courseLevel: userProfile.courseLevel || 'beginner',
+          isTelegram: !!syncData.telegramId,
+          isPhoneRegistration: !!syncData.isPhoneRegistration,
           isVIP,
-          isAdmin: await isUserAdmin(telegramUserId),
+          isAdmin: await isUserAdmin(targetUserId),
           yearlyEligible: yearly.eligible,
           vipDetails: yearly,
-          completedLessonsCount: Object.keys(tgData.completed_lessons || {}).length,
-          certificatesCount: Object.keys(tgData.subject_certifications || {}).length
+          completedLessonsCount: Object.keys(userData.completed_lessons || {}).length,
+          certificatesCount: Object.keys(userData.subject_certifications || {}).length
         },
         deviceId: session.deviceId,
         sessionToken: session.sessionToken
@@ -3460,6 +3478,602 @@ Provide practical English pronunciation coaching:
 
   router.get('/verbs', (req, res) => {
     res.json({ success: true, verbs: irregularVerbs });
+  });
+
+  // ==========================================
+  // 8. SCHOOL MANAGEMENT DASHBOARD API (ADMIN)
+  // ==========================================
+
+  async function requireAdminAuth(req, res) {
+    const adminId = (req.body?.adminId || req.query?.adminId || req.headers['x-admin-id'] || '').toString().trim();
+    if (!adminId) {
+      res.status(401).json({ error: 'មិនមានព័ត៌មានសម្គាល់ Admin ឡើយ (Admin ID required)' });
+      return null;
+    }
+    const authorized = await isUserAdmin(adminId);
+    if (!authorized) {
+      res.status(403).json({ error: '⛔ គណនីនេះគ្មានសិទ្ធិជា Admin ឡើយ (Unauthorized Admin)' });
+      return null;
+    }
+    return adminId;
+  }
+
+  // Admin Check / Verify
+  router.get('/admin/verify', async (req, res) => {
+    try {
+      const adminId = await requireAdminAuth(req, res);
+      if (!adminId) return;
+      res.json({ success: true, isAdmin: true, adminId });
+    } catch (err) {
+      res.status(500).json({ error: 'Admin check failed' });
+    }
+  });
+
+  // 1. Dashboard Overview Stats
+  router.get('/admin/overview', async (req, res) => {
+    try {
+      const adminId = await requireAdminAuth(req, res);
+      if (!adminId) return;
+      if (!db) return res.status(500).json({ error: 'Database disconnected' });
+
+      const now = Date.now();
+
+      // Read users
+      const usersSnap = await db.ref('users').once('value');
+      const usersVal = usersSnap.val() || {};
+
+      let totalStudents = 0;
+      let vipStudents = 0;
+      let freeStudents = 0;
+      let beginnerGraduated = 0;
+      let elementaryGraduated = 0;
+      let phoneRegisteredCount = 0;
+
+      for (const [uid, udata] of Object.entries(usersVal)) {
+        totalStudents++;
+        const sub = udata?.subscription;
+        if (sub && sub.expiresAt && sub.expiresAt > now && sub.status !== 'revoked') {
+          vipStudents++;
+        } else {
+          freeStudents++;
+        }
+
+        if (udata?.beginner_graduation?.isGraduated) beginnerGraduated++;
+        if (udata?.elementary_graduation?.isGraduated) elementaryGraduated++;
+        if (uid.startsWith('p_') || udata?.profile?.phone) phoneRegisteredCount++;
+      }
+
+      // Read certificates count
+      const certsSnap = await db.ref('certificates').once('value');
+      const certsVal = certsSnap.val() || {};
+      const certificatesIssued = Object.keys(certsVal).length;
+
+      // Read recent payments
+      const paymentsSnap = await db.ref('payments_log').limitToLast(20).once('value');
+      const paymentsVal = paymentsSnap.val() || {};
+      const recentPayments = Object.values(paymentsVal).reverse();
+
+      // Read licenses count
+      const licensesSnap = await db.ref('licenses').once('value');
+      const licensesVal = licensesSnap.val() || {};
+      let activeLicenses = 0;
+      let usedLicenses = 0;
+      for (const lic of Object.values(licensesVal)) {
+        if (lic.status === 'active') activeLicenses++;
+        else if (lic.status === 'used') usedLicenses++;
+      }
+
+      // Read school info
+      const schoolSnap = await db.ref('school_info').once('value');
+      const schoolInfo = schoolSnap.val() || {
+        schoolName: 'វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline (StudyAI Academy)',
+        directorName: 'លោកគ្រូ សន (Teacher Sorn)',
+        tagline: 'ចំណេះដឹងភាសាអង់គ្លេសកម្រិតស្តង់ដារអន្តរជាតិ ជាមួយប្រព័ន្ធបច្ចេកវិទ្យា AI ឈានមុខគេ',
+        phone: '012 345 678 / 098 765 432',
+        telegramContact: '@StudyAiEngKH_bot',
+        location: 'រាជធានីភ្នំពេញ, ព្រះរាជាណាចក្រកម្ពុជា',
+        bannerNotice: ''
+      };
+
+      res.json({
+        success: true,
+        stats: {
+          totalStudents,
+          vipStudents,
+          freeStudents,
+          certificatesIssued,
+          beginnerGraduated,
+          elementaryGraduated,
+          phoneRegisteredCount,
+          activeLicenses,
+          usedLicenses,
+          paymentsCount: Object.keys(paymentsVal).length
+        },
+        recentPayments: recentPayments.slice(0, 10),
+        schoolInfo
+      });
+    } catch (err) {
+      console.error('Admin overview error:', err);
+      res.status(500).json({ error: 'Server error fetching admin overview' });
+    }
+  });
+
+  // 2. Student Directory with Filters & Pagination
+  router.get('/admin/students', async (req, res) => {
+    try {
+      const adminId = await requireAdminAuth(req, res);
+      if (!adminId) return;
+      if (!db) return res.status(500).json({ error: 'Database disconnected' });
+
+      const search = (req.query.search || '').trim().toLowerCase();
+      const statusFilter = (req.query.status || 'all').toLowerCase(); // all | vip | free
+      const levelFilter = (req.query.level || 'all').toLowerCase();   // all | beginner | elementary | standard
+
+      const snap = await db.ref('users').once('value');
+      const allUsers = snap.val() || {};
+      const now = Date.now();
+
+      const students = [];
+
+      for (const [uid, udata] of Object.entries(allUsers)) {
+        const prof = udata?.profile || {};
+        const sub = udata?.subscription || {};
+        const isVIP = !!(sub && sub.expiresAt && sub.expiresAt > now && sub.status !== 'revoked');
+        const daysRemaining = isVIP ? Math.max(0, Math.floor((sub.expiresAt - now) / (1000 * 60 * 60 * 24))) : 0;
+
+        const name = prof.name || prof.username || (prof.khmerName ? `${prof.khmerName}` : `សិស្ស #${uid}`);
+        const phone = prof.phone || (uid.startsWith('p_') ? uid.replace('p_', '') : '');
+        const email = prof.email || '';
+        const courseLevel = prof.courseLevel || 'beginner';
+        const isBlocked = !!prof.isBlocked;
+
+        // Apply filters
+        if (statusFilter === 'vip' && !isVIP) continue;
+        if (statusFilter === 'free' && isVIP) continue;
+        if (levelFilter !== 'all' && courseLevel.toLowerCase() !== levelFilter) continue;
+
+        if (search) {
+          const match = (
+            uid.toLowerCase().includes(search) ||
+            name.toLowerCase().includes(search) ||
+            phone.toLowerCase().includes(search) ||
+            email.toLowerCase().includes(search) ||
+            (prof.khmerName || '').toLowerCase().includes(search)
+          );
+          if (!match) continue;
+        }
+
+        const completedCount = Object.keys(udata?.completed_lessons || {}).length;
+        const certCount = Object.keys(udata?.subject_certifications || {}).length;
+
+        students.push({
+          id: uid,
+          name: name,
+          khmerName: prof.khmerName || '',
+          phone: phone,
+          email: email,
+          photoUrl: prof.photoUrl || prof.avatar || null,
+          role: prof.role || 'student',
+          courseLevel: courseLevel,
+          isVIP: isVIP,
+          plan: sub.plan || (isVIP ? 'VIP' : 'Free'),
+          expiresAt: sub.expiresAt || null,
+          expireDateFormatted: sub.expiresAt ? formatCambodiaTime(sub.expiresAt) : 'មិនទាន់មាន',
+          daysRemaining: daysRemaining,
+          completedLessonsCount: completedCount,
+          certificatesCount: certCount,
+          beginnerGraduated: !!udata?.beginner_graduation?.isGraduated,
+          elementaryGraduated: !!udata?.elementary_graduation?.isGraduated,
+          notes: prof.notes || '',
+          isBlocked: isBlocked,
+          registeredBy: prof.registeredBy || 'Self',
+          createdAt: prof.createdAt || udata?.createdAt || null
+        });
+      }
+
+      // Sort newest first
+      students.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+      res.json({
+        success: true,
+        count: students.length,
+        students: students.slice(0, 100) // return up to 100
+      });
+    } catch (err) {
+      console.error('Admin students list error:', err);
+      res.status(500).json({ error: 'Server error fetching student list' });
+    }
+  });
+
+  // 3. Create Student Account by Phone Number (ចុះឈ្មោះសិស្សថ្មីតាមលេខទូរស័ព្ទ)
+  router.post('/admin/students/create-by-phone', async (req, res) => {
+    try {
+      const adminId = await requireAdminAuth(req, res);
+      if (!adminId) return;
+      if (!db) return res.status(500).json({ error: 'Database disconnected' });
+
+      const { phone, name, courseLevel, vipPlan, notes } = req.body;
+
+      if (!phone || !name) {
+        return res.status(400).json({ error: 'សូមបញ្ជាក់លេខទូរស័ព្ទ និងឈ្មោះសិស្ស!' });
+      }
+
+      // Clean & normalize phone number
+      let cleanPhone = phone.toString().replace(/[\s\-\(\)]/g, '');
+      if (cleanPhone.startsWith('+855')) cleanPhone = '0' + cleanPhone.slice(4);
+      else if (cleanPhone.startsWith('855')) cleanPhone = '0' + cleanPhone.slice(3);
+      else if (!cleanPhone.startsWith('0') && cleanPhone.length >= 8 && cleanPhone.length <= 9) {
+        cleanPhone = '0' + cleanPhone;
+      }
+
+      if (!/^0\d{7,10}$/.test(cleanPhone)) {
+        return res.status(400).json({ error: 'ទម្រង់លេខទូរស័ព្ទមិនត្រឹមត្រូវ! (ឧទាហរណ៍៖ 012345678)' });
+      }
+
+      const studentId = `p_${cleanPhone}`;
+
+      // Check if student already exists
+      const existingSnap = await db.ref(`users/${studentId}`).once('value');
+      const isExisting = existingSnap.exists();
+
+      // Generate 6-digit one-time Sync / Login Code
+      const loginCode = Math.floor(100000 + Math.random() * 900000).toString();
+      const codeExpiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000; // 30 days valid
+
+      await db.ref(`sync_codes/${loginCode}`).set({
+        code: loginCode,
+        targetUserId: studentId,
+        phone: cleanPhone,
+        name: name.trim(),
+        isPhoneRegistration: true,
+        expiresAt: codeExpiresAt,
+        createdBy: adminId.toString(),
+        createdAt: Date.now()
+      });
+
+      // Update / Create user record
+      const studentProfile = {
+        name: name.trim(),
+        phone: cleanPhone,
+        courseLevel: courseLevel || 'beginner',
+        role: 'student',
+        notes: notes ? notes.trim() : '',
+        registeredBy: adminId.toString(),
+        createdAt: isExisting ? (existingSnap.val()?.profile?.createdAt || Date.now()) : Date.now(),
+        lastUpdated: Date.now()
+      };
+
+      await db.ref(`users/${studentId}/profile`).update(studentProfile);
+
+      // Apply VIP Plan if selected
+      let vipResult = null;
+      if (vipPlan && vipPlan !== 'free') {
+        vipResult = await setDirectLicense(db, adminId, studentId, vipPlan);
+      }
+
+      // Pre-compose Khmer invitation template
+      const planLabel = vipResult ? vipResult.label : (vipPlan === 'free' ? 'ឥតគិតថ្លៃ (Free)' : 'មិនទាន់មាន VIP');
+      const levelKhmer = courseLevel === 'elementary' ? 'ថ្នាក់បឋម (Elementary)' : (courseLevel === 'standard' ? 'ថ្នាក់ទូទៅ (Standard)' : 'ថ្នាក់ដំបូង (Beginner)');
+      const defaultWebUrl = process.env.WEBAPP_URL || process.env.RENDER_EXTERNAL_URL || 'https://studyai-bot-wmha.onrender.com/';
+
+      const inviteMessage = 
+`🏫 *វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline*
+👋 សួស្តីប្អូន *${name.trim()}*! 
+គណនីសិក្សាភាសាអង់គ្លេសស្វ័យប្រវត្តរបស់ប្អូនត្រូវបានបង្កើតជោគជ័យ៖
+📱 លេខទូរស័ព្ទ: \`${cleanPhone}\`
+🔑 លេខកូដចូលរៀន (Sync Code): \`${loginCode}\`
+💎 កញ្ចប់សិក្សា: *${planLabel}*
+📚 កម្រិតថ្នាក់: *${levelKhmer}*
+
+👉 *វិធីចូលរៀនភ្លាមៗ៖*
+1. បើកវេបសាយ: ${defaultWebUrl}
+2. ចុចប៊ូតុង **«Login»**
+3. វាយលេខកូដ **${loginCode}** ដើម្បីចូលរៀនភ្លាមៗ!
+*(ឬផ្ញើលេខកូដនេះទៅកាន់ Telegram Bot: @StudyAiEngKH_bot)*`;
+
+      res.json({
+        success: true,
+        message: isExisting ? 'បានកែសម្រួលគណនីសិស្ស និងបង្កើតកូដចូលរៀនជោគជ័យ!' : 'បានបង្កើតគណនីសិស្សថ្មីជោគជ័យ!',
+        student: {
+          id: studentId,
+          name: name.trim(),
+          phone: cleanPhone,
+          courseLevel: courseLevel || 'beginner',
+          loginCode: loginCode,
+          vipPlan: planLabel,
+          expiresAt: vipResult?.expiresAt || null,
+          expireDateFormatted: vipResult?.expireDateFormatted || 'Free Account'
+        },
+        inviteMessage
+      });
+    } catch (err) {
+      console.error('Admin create student by phone error:', err);
+      res.status(500).json({ error: 'Server error creating student' });
+    }
+  });
+
+  // 4. Update Student VIP Status (Grant / Revoke)
+  router.post('/admin/students/update-vip', async (req, res) => {
+    try {
+      const adminId = await requireAdminAuth(req, res);
+      if (!adminId) return;
+      if (!db) return res.status(500).json({ error: 'Database disconnected' });
+
+      const { studentId, action, duration } = req.body;
+      if (!studentId || !action) {
+        return res.status(400).json({ error: 'Missing studentId or action' });
+      }
+
+      if (action === 'grant') {
+        if (!duration) return res.status(400).json({ error: 'Missing duration for granting VIP' });
+        const result = await setDirectLicense(db, adminId, studentId, duration);
+        if (result.success) {
+          res.json({ success: true, message: `បានបន្ថែម VIP រយៈពេល ${result.label} ជោគជ័យ!`, data: result });
+        } else {
+          res.status(400).json({ error: result.message });
+        }
+      } else if (action === 'revoke') {
+        const result = await revokeUserLicense(db, adminId, studentId);
+        res.json({ success: true, message: 'បានដកហូត VIP របស់សិស្សរួចរាល់ហើយ!', data: result });
+      } else {
+        res.status(400).json({ error: 'Invalid action (grant | revoke)' });
+      }
+    } catch (err) {
+      console.error('Admin update VIP error:', err);
+      res.status(500).json({ error: 'Server error updating VIP status' });
+    }
+  });
+
+  // 5. Update Student Info / Notes / Academic Level
+  router.post('/admin/students/update-info', async (req, res) => {
+    try {
+      const adminId = await requireAdminAuth(req, res);
+      if (!adminId) return;
+      if (!db) return res.status(500).json({ error: 'Database disconnected' });
+
+      const { studentId, name, khmerName, phone, courseLevel, notes, isBlocked } = req.body;
+      if (!studentId) return res.status(400).json({ error: 'Missing studentId' });
+
+      const updates = {};
+      if (name !== undefined) updates.name = name.trim();
+      if (khmerName !== undefined) updates.khmerName = khmerName.trim();
+      if (phone !== undefined) updates.phone = phone.trim();
+      if (courseLevel !== undefined) updates.courseLevel = courseLevel;
+      if (notes !== undefined) updates.notes = notes.trim();
+      if (isBlocked !== undefined) updates.isBlocked = !!isBlocked;
+      updates.lastUpdated = Date.now();
+      updates.updatedBy = adminId.toString();
+
+      await db.ref(`users/${studentId}/profile`).update(updates);
+
+      res.json({ success: true, message: 'បានរក្សាទុកព័ត៌មានសិស្សជោគជ័យ!' });
+    } catch (err) {
+      console.error('Admin update student info error:', err);
+      res.status(500).json({ error: 'Server error updating student info' });
+    }
+  });
+
+  // 6. Delete / Archive Student Record
+  router.post('/admin/students/delete', async (req, res) => {
+    try {
+      const adminId = await requireAdminAuth(req, res);
+      if (!adminId) return;
+      if (!db) return res.status(500).json({ error: 'Database disconnected' });
+
+      const { studentId } = req.body;
+      if (!studentId) return res.status(400).json({ error: 'Missing studentId' });
+
+      // Safety check: Cannot delete super admin
+      if (SUPER_ADMIN_IDS.includes(studentId.toString())) {
+        return res.status(403).json({ error: 'មិនអាចលុបគណនី Super Admin បានឡើយ!' });
+      }
+
+      await db.ref(`users/${studentId}`).remove();
+
+      res.json({ success: true, message: `បានលុបគណនីសិស្ស #${studentId} ដោយជោគជ័យ!` });
+    } catch (err) {
+      console.error('Admin delete student error:', err);
+      res.status(500).json({ error: 'Server error deleting student' });
+    }
+  });
+
+  // 7. Payment Management: Fetch logs & Receipts
+  router.get('/admin/payments', async (req, res) => {
+    try {
+      const adminId = await requireAdminAuth(req, res);
+      if (!adminId) return;
+      if (!db) return res.status(500).json({ error: 'Database disconnected' });
+
+      const logsSnap = await db.ref('payments_log').limitToLast(100).once('value');
+      const logsVal = logsSnap.val() || {};
+      const payments = Object.entries(logsVal).map(([id, item]) => ({
+        id,
+        ...item,
+        dateFormatted: formatCambodiaTime(item.timestamp)
+      })).reverse();
+
+      // Also fetch receipts if any
+      const receiptsSnap = await db.ref('receipts').limitToLast(50).once('value');
+      const receiptsVal = receiptsSnap.val() || {};
+      const receipts = Object.entries(receiptsVal).map(([id, item]) => ({
+        id,
+        ...item,
+        dateFormatted: formatCambodiaTime(item.timestamp)
+      })).reverse();
+
+      res.json({ success: true, payments, receipts });
+    } catch (err) {
+      console.error('Admin payments error:', err);
+      res.status(500).json({ error: 'Server error fetching payments' });
+    }
+  });
+
+  // 8. License Management: List keys
+  router.get('/admin/licenses', async (req, res) => {
+    try {
+      const adminId = await requireAdminAuth(req, res);
+      if (!adminId) return;
+      if (!db) return res.status(500).json({ error: 'Database disconnected' });
+
+      const snap = await db.ref('licenses').limitToLast(100).once('value');
+      const val = snap.val() || {};
+      const licenses = Object.values(val).map(item => ({
+        ...item,
+        createdDateFormatted: formatCambodiaTime(item.createdAt),
+        usedDateFormatted: item.usedAt ? formatCambodiaTime(item.usedAt) : null
+      })).reverse();
+
+      res.json({ success: true, licenses });
+    } catch (err) {
+      console.error('Admin licenses error:', err);
+      res.status(500).json({ error: 'Server error fetching licenses' });
+    }
+  });
+
+  // 9. License Management: Create new License Keys
+  router.post('/admin/licenses/create', async (req, res) => {
+    try {
+      const adminId = await requireAdminAuth(req, res);
+      if (!adminId) return;
+      if (!db) return res.status(500).json({ error: 'Database disconnected' });
+
+      const { duration, count = 1, note = '' } = req.body;
+      const numKeys = Math.min(20, Math.max(1, parseInt(count, 10) || 1));
+
+      const generated = [];
+      for (let i = 0; i < numKeys; i++) {
+        const result = await createLicenseKey(db, adminId, duration, note);
+        if (result.success) {
+          generated.push(result);
+        } else {
+          return res.status(400).json({ error: result.message });
+        }
+      }
+
+      res.json({
+        success: true,
+        message: `បានបង្កើត License Key ចំនួន ${generated.length} ដោយជោគជ័យ!`,
+        keys: generated
+      });
+    } catch (err) {
+      console.error('Admin create licenses error:', err);
+      res.status(500).json({ error: 'Server error creating licenses' });
+    }
+  });
+
+  // 10. School Info (GET & POST)
+  router.get('/admin/school-info', async (req, res) => {
+    try {
+      if (!db) return res.status(500).json({ error: 'Database disconnected' });
+      const snap = await db.ref('school_info').once('value');
+      const info = snap.val() || {
+        schoolName: 'វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline (StudyAI Academy)',
+        directorName: 'លោកគ្រូ សន (Teacher Sorn)',
+        tagline: 'ចំណេះដឹងភាសាអង់គ្លេសកម្រិតស្តង់ដារអន្តរជាតិ ជាមួយប្រព័ន្ធបច្ចេកវិទ្យា AI ឈានមុខគេ',
+        phone: '012 345 678 / 098 765 432',
+        telegramContact: '@StudyAiEngKH_bot',
+        location: 'រាជធានីភ្នំពេញ, ព្រះរាជាណាចក្រកម្ពុជា',
+        bannerNotice: '',
+        enableNotice: false
+      };
+      res.json({ success: true, schoolInfo: info });
+    } catch (err) {
+      res.status(500).json({ error: 'Server error fetching school info' });
+    }
+  });
+
+  router.post('/admin/school-info', async (req, res) => {
+    try {
+      const adminId = await requireAdminAuth(req, res);
+      if (!adminId) return;
+      if (!db) return res.status(500).json({ error: 'Database disconnected' });
+
+      const { schoolName, directorName, tagline, phone, telegramContact, location, bannerNotice, enableNotice } = req.body;
+      const data = {
+        schoolName: schoolName?.trim() || 'វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline (StudyAI Academy)',
+        directorName: directorName?.trim() || 'លោកគ្រូ សន (Teacher Sorn)',
+        tagline: tagline?.trim() || '',
+        phone: phone?.trim() || '',
+        telegramContact: telegramContact?.trim() || '',
+        location: location?.trim() || '',
+        bannerNotice: bannerNotice ? bannerNotice.trim() : '',
+        enableNotice: !!enableNotice,
+        lastUpdated: Date.now(),
+        updatedBy: adminId.toString()
+      };
+
+      await db.ref('school_info').set(data);
+
+      res.json({ success: true, message: 'បានរក្សាទុកព័ត៌មានសាលារៀនជោគជ័យ!', schoolInfo: data });
+    } catch (err) {
+      console.error('Admin save school info error:', err);
+      res.status(500).json({ error: 'Server error saving school info' });
+    }
+  });
+
+  // 11. Broadcast Announcement
+  router.post('/admin/broadcast', async (req, res) => {
+    try {
+      const adminId = await requireAdminAuth(req, res);
+      if (!adminId) return;
+      if (!db) return res.status(500).json({ error: 'Database disconnected' });
+
+      const { title, message, sendTelegram } = req.body;
+      if (!title || !message) {
+        return res.status(400).json({ error: 'សូមបញ្ជាក់ចំណងជើង និងខ្លឹមសារសេចក្តីប្រកាស!' });
+      }
+
+      // Save announcement in Firebase
+      const announcement = {
+        title: title.trim(),
+        message: message.trim(),
+        createdAt: Date.now(),
+        createdBy: adminId.toString()
+      };
+
+      await db.ref('announcements').push(announcement);
+
+      // Also set as active banner notice in school_info
+      await db.ref('school_info').update({
+        bannerNotice: `${title}: ${message}`,
+        enableNotice: true,
+        lastNoticeUpdate: Date.now()
+      });
+
+      // Optional Telegram broadcast if bot is active
+      let tgSentCount = 0;
+      if (sendTelegram && bot) {
+        try {
+          const usersSnap = await db.ref('users').once('value');
+          const users = usersSnap.val() || {};
+          const tgMsg = `📢 *សេចក្តីប្រកាសព័ត៌មានពីសាលា SSOnline*\n\n📌 *${title.trim()}*\n\n${message.trim()}`;
+          
+          for (const uid of Object.keys(users)) {
+            // Only send to valid numeric telegram user IDs
+            if (/^\d{6,12}$/.test(uid)) {
+              try {
+                await bot.telegram.sendMessage(uid, tgMsg, { parse_mode: 'Markdown' });
+                tgSentCount++;
+                // Small delay to avoid Telegram rate limits
+                if (tgSentCount % 20 === 0) await new Promise(r => setTimeout(r, 1000));
+              } catch (e) {
+                // Ignore blocked bot / inactive chats
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('Telegram broadcast note:', e.message);
+        }
+      }
+
+      res.json({
+        success: true,
+        message: `បានផ្សព្វផ្សាយសេចក្តីប្រកាសជោគជ័យ! ${tgSentCount > 0 ? `(បានផ្ញើទៅ Telegram ចំនួន ${tgSentCount} នាក់)` : ''}`
+      });
+    } catch (err) {
+      console.error('Admin broadcast error:', err);
+      res.status(500).json({ error: 'Server error sending broadcast' });
+    }
   });
 
   return router;
