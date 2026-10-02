@@ -65,11 +65,11 @@ body.dark-theme {
   color: #f8fafc;
 }
 
-/* Day Mode (Optional Clean & Crisp Light Theme) */
+/* Day Mode (Clean & Crisp Light Theme) */
 body.day-mode {
   --bg-dark: #f8fafc;
   --bg-surface: #ffffff;
-  --bg-card: rgba(255, 255, 255, 0.92);
+  --bg-card: rgba(255, 255, 255, 0.94);
   --bg-card-hover: rgba(241, 245, 249, 0.98);
   --border-glass: rgba(0, 0, 0, 0.08);
   --border-glow: rgba(79, 70, 229, 0.3);
@@ -81,6 +81,254 @@ body.day-mode {
   --input-bg: #ffffff;
   background-color: #f8fafc;
   color: #0f172a;
+}
+
+/* ==========================================================================
+   1. APPLE iOS 18 & visionOS ULTRA-FROSTED GLASS THEME
+   ========================================================================== */
+body.theme-ios {
+  --font-khmer: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Battambang', sans-serif;
+  --font-english: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Outfit', sans-serif;
+  --bg-dark: #000000;
+  --bg-surface: #121214;
+  --bg-card: rgba(28, 28, 30, 0.78);
+  --bg-card-hover: rgba(44, 44, 46, 0.9);
+  --border-glass: rgba(255, 255, 255, 0.16);
+  --border-glow: rgba(0, 122, 255, 0.45);
+  --primary: #007aff;
+  --primary-glow: rgba(0, 122, 255, 0.5);
+  --primary-light: #5ac8fa;
+  --cyan: #32ade6;
+  --cyan-glow: rgba(50, 173, 230, 0.45);
+  --gold: #ff9f0a;
+  --gold-glow: rgba(255, 159, 10, 0.45);
+  --emerald: #34c759;
+  --rose: #ff3b30;
+  --text-main: #ffffff;
+  --text-muted: #8e8e93;
+  --text-dim: #636366;
+  --radius-sm: 10px;
+  --radius-md: 18px;
+  --radius-lg: 26px;
+  --radius-full: 9999px;
+  --shadow-card: 0 14px 40px rgba(0, 0, 0, 0.75);
+  --shadow-glow: 0 0 28px rgba(0, 122, 255, 0.35);
+  --input-bg: rgba(28, 28, 30, 0.92);
+  background-color: #000000;
+  color: #ffffff;
+}
+
+body.theme-ios .glass-panel {
+  background: rgba(28, 28, 30, 0.78);
+  backdrop-filter: blur(35px) saturate(210%);
+  -webkit-backdrop-filter: blur(35px) saturate(210%);
+  border: 0.5px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+body.theme-ios .mobile-bottom-nav {
+  background: rgba(22, 22, 24, 0.82);
+  backdrop-filter: blur(40px) saturate(220%);
+  -webkit-backdrop-filter: blur(40px) saturate(220%);
+  border: 0.5px solid rgba(255, 255, 255, 0.22);
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.8), 0 0 20px rgba(0, 122, 255, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  border-radius: 32px;
+}
+
+body.theme-ios .m-ai-bubble {
+  background: linear-gradient(135deg, #007aff 0%, #5856d6 50%, #af52de 100%);
+  box-shadow: 0 8px 25px rgba(0, 122, 255, 0.7);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+body.theme-ios .btn-start-learning {
+  background: linear-gradient(135deg, #007aff 0%, #5856d6 100%);
+  border: 0.5px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 18px rgba(0, 122, 255, 0.5);
+}
+
+/* ==========================================================================
+   2. GOOGLE ANDROID 15 MATERIAL YOU 3 EXPRESSIVE THEME
+   ========================================================================== */
+body.theme-android {
+  --font-khmer: 'Google Sans', 'Roboto', 'Battambang', sans-serif;
+  --font-english: 'Google Sans', 'Roboto', 'Inter', sans-serif;
+  --bg-dark: #111318;
+  --bg-surface: #191c20;
+  --bg-card: rgba(29, 32, 36, 0.94);
+  --bg-card-hover: rgba(39, 43, 49, 0.98);
+  --border-glass: rgba(142, 145, 153, 0.22);
+  --border-glow: rgba(168, 199, 250, 0.3);
+  --primary: #a8c7fa;
+  --primary-glow: rgba(168, 199, 250, 0.4);
+  --primary-light: #d3e3fd;
+  --cyan: #7fd5ff;
+  --cyan-glow: rgba(127, 213, 255, 0.4);
+  --gold: #fdd663;
+  --gold-glow: rgba(253, 214, 99, 0.4);
+  --emerald: #7adaa2;
+  --rose: #f28b82;
+  --text-main: #e2e2e9;
+  --text-muted: #8e9099;
+  --text-dim: #74777f;
+  --radius-sm: 12px;
+  --radius-md: 22px;
+  --radius-lg: 30px;
+  --radius-full: 9999px;
+  --shadow-card: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 20px rgba(168, 199, 250, 0.22);
+  --input-bg: #1d2024;
+  background-color: #111318;
+  color: #e2e2e9;
+}
+
+body.theme-android .glass-panel {
+  background: #1d2024;
+  border: 1px solid rgba(142, 145, 153, 0.22);
+  border-radius: 24px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
+}
+
+body.theme-android .mobile-bottom-nav {
+  background: #1e2025;
+  border: 1px solid rgba(142, 145, 153, 0.22);
+  border-radius: 28px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+}
+
+body.theme-android .mobile-bottom-nav .m-nav-item.active {
+  color: #a8c7fa;
+}
+
+body.theme-android .mobile-bottom-nav .m-nav-item.active::after {
+  background: #a8c7fa;
+  box-shadow: 0 0 8px #a8c7fa;
+  width: 24px;
+  height: 4px;
+  border-radius: 8px;
+}
+
+body.theme-android .m-ai-bubble {
+  background: linear-gradient(135deg, #1b72e8 0%, #8ab4f8 50%, #c58af9 100%);
+  border: 2px solid #a8c7fa;
+  box-shadow: 0 4px 18px rgba(168, 199, 250, 0.45);
+}
+
+body.theme-android .btn-start-learning {
+  background: #a8c7fa;
+  color: #042e6f;
+  font-weight: 800;
+  border: none;
+  box-shadow: 0 4px 14px rgba(168, 199, 250, 0.35);
+}
+
+body.theme-android .btn-start-learning:hover {
+  background: #d3e3fd;
+  color: #042e6f;
+}
+
+/* ==========================================================================
+   3. LUXURY ROYAL GOLD VIP THEME
+   ========================================================================== */
+body.theme-luxury-gold {
+  --bg-dark: #08080a;
+  --bg-surface: #101014;
+  --bg-card: rgba(18, 18, 22, 0.88);
+  --bg-card-hover: rgba(28, 28, 34, 0.95);
+  --border-glass: rgba(245, 158, 11, 0.25);
+  --border-glow: rgba(245, 158, 11, 0.5);
+  --primary: #f59e0b;
+  --primary-glow: rgba(245, 158, 11, 0.55);
+  --primary-light: #fde68a;
+  --cyan: #38bdf8;
+  --cyan-glow: rgba(56, 189, 248, 0.45);
+  --gold: #fbbf24;
+  --gold-glow: rgba(251, 191, 36, 0.6);
+  --emerald: #10b981;
+  --rose: #f43f5e;
+  --text-main: #fef3c7;
+  --text-muted: #d4d4d8;
+  --text-dim: #71717a;
+  --shadow-card: 0 16px 45px rgba(0, 0, 0, 0.88);
+  --shadow-glow: 0 0 30px rgba(245, 158, 11, 0.35);
+  --input-bg: #121216;
+  background-color: #08080a;
+  color: #fef3c7;
+}
+
+body.theme-luxury-gold .glass-panel {
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  box-shadow: 0 16px 45px rgba(0, 0, 0, 0.75), 0 0 20px rgba(245, 158, 11, 0.15);
+}
+
+body.theme-luxury-gold .mobile-bottom-nav {
+  background: rgba(14, 14, 18, 0.88);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.75), 0 0 25px rgba(245, 158, 11, 0.22);
+}
+
+body.theme-luxury-gold .m-ai-bubble {
+  background: linear-gradient(135deg, #d97706 0%, #fbbf24 50%, #b45309 100%);
+  border: 2px solid #fef3c7;
+  box-shadow: 0 6px 22px rgba(245, 158, 11, 0.7);
+}
+
+body.theme-luxury-gold .btn-start-learning {
+  background: linear-gradient(135deg, #d97706 0%, #f59e0b 50%, #b45309 100%);
+  color: #000000;
+  font-weight: 800;
+  box-shadow: 0 4px 18px rgba(245, 158, 11, 0.6);
+}
+
+/* ==========================================================================
+   4. MATRIX CYBER NEON THEME
+   ========================================================================== */
+body.theme-matrix-neon {
+  --bg-dark: #040806;
+  --bg-surface: #08110d;
+  --bg-card: rgba(10, 20, 16, 0.88);
+  --bg-card-hover: rgba(16, 32, 25, 0.95);
+  --border-glass: rgba(16, 185, 129, 0.28);
+  --border-glow: rgba(16, 185, 129, 0.55);
+  --primary: #10b981;
+  --primary-glow: rgba(16, 185, 129, 0.6);
+  --primary-light: #6ee7b7;
+  --cyan: #06b6d4;
+  --cyan-glow: rgba(6, 182, 212, 0.45);
+  --gold: #f59e0b;
+  --emerald: #00ff88;
+  --text-main: #ecfdf5;
+  --text-muted: #a7f3d0;
+  --text-dim: #6ee7b7;
+  --shadow-card: 0 16px 45px rgba(0, 0, 0, 0.88);
+  --shadow-glow: 0 0 30px rgba(16, 185, 129, 0.35);
+  --input-bg: #09140f;
+  background-color: #040806;
+  color: #ecfdf5;
+}
+
+body.theme-matrix-neon .glass-panel {
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  box-shadow: 0 16px 45px rgba(0, 0, 0, 0.8), 0 0 25px rgba(16, 185, 129, 0.2);
+}
+
+body.theme-matrix-neon .mobile-bottom-nav {
+  background: rgba(6, 15, 11, 0.88);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8), 0 0 25px rgba(16, 185, 129, 0.3);
+}
+
+body.theme-matrix-neon .m-ai-bubble {
+  background: linear-gradient(135deg, #059669 0%, #10b981 50%, #00ff88 100%);
+  border: 2px solid #ecfdf5;
+  box-shadow: 0 6px 22px rgba(16, 185, 129, 0.8);
+}
+
+body.theme-matrix-neon .btn-start-learning {
+  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+  color: #022c22;
+  font-weight: 800;
+  box-shadow: 0 4px 18px rgba(16, 185, 129, 0.6);
 }
 
 * {
@@ -8359,6 +8607,211 @@ body.day-mode .lesson-locked {
     opacity: 1;
     transform: translateY(0);
   }
+/* ====================================================
+   THEME SELECTOR MODAL & OS STYLES (iOS 18, Android 15, etc.)
+   ==================================================== */
+.theme-selector-modal-card {
+  width: 95%;
+  max-width: 580px;
+  border-radius: 24px;
+  overflow: hidden;
+  background: rgba(13, 19, 33, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.85), 0 0 30px rgba(56, 189, 248, 0.15);
+}
+
+.theme-card-option {
+  background: rgba(18, 25, 43, 0.7);
+  border: 1.5px solid rgba(255, 255, 255, 0.09);
+  border-radius: 18px;
+  padding: 12px;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+  overflow: hidden;
+  user-select: none;
+}
+
+.theme-card-option:hover {
+  transform: translateY(-3px) scale(1.01);
+  border-color: rgba(56, 189, 248, 0.5);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5), 0 0 20px rgba(56, 189, 248, 0.2);
+  background: rgba(25, 36, 62, 0.85);
+}
+
+.theme-card-option.active {
+  border-color: #38bdf8 !important;
+  background: rgba(14, 165, 233, 0.12) !important;
+  box-shadow: 0 8px 30px rgba(14, 165, 233, 0.3), inset 0 0 15px rgba(56, 189, 248, 0.15);
+}
+
+.theme-card-preview {
+  height: 64px;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 8px 10px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.15);
+}
+
+.theme-card-preview.ios-preview {
+  background: radial-gradient(circle at 10% 20%, #1c1c1e 0%, #000000 100%);
+  border: 0.5px solid rgba(255, 255, 255, 0.2);
+}
+
+.theme-card-preview.android-preview {
+  background: radial-gradient(circle at 10% 20%, #1e1f25 0%, #111318 100%);
+  border: 1px solid rgba(142, 145, 153, 0.25);
+}
+
+.theme-card-preview.oled-preview {
+  background: radial-gradient(circle at 10% 20%, #0f172a 0%, #030712 100%);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+}
+
+.theme-card-preview.gold-preview {
+  background: radial-gradient(circle at 10% 20%, #20170a 0%, #08080a 100%);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+.theme-card-preview.matrix-preview {
+  background: radial-gradient(circle at 10% 20%, #061910 0%, #040806 100%);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.theme-card-preview.daylight-preview {
+  background: radial-gradient(circle at 10% 20%, #ffffff 0%, #f1f5f9 100%);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.theme-preview-dots {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.preview-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.dot-blue { background: #007aff; box-shadow: 0 0 6px #007aff; }
+.dot-purple { background: #af52de; }
+.dot-cyan { background: #32ade6; box-shadow: 0 0 6px #32ade6; }
+.dot-tonal-blue { background: #a8c7fa; box-shadow: 0 0 6px #a8c7fa; }
+.dot-tonal-mint { background: #7adaa2; }
+.dot-tonal-lilac { background: #d0bcff; }
+.dot-indigo { background: #4f46e5; }
+.dot-pink { background: #ec4899; }
+.dot-gold { background: #fbbf24; box-shadow: 0 0 6px #fbbf24; }
+.dot-amber { background: #f59e0b; }
+.dot-gold-light { background: #fef3c7; }
+.dot-matrix { background: #10b981; box-shadow: 0 0 6px #10b981; }
+.dot-emerald { background: #00ff88; }
+.dot-teal { background: #06b6d4; }
+.dot-sun { background: #f59e0b; }
+.dot-sky { background: #0284c7; }
+.dot-slate { background: #475569; }
+
+.theme-preview-glass-pill {
+  align-self: flex-start;
+  padding: 3px 8px;
+  border-radius: 9999px;
+  font-size: 10px;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 0.5px solid rgba(255, 255, 255, 0.15);
+}
+
+.daylight-preview .theme-preview-glass-pill {
+  background: rgba(0, 0, 0, 0.08);
+  color: #0f172a;
+  border-color: rgba(0, 0, 0, 0.12);
+}
+
+.theme-card-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.theme-card-desc {
+  font-size: 11.5px;
+  color: #94a3b8;
+  line-height: 1.4;
+  font-family: var(--font-khmer, sans-serif);
+}
+
+.theme-badge-os {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 6px;
+  letter-spacing: 0.2px;
+}
+
+.badge-ios {
+  background: rgba(0, 122, 255, 0.2);
+  color: #5ac8fa;
+  border: 1px solid rgba(0, 122, 255, 0.4);
+}
+
+.badge-android {
+  background: rgba(168, 199, 250, 0.18);
+  color: #a8c7fa;
+  border: 1px solid rgba(168, 199, 250, 0.4);
+}
+
+.badge-oled {
+  background: rgba(56, 189, 248, 0.18);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.4);
+}
+
+.badge-gold {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.badge-matrix {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
+.badge-day {
+  background: rgba(241, 245, 249, 0.2);
+  color: #f8fafc;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.theme-active-indicator {
+  margin-top: 4px;
+}
+
+.indicator-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.15);
+  padding: 2px 8px;
+  border-radius: 9999px;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.2);
 }
 
 

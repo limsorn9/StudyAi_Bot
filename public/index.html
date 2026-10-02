@@ -26,7 +26,7 @@
   <link rel="icon" type="image/png" href="/school_logo.png">
   <link rel="apple-touch-icon" href="/school_logo.png">
 
-  <link rel="stylesheet" href="/style.css?v=2.4_futuristic">
+  <link rel="stylesheet" href="/style.css?v=2.5_themes_os">
 </head>
 <body class="night-mode-full">
   <!-- Top Ambient Glow -->
@@ -64,9 +64,9 @@
           <span class="action-icon">🔍</span>
         </button>
 
-        <!-- Theme / Night Mode Quick Toggle -->
-        <button id="themeToggleBtn" class="header-action-icon-btn" onclick="toggleNightMode()" title="ប្តូររបៀបរាត្រី / ពន្លឺ">
-          <span class="theme-icon" id="themeIcon">🌙</span>
+        <!-- Theme Selector (iOS 18, Android 15, OLED, Gold...) -->
+        <button id="themeToggleBtn" class="header-action-icon-btn" onclick="openThemeSelectorModal()" title="ប្តូរ Theme & OS Style (iOS 18, Android 15, OLED...)">
+          <span class="theme-icon" id="themeIcon">🎨</span>
         </button>
 
         <!-- User Profile / Settings Trigger -->
@@ -1640,6 +1640,173 @@
        MODALS
   ============================================== -->
 
+  <!-- THEME SELECTOR MODAL (iOS 18, Android 15, OLED, Gold, Matrix, Day) -->
+  <div id="themeSelectorModal" class="modal-overlay hidden">
+    <div class="modal-card glass-panel theme-selector-modal-card">
+      <div class="modal-header">
+        <div class="modal-title flex items-center gap-2">
+          <span>🎨 ជ្រើសរើសរចនាបថ (Themes & OS Styles)</span>
+        </div>
+        <button class="modal-close" onclick="closeModal('themeSelectorModal')">✕</button>
+      </div>
+
+      <div class="theme-modal-intro p-3 text-xs text-slate-400 border-b border-slate-700/60">
+        ជ្រើសរើស Style UI/UX តាមចំណូលចិត្តរបស់អ្នក រួមមានស្ទីល iOS 18 (Apple) និង Android 15 (Material You 3) ថ្មីបំផុត៖
+      </div>
+
+      <div class="theme-grid-container p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[70vh] overflow-y-auto">
+        <!-- 1. Apple iOS 18 / visionOS -->
+        <div class="theme-card-option" data-theme-id="theme-ios" onclick="selectAppTheme('theme-ios')">
+          <div class="theme-card-preview ios-preview">
+            <div class="theme-preview-dots">
+              <span class="preview-dot dot-blue"></span>
+              <span class="preview-dot dot-purple"></span>
+              <span class="preview-dot dot-cyan"></span>
+            </div>
+            <div class="theme-preview-glass-pill">
+              <span>🍏 iOS 18 Glass</span>
+            </div>
+          </div>
+          <div class="theme-card-details">
+            <div class="theme-card-title flex items-center justify-between">
+              <span class="font-bold text-white text-sm">🍏 Apple iOS 18</span>
+              <span class="theme-badge-os badge-ios">iOS / visionOS</span>
+            </div>
+            <p class="theme-card-desc">កញ្ចក់ថ្លា Frosted Glass, SF squircle curves, និង Apple Blue Accent</p>
+            <div class="theme-active-indicator hidden" id="themeCheck-theme-ios">
+              <span class="indicator-badge">✓ កំពុងប្រើប្រាស់</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Android 15 Material You -->
+        <div class="theme-card-option" data-theme-id="theme-android" onclick="selectAppTheme('theme-android')">
+          <div class="theme-card-preview android-preview">
+            <div class="theme-preview-dots">
+              <span class="preview-dot dot-tonal-blue"></span>
+              <span class="preview-dot dot-tonal-mint"></span>
+              <span class="preview-dot dot-tonal-lilac"></span>
+            </div>
+            <div class="theme-preview-glass-pill">
+              <span>🤖 Android 15</span>
+            </div>
+          </div>
+          <div class="theme-card-details">
+            <div class="theme-card-title flex items-center justify-between">
+              <span class="font-bold text-white text-sm">🤖 Android 15</span>
+              <span class="theme-badge-os badge-android">Material You 3</span>
+            </div>
+            <p class="theme-card-desc">ស្ទីល Material Design 3 Expressive, Tonal Surface & Pill Navigation</p>
+            <div class="theme-active-indicator hidden" id="themeCheck-theme-android">
+              <span class="indicator-badge">✓ កំពុងប្រើប្រាស់</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Midnight OLED Cyberpunk -->
+        <div class="theme-card-option" data-theme-id="night-mode-full" onclick="selectAppTheme('night-mode-full')">
+          <div class="theme-card-preview oled-preview">
+            <div class="theme-preview-dots">
+              <span class="preview-dot dot-cyan"></span>
+              <span class="preview-dot dot-indigo"></span>
+              <span class="preview-dot dot-pink"></span>
+            </div>
+            <div class="theme-preview-glass-pill">
+              <span>🌌 Midnight OLED</span>
+            </div>
+          </div>
+          <div class="theme-card-details">
+            <div class="theme-card-title flex items-center justify-between">
+              <span class="font-bold text-white text-sm">🌌 Midnight OLED</span>
+              <span class="theme-badge-os badge-oled">Cyber Night</span>
+            </div>
+            <p class="theme-card-desc">ផ្ទៃខ្មៅដិត OLED សន្សំថ្ម និងពន្លឺ Neon ស្រួលភ្នែកពេលរាត្រី</p>
+            <div class="theme-active-indicator hidden" id="themeCheck-night-mode-full">
+              <span class="indicator-badge">✓ កំពុងប្រើប្រាស់</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. Luxury Royal Gold -->
+        <div class="theme-card-option" data-theme-id="theme-luxury-gold" onclick="selectAppTheme('theme-luxury-gold')">
+          <div class="theme-card-preview gold-preview">
+            <div class="theme-preview-dots">
+              <span class="preview-dot dot-gold"></span>
+              <span class="preview-dot dot-amber"></span>
+              <span class="preview-dot dot-gold-light"></span>
+            </div>
+            <div class="theme-preview-glass-pill">
+              <span>👑 Royal Gold</span>
+            </div>
+          </div>
+          <div class="theme-card-details">
+            <div class="theme-card-title flex items-center justify-between">
+              <span class="font-bold text-white text-sm">👑 Royal Gold</span>
+              <span class="theme-badge-os badge-gold">VIP Premium</span>
+            </div>
+            <p class="theme-card-desc">រចនាបថប្រណីត Obsidian ឆ្លុះទឹកមាស ២៤K សម្រាប់សមាជិក VIP</p>
+            <div class="theme-active-indicator hidden" id="themeCheck-theme-luxury-gold">
+              <span class="indicator-badge">✓ កំពុងប្រើប្រាស់</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5. Matrix Cyber Neon -->
+        <div class="theme-card-option" data-theme-id="theme-matrix-neon" onclick="selectAppTheme('theme-matrix-neon')">
+          <div class="theme-card-preview matrix-preview">
+            <div class="theme-preview-dots">
+              <span class="preview-dot dot-matrix"></span>
+              <span class="preview-dot dot-emerald"></span>
+              <span class="preview-dot dot-teal"></span>
+            </div>
+            <div class="theme-preview-glass-pill">
+              <span>⚡ Cyber Matrix</span>
+            </div>
+          </div>
+          <div class="theme-card-details">
+            <div class="theme-card-title flex items-center justify-between">
+              <span class="font-bold text-white text-sm">⚡ Cyber Matrix</span>
+              <span class="theme-badge-os badge-matrix">Electric Neon</span>
+            </div>
+            <p class="theme-card-desc">បច្ចេកវិទ្យាអនាគត Neon Emerald ជាមួយបន្ទាត់ Hacker Cyberpunk</p>
+            <div class="theme-active-indicator hidden" id="themeCheck-theme-matrix-neon">
+              <span class="indicator-badge">✓ កំពុងប្រើប្រាស់</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 6. Daylight Pro -->
+        <div class="theme-card-option" data-theme-id="day-mode" onclick="selectAppTheme('day-mode')">
+          <div class="theme-card-preview daylight-preview">
+            <div class="theme-preview-dots">
+              <span class="preview-dot dot-sun"></span>
+              <span class="preview-dot dot-sky"></span>
+              <span class="preview-dot dot-slate"></span>
+            </div>
+            <div class="theme-preview-glass-pill">
+              <span>☀️ Daylight Pro</span>
+            </div>
+          </div>
+          <div class="theme-card-details">
+            <div class="theme-card-title flex items-center justify-between">
+              <span class="font-bold text-white text-sm">☀️ Daylight Pro</span>
+              <span class="theme-badge-os badge-day">Clean Light</span>
+            </div>
+            <p class="theme-card-desc">រចនាបថភ្លឺស្រស់ស្អាត ពណ៌សស្អាតស្អំ ងាយស្រួលមើលពេលថ្ងៃ</p>
+            <div class="theme-active-indicator hidden" id="themeCheck-day-mode">
+              <span class="indicator-badge">✓ កំពុងប្រើប្រាស់</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer p-3 border-t border-slate-700/60 flex items-center justify-between">
+        <span class="text-xs text-slate-400">Theme នឹងរក្សាទុកដោយស្វ័យប្រវត្តលើឧបករណ៍នេះ</span>
+        <button class="btn btn-outline btn-sm font-semibold" onclick="closeModal('themeSelectorModal')">បិទ (Close)</button>
+      </div>
+    </div>
+  </div>
+
   <!-- SEARCH MODAL -->
   <div id="searchModal" class="modal-overlay hidden">
     <div class="modal-card glass-panel max-w-md">
@@ -2052,6 +2219,9 @@
         </button>
         <button id="profSyncTelegramBtn" class="btn btn-cyan btn-block" onclick="closeModal('profileModal'); startTelegramOneClickLogin();">
           <span>📱 ភ្ជាប់ជាមួយ Telegram Bot (ចុចយល់ព្រមភ្ជាប់)</span>
+        </button>
+        <button class="btn btn-outline btn-block font-semibold" onclick="closeModal('profileModal'); openThemeSelectorModal();">
+          🎨 ប្តូររចនាបថ Theme (iOS 18, Android 15, OLED...)
         </button>
         <button class="btn btn-outline-danger btn-block" onclick="handleLogout()">
           🚪 ចាកចេញពីឧបករណ៍នេះ (Logout This Device)
@@ -2483,6 +2653,6 @@
   <!-- Toast Notification Container -->
   <div id="toastContainer" class="toast-container"></div>
 
-  <script src="/app.js?v=2.4_futuristic"></script>
+  <script src="/app.js?v=2.5_themes_os"></script>
 </body>
 </html>

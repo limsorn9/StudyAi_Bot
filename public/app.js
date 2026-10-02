@@ -58,40 +58,92 @@ document.addEventListener('DOMContentLoaded', async () => {
 // THEME MANAGEMENT (NIGHT MODE FULL)
 // ==========================================
 
+// ==========================================
+// THEME & OS STYLE SYSTEM (iOS 18, Android 15, OLED, Gold, Matrix, Day)
+// ==========================================
+
+const ALL_APP_THEMES = [
+  'night-mode-full',
+  'dark-theme',
+  'day-mode',
+  'theme-ios',
+  'theme-android',
+  'theme-luxury-gold',
+  'theme-matrix-neon'
+];
+
+const THEME_META = {
+  'theme-ios': { icon: '🍏', label: 'Apple iOS 18', toast: '🍏 បានជ្រើសរើសរចនាបថ Apple iOS 18 (visionOS Glass)' },
+  'theme-android': { icon: '🤖', label: 'Android 15', toast: '🤖 បានជ្រើសរើសរចនាបថ Android 15 (Material You 3)' },
+  'night-mode-full': { icon: '🌌', label: 'Midnight OLED', toast: '🌌 បានជ្រើសរើសរចនាបថ Midnight OLED Cyberpunk' },
+  'day-mode': { icon: '☀️', label: 'Daylight Pro', toast: '☀️ បានជ្រើសរើសរចនាបថ Daylight Pro (ពន្លឺ)' },
+  'theme-luxury-gold': { icon: '👑', label: 'Royal Gold VIP', toast: '👑 បានជ្រើសរើសរចនាបថ Luxury Royal Gold VIP' },
+  'theme-matrix-neon': { icon: '⚡', label: 'Cyber Matrix', toast: '⚡ បានជ្រើសរើសរចនាបថ Cyber Matrix Neon' },
+};
+
 function initTheme() {
   const savedTheme = localStorage.getItem('app_theme') || 'night-mode-full';
-  applyTheme(savedTheme);
+  applyTheme(savedTheme, false);
 }
 
-function applyTheme(themeName) {
+function applyTheme(themeName, showNotification = false) {
   const body = document.body;
   const icon = document.getElementById('themeIcon');
   const label = document.getElementById('themeLabel');
 
-  if (themeName === 'day-mode') {
-    body.classList.remove('night-mode-full', 'dark-theme');
-    body.classList.add('day-mode');
-    if (icon) icon.textContent = '☀️';
-    if (label) label.textContent = 'Day Mode';
-    localStorage.setItem('app_theme', 'day-mode');
-  } else {
-    body.classList.remove('day-mode');
-    body.classList.add('night-mode-full', 'dark-theme');
-    if (icon) icon.textContent = '🌙';
-    if (label) label.textContent = 'Night Mode';
-    localStorage.setItem('app_theme', 'night-mode-full');
+  // Remove existing theme classes
+  ALL_APP_THEMES.forEach(t => body.classList.remove(t));
+
+  // Determine target theme
+  const targetTheme = THEME_META[themeName] ? themeName : 'night-mode-full';
+  body.classList.add(targetTheme);
+
+  // If theme is dark-oriented, also add 'dark-theme' for any generic styles
+  if (targetTheme !== 'day-mode') {
+    body.classList.add('dark-theme');
+  }
+
+  const meta = THEME_META[targetTheme] || THEME_META['night-mode-full'];
+  if (icon) icon.textContent = meta.icon;
+  if (label) label.textContent = meta.label;
+
+  localStorage.setItem('app_theme', targetTheme);
+  updateThemeModalIndicators(targetTheme);
+
+  if (showNotification) {
+    showToast(meta.toast, 'info');
   }
 }
 
+function openThemeSelectorModal() {
+  const current = localStorage.getItem('app_theme') || 'night-mode-full';
+  updateThemeModalIndicators(current);
+  openModal('themeSelectorModal');
+}
+
+function selectAppTheme(themeId) {
+  applyTheme(themeId, true);
+  setTimeout(() => {
+    closeModal('themeSelectorModal');
+  }, 350);
+}
+
+function updateThemeModalIndicators(activeTheme) {
+  const options = document.querySelectorAll('.theme-card-option');
+  options.forEach(opt => {
+    const tid = opt.getAttribute('data-theme-id');
+    const isAct = (tid === activeTheme);
+    opt.classList.toggle('active', isAct);
+    const checkEl = document.getElementById(`themeCheck-${tid}`);
+    if (checkEl) {
+      if (isAct) checkEl.classList.remove('hidden');
+      else checkEl.classList.add('hidden');
+    }
+  });
+}
+
 function toggleNightMode() {
-  const isNight = document.body.classList.contains('night-mode-full') || !document.body.classList.contains('day-mode');
-  if (isNight) {
-    applyTheme('day-mode');
-    showToast('☀️ បានប្តូរទៅ Day Mode (ពន្លឺ)', 'info');
-  } else {
-    applyTheme('night-mode-full');
-    showToast('🌙 បានប្តូរទៅ Night Mode Full (ស្រួលភ្នែកពេលយប់)', 'info');
-  }
+  openThemeSelectorModal();
 }
 
 async function initFirebaseClient() {
