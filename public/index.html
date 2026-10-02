@@ -26,7 +26,7 @@
   <link rel="icon" type="image/png" href="/school_logo.png">
   <link rel="apple-touch-icon" href="/school_logo.png">
 
-  <link rel="stylesheet" href="/style.css?v=2.2_dict">
+  <link rel="stylesheet" href="/style.css?v=2.4_futuristic">
 </head>
 <body class="night-mode-full">
   <!-- Top Ambient Glow -->
@@ -114,7 +114,7 @@
                   <span class="btn-icon">🤖</span>
                   <span>Ai Chatbot</span>
                 </button>
-                <button class="btn-dictionary" onclick="navigateTo('dictionary')" style="background: linear-gradient(135deg, #0284c7, #0d9488); color: white; border: none; padding: 10px 16px; border-radius: 12px; font-weight: 700; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; box-shadow: 0 4px 15px rgba(2, 132, 199, 0.3);">
+                <button class="btn-dictionary" onclick="navigateTo('dictionary')">
                   <span class="btn-icon">📖</span>
                   <span>វចនានុក្រម (Dictionary)</span>
                 </button>
@@ -1609,15 +1609,15 @@
         <span class="m-icon">📚</span>
         <span class="m-label">មេរៀន</span>
       </button>
+      <button class="m-nav-item" data-tab="dictionary" onclick="navigateTo('dictionary')">
+        <span class="m-icon">📖</span>
+        <span class="m-label">វចនានុក្រម</span>
+      </button>
       <button class="m-nav-item m-nav-ai" data-tab="ai-tutor" onclick="navigateTo('ai-tutor')">
         <div class="m-ai-bubble">
           <span class="m-ai-icon">🧠</span>
         </div>
         <span class="m-label">ភ្នាក់ងារ AI</span>
-      </button>
-      <button class="m-nav-item" data-tab="dictionary" onclick="navigateTo('dictionary')">
-        <span class="m-icon">📖</span>
-        <span class="m-label">វចនានុក្រម</span>
       </button>
       <button class="m-nav-item" data-tab="annual-exams" onclick="navigateTo('annual-exams')">
         <span class="m-icon">📝</span>
@@ -2483,6 +2483,6 @@
   <!-- Toast Notification Container -->
   <div id="toastContainer" class="toast-container"></div>
 
-  <script src="/app.js?v=2.2_dict"></script>
+  <script src="/app.js?v=2.4_futuristic"></script>
 </body>
 </html>
