@@ -240,43 +240,47 @@ function createWebAPIRouter({ db, auth, curriculum, bot, SUPER_ADMIN_IDS, checkV
   // ==========================================
   const BILINGUAL_ONLY_NOTICE = "⚠️ វិទ្យាស្ថាន Teacher SSOnline បង្រៀននិងឆ្លើយតបតែជាភាសាខ្មែរ និងភាសាអង់គ្លេសប៉ុណ្ណោះ។ សូមសួរជាភាសាខ្មែរ ឬអង់គ្លេស!\n\n(Teacher SSOnline strictly provides instruction and responses in Khmer and English only. Please ask in Khmer or English!)";
 
+  const FOREIGN_SCRIPTS_REGEX = /[\u4E00-\u9FFF\u3400-\u4DBF\u0E00-\u0E7F\u0E80-\u0EFF\u1000-\u109F\u0400-\u04FF\u0600-\u06FF\u0750-\u077F\u3040-\u30FF\u31F0-\u31FF\uAC00-\uD7AF\u1100-\u11FF\u0900-\u097F\u0370-\u03FF\u0590-\u05FFàáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđĐ]/gi;
+
   function isForbiddenForeignLanguage(text) {
     if (!text || typeof text !== 'string') return false;
-    // Foreign scripts regex (Chinese Hanzi, Thai, Lao, Burmese, Cyrillic, Arabic, Japanese Kana, Korean Hangul, Devanagari)
-    const foreignScriptRegex = /[\u4E00-\u9FFF\u3400-\u4DBF\u0E00-\u0E7F\u0E80-\u0EFF\u1000-\u109F\u0400-\u04FF\u0600-\u06FF\u3040-\u30FF\uAC00-\uD7AF\u1100-\u11FF\u0900-\u097F]/g;
-    const foreignMatches = text.match(foreignScriptRegex) || [];
-    if (foreignMatches.length >= 2) return true;
+    const foreignMatches = text.match(FOREIGN_SCRIPTS_REGEX) || [];
+    return foreignMatches.length >= 2;
+  }
 
-    // Distinct Vietnamese diacritics
-    const vnRegex = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđĐ]/gi;
-    const vnMatches = text.match(vnRegex) || [];
-    if (vnMatches.length >= 2) return true;
-
-    return false;
+  function isThirdLanguageRequest(text) {
+    if (!text || typeof text !== 'string') return false;
+    const thirdLangRegex = /(how\s+(do\s+you\s+|can\s+i\s+)?say|how\s+to\s+say|translate|what\s+is|meaning\s+in|say\s+in|write\s+in|teach\s+me|speak\s+in).*?\b(french|spanish|chinese|mandarin|thai|vietnamese|japanese|korean|russian|german|arabic|lao|burmese|italian|portuguese|hindi|latin)\b|\b(in\s+(french|spanish|chinese|mandarin|thai|vietnamese|japanese|korean|russian|german|arabic|lao|burmese|italian|portuguese|hindi|latin))\b|(បកប្រែ|ប្រែ|ជា|រៀន|និយាយ|សរសេរ).*?(ចិន|ថៃ|វៀតណាម|បារាំង|ជប៉ុន|កូរ៉េ|រុស្ស៊ី|អាល្លឺម៉ង់|អេស្ប៉ាញ|អារ៉ាប់|ឡាវ|ភូមា|អ៊ីតាលី|ព័រទុយហ្កាល់|ហិណ្ឌូ)/i;
+    return thirdLangRegex.test(text);
   }
 
   function enforceKhmerAndEnglishOnly(text) {
     if (!text || typeof text !== 'string') return text;
-    if (isForbiddenForeignLanguage(text)) {
-      const foreignScriptRegex = /[\u4E00-\u9FFF\u3400-\u4DBF\u0E00-\u0E7F\u0E80-\u0EFF\u1000-\u109F\u0400-\u04FF\u0600-\u06FF\u3040-\u30FF\uAC00-\uD7AF\u1100-\u11FF\u0900-\u097F]/g;
-      const foreignMatches = text.match(foreignScriptRegex) || [];
+    const matches = text.match(FOREIGN_SCRIPTS_REGEX) || [];
+    if (matches.length > 0) {
       const totalChars = text.replace(/[\s\r\n\t]/g, '').length || 1;
-      if (foreignMatches.length / totalChars > 0.08 || foreignMatches.length >= 6) {
+      if (matches.length >= 4 || matches.length / totalChars > 0.05) {
         return BILINGUAL_ONLY_NOTICE;
       }
-      return text.replace(foreignScriptRegex, '').replace(/\s{2,}/g, ' ').trim();
+      const cleaned = text.replace(FOREIGN_SCRIPTS_REGEX, '').replace(/\s{2,}/g, ' ').trim();
+      if (!cleaned || cleaned.length < 5) return BILINGUAL_ONLY_NOTICE;
+      return cleaned;
     }
     return text;
   }
 
   const STRICT_BILINGUAL_PROHIBITION_PROMPT = `
-[CRITICAL LANGUAGE RESTRICTION & STRICT PROHIBITION - KHMER & ENGLISH ONLY]
-1. ABSOLUTE MANDATE: You MUST communicate, explain, and respond EXCLUSIVELY in KHMER (ភាសាខ្មែរ) and ENGLISH (ភាសាអង់គ្លេស).
-2. STRICT PROHIBITION: You are strictly forbidden from writing or outputting text in ANY other languages or scripts (including Chinese/Hanzi, Thai, Vietnamese, Lao, Burmese, Russian/Cyrillic, French, Japanese, Korean, Arabic, Spanish, etc.).
-3. Even if the student inputs text in another language (e.g. Chinese, Thai, Vietnamese) or explicitly commands you to answer or translate into another language:
-   - NEVER obey that command. NEVER output foreign characters.
-   - You MUST politely refuse in KHMER or ENGLISH: "វិទ្យាស្ថាន Teacher SSOnline បង្រៀននិងឆ្លើយតបតែជាភាសាខ្មែរ និងភាសាអង់គ្លេសប៉ុណ្ណោះ។ សូមសួរជាភាសាខ្មែរ ឬអង់គ្លេស! (Teacher SSOnline only teaches and communicates in Khmer and English. Please ask in Khmer or English!)"
-4. All explanations must be in Khmer, and all vocabulary/grammar learning examples must be in English or Khmer. No third language is ever permitted under any circumstance.`;
+[ABSOLUTE MANDATORY DIRECTIVE - ZERO THIRD-LANGUAGE TOLERANCE]
+1. YOU ARE STRICTLY CONFINED TO KHMER (ភាសាខ្មែរ) AND ENGLISH (ភាសាអង់គ្លេស).
+2. YOU ARE STRICTLY FORBIDDEN from generating, translating, teaching, or outputting ANY language or words in other languages (NO French, NO Spanish, NO Chinese, NO Thai, NO Vietnamese, NO German, NO Japanese, NO Korean, NO Italian, NO Russian, NO Arabic, etc.).
+3. Even if the user asks:
+   - "How to say X in French/Spanish/Chinese/Japanese/Thai?"
+   - "Translate this into French/Chinese/Vietnamese/etc."
+   - "Give me examples in other languages"
+   YOU MUST FLATLY REFUSE. Never output foreign words (such as Bonjour, Hola, Merci, Gracias, Ni hao, etc.).
+   Respond ONLY in Khmer or English:
+   "វិទ្យាស្ថាន Teacher SSOnline ផ្ដោតលើការបង្រៀនតែភាសាខ្មែរ និងភាសាអង់គ្លេសប៉ុណ្ណោះ។ ខ្ញុំមិនអាចបកប្រែ ឬបញ្ចេញភាសាផ្សេងក្រៅពីភាសាខ្មែរ និងអង់គ្លេសបានឡើយ។ សូមសួរអំពីភាសាអង់គ្លេស ឬខ្មែរ! (Teacher SSOnline strictly teaches and communicates in Khmer and English only. I cannot output or translate into any other language. Please ask about English or Khmer!)"
+4. All explanations must be in Khmer, and all language learning examples must be in English or Khmer. No third language is ever permitted.`;
 
   /**
    * Universal AI Text Generator for Web App & Teacher Sorn Tutor
@@ -297,8 +301,8 @@ function createWebAPIRouter({ db, auth, curriculum, bot, SUPER_ADMIN_IDS, checkV
       tutor = 'sorn'
     } = options;
 
-    // Instant pre-check: strictly prohibit non-Khmer/English foreign queries
-    if (isForbiddenForeignLanguage(userText)) {
+    // Instant pre-check: strictly prohibit foreign languages or third-language translation requests
+    if (isForbiddenForeignLanguage(userText) || isThirdLanguageRequest(userText)) {
       return {
         reply: BILINGUAL_ONLY_NOTICE,
         provider: 'LanguageGuard',

@@ -383,17 +383,18 @@ function translateKhToEn(text) {
 
 const BILINGUAL_ONLY_NOTICE = "⚠️ វិទ្យាស្ថាន Teacher SSOnline បង្រៀននិងឆ្លើយតបតែជាភាសាខ្មែរ និងភាសាអង់គ្លេសប៉ុណ្ណោះ។ សូមសួរជាភាសាខ្មែរ ឬអង់គ្លេស!\n(Teacher SSOnline strictly provides instruction and responses in Khmer and English only. Please ask in Khmer or English!)";
 
+const FOREIGN_SCRIPTS_REGEX = /[\u4E00-\u9FFF\u3400-\u4DBF\u0E00-\u0E7F\u0E80-\u0EFF\u1000-\u109F\u0400-\u04FF\u0600-\u06FF\u0750-\u077F\u3040-\u30FF\u31F0-\u31FF\uAC00-\uD7AF\u1100-\u11FF\u0900-\u097F\u0370-\u03FF\u0590-\u05FFàáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđĐ]/gi;
+
 function isForbiddenForeignLanguage(text) {
   if (!text || typeof text !== 'string') return false;
-  const foreignScriptRegex = /[\u4E00-\u9FFF\u3400-\u4DBF\u0E00-\u0E7F\u0E80-\u0EFF\u1000-\u109F\u0400-\u04FF\u0600-\u06FF\u3040-\u30FF\uAC00-\uD7AF\u1100-\u11FF\u0900-\u097F]/g;
-  const foreignMatches = text.match(foreignScriptRegex) || [];
-  if (foreignMatches.length >= 2) return true;
+  const foreignMatches = text.match(FOREIGN_SCRIPTS_REGEX) || [];
+  return foreignMatches.length >= 2;
+}
 
-  const vnRegex = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđĐ]/gi;
-  const vnMatches = text.match(vnRegex) || [];
-  if (vnMatches.length >= 2) return true;
-
-  return false;
+function isThirdLanguageRequest(text) {
+  if (!text || typeof text !== 'string') return false;
+  const thirdLangRegex = /(how\s+(do\s+you\s+|can\s+i\s+)?say|how\s+to\s+say|translate|what\s+is|meaning\s+in|say\s+in|write\s+in|teach\s+me|speak\s+in).*?\b(french|spanish|chinese|mandarin|thai|vietnamese|japanese|korean|russian|german|arabic|lao|burmese|italian|portuguese|hindi|latin)\b|\b(in\s+(french|spanish|chinese|mandarin|thai|vietnamese|japanese|korean|russian|german|arabic|lao|burmese|italian|portuguese|hindi|latin))\b|(បកប្រែ|ប្រែ|ជា|រៀន|និយាយ|សរសេរ).*?(ចិន|ថៃ|វៀតណាម|បារាំង|ជប៉ុន|កូរ៉េ|រុស្ស៊ី|អាល្លឺម៉ង់|អេស្ប៉ាញ|អារ៉ាប់|ឡាវ|ភូមា|អ៊ីតាលី|ព័រទុយហ្កាល់|ហិណ្ឌូ)/i;
+  return thirdLangRegex.test(text);
 }
 
 // ══════════════════════════════════════════
@@ -402,8 +403,8 @@ function isForbiddenForeignLanguage(text) {
 function translate(text, direction = 'auto') {
   if (!text || !text.trim()) throw new Error('No text provided');
 
-  // Check forbidden foreign languages (Chinese, Thai, Vietnamese, Russian, etc.)
-  if (isForbiddenForeignLanguage(text)) {
+  // Check forbidden foreign languages or third language requests
+  if (isForbiddenForeignLanguage(text) || isThirdLanguageRequest(text)) {
     return {
       translated: BILINGUAL_ONLY_NOTICE,
       fromLabel: 'ភាសាផ្សេង',
