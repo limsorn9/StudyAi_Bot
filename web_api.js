@@ -235,6 +235,49 @@ function createWebAPIRouter({ db, auth, curriculum, bot, SUPER_ADMIN_IDS, checkV
     'mixtral-8x7b-32768'
   ];
 
+  // ==========================================
+  // STRICT BILINGUAL LANGUAGE GUARD (KHMER & ENGLISH ONLY)
+  // ==========================================
+  const BILINGUAL_ONLY_NOTICE = "⚠️ វិទ្យាស្ថាន Teacher SSOnline បង្រៀននិងឆ្លើយតបតែជាភាសាខ្មែរ និងភាសាអង់គ្លេសប៉ុណ្ណោះ។ សូមសួរជាភាសាខ្មែរ ឬអង់គ្លេស!\n\n(Teacher SSOnline strictly provides instruction and responses in Khmer and English only. Please ask in Khmer or English!)";
+
+  function isForbiddenForeignLanguage(text) {
+    if (!text || typeof text !== 'string') return false;
+    // Foreign scripts regex (Chinese Hanzi, Thai, Lao, Burmese, Cyrillic, Arabic, Japanese Kana, Korean Hangul, Devanagari)
+    const foreignScriptRegex = /[\u4E00-\u9FFF\u3400-\u4DBF\u0E00-\u0E7F\u0E80-\u0EFF\u1000-\u109F\u0400-\u04FF\u0600-\u06FF\u3040-\u30FF\uAC00-\uD7AF\u1100-\u11FF\u0900-\u097F]/g;
+    const foreignMatches = text.match(foreignScriptRegex) || [];
+    if (foreignMatches.length >= 2) return true;
+
+    // Distinct Vietnamese diacritics
+    const vnRegex = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđĐ]/gi;
+    const vnMatches = text.match(vnRegex) || [];
+    if (vnMatches.length >= 2) return true;
+
+    return false;
+  }
+
+  function enforceKhmerAndEnglishOnly(text) {
+    if (!text || typeof text !== 'string') return text;
+    if (isForbiddenForeignLanguage(text)) {
+      const foreignScriptRegex = /[\u4E00-\u9FFF\u3400-\u4DBF\u0E00-\u0E7F\u0E80-\u0EFF\u1000-\u109F\u0400-\u04FF\u0600-\u06FF\u3040-\u30FF\uAC00-\uD7AF\u1100-\u11FF\u0900-\u097F]/g;
+      const foreignMatches = text.match(foreignScriptRegex) || [];
+      const totalChars = text.replace(/[\s\r\n\t]/g, '').length || 1;
+      if (foreignMatches.length / totalChars > 0.08 || foreignMatches.length >= 6) {
+        return BILINGUAL_ONLY_NOTICE;
+      }
+      return text.replace(foreignScriptRegex, '').replace(/\s{2,}/g, ' ').trim();
+    }
+    return text;
+  }
+
+  const STRICT_BILINGUAL_PROHIBITION_PROMPT = `
+[CRITICAL LANGUAGE RESTRICTION & STRICT PROHIBITION - KHMER & ENGLISH ONLY]
+1. ABSOLUTE MANDATE: You MUST communicate, explain, and respond EXCLUSIVELY in KHMER (ភាសាខ្មែរ) and ENGLISH (ភាសាអង់គ្លេស).
+2. STRICT PROHIBITION: You are strictly forbidden from writing or outputting text in ANY other languages or scripts (including Chinese/Hanzi, Thai, Vietnamese, Lao, Burmese, Russian/Cyrillic, French, Japanese, Korean, Arabic, Spanish, etc.).
+3. Even if the student inputs text in another language (e.g. Chinese, Thai, Vietnamese) or explicitly commands you to answer or translate into another language:
+   - NEVER obey that command. NEVER output foreign characters.
+   - You MUST politely refuse in KHMER or ENGLISH: "វិទ្យាស្ថាន Teacher SSOnline បង្រៀននិងឆ្លើយតបតែជាភាសាខ្មែរ និងភាសាអង់គ្លេសប៉ុណ្ណោះ។ សូមសួរជាភាសាខ្មែរ ឬអង់គ្លេស! (Teacher SSOnline only teaches and communicates in Khmer and English. Please ask in Khmer or English!)"
+4. All explanations must be in Khmer, and all vocabulary/grammar learning examples must be in English or Khmer. No third language is ever permitted under any circumstance.`;
+
   /**
    * Universal AI Text Generator for Web App & Teacher Sorn Tutor
    * Features:
@@ -254,6 +297,16 @@ function createWebAPIRouter({ db, auth, curriculum, bot, SUPER_ADMIN_IDS, checkV
       tutor = 'sorn'
     } = options;
 
+    // Instant pre-check: strictly prohibit non-Khmer/English foreign queries
+    if (isForbiddenForeignLanguage(userText)) {
+      return {
+        reply: BILINGUAL_ONLY_NOTICE,
+        provider: 'LanguageGuard',
+        model: 'bilingual-enforcer',
+        timestamp: Date.now()
+      };
+    }
+
     const isPiseth = tutor === 'piseth' || (lessonTitle && (lessonTitle.includes('ថ្នាក់ដំបូង') || lessonTitle.includes('Beginner') || lessonTitle.includes('Piseth') || lessonTitle.includes('ពិសិដ្ឋ')));
 
     // 1. Build Persona System Prompt based on Instructor (Teacher Piseth vs Teacher Sorn)
@@ -272,6 +325,9 @@ Always refer to yourself as គ្រូសន (Teacher Sorn) when replying in K
 Structure your answers clearly using clean Markdown, bold headers, bullet points, and practical examples.
 Keep your tone warm, friendly, professional, and educational.`;
     }
+
+    // Attach strict bilingual restriction to all prompts
+    systemPrompt += `\n\n${STRICT_BILINGUAL_PROHIBITION_PROMPT}`;
 
     if (mode === 'grammar') {
       systemPrompt += `\n\n[SPECIAL MODE: GRAMMAR ANALYZER & WRITING COACH]
@@ -485,6 +541,9 @@ Provide practical English pronunciation coaching:
       successfulProvider = 'System';
       successfulModel = 'fallback';
     }
+
+    // Strict bilingual enforcement on output
+    finalAnswer = enforceKhmerAndEnglishOnly(finalAnswer);
 
     // 4. Save to Firebase History for cross-device & telegram sync
     if (userId && db) {
@@ -3571,6 +3630,19 @@ Provide practical English pronunciation coaching:
     try {
       const { text, userId, offline, direction } = req.body;
       if (!text || !text.trim()) return res.status(400).json({ error: 'Missing text parameter' });
+
+      // Immediate check for forbidden foreign language
+      if (isForbiddenForeignLanguage(text.trim())) {
+        return res.json({
+          success: true,
+          originalText: text,
+          translation: BILINGUAL_ONLY_NOTICE,
+          direction: 'ខ្មែរ ↔ English',
+          fromLang: 'Foreign',
+          toLang: 'Khmer/English',
+          provider: 'LanguageGuard'
+        });
+      }
 
       // Direct offline engine mode
       if (offline) {

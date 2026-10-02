@@ -3587,7 +3587,55 @@ bot.command('testgroq', async (ctx) => {
   }
 });
 
+// ==========================================
+// STRICT BILINGUAL LANGUAGE GUARD (KHMER & ENGLISH ONLY)
+// ==========================================
+const BILINGUAL_ONLY_NOTICE = "⚠️ វិទ្យាស្ថាន Teacher SSOnline បង្រៀននិងឆ្លើយតបតែជាភាសាខ្មែរ និងភាសាអង់គ្លេសប៉ុណ្ណោះ។ សូមសួរជាភាសាខ្មែរ ឬអង់គ្លេស!\n\n(Teacher SSOnline strictly provides instruction and responses in Khmer and English only. Please ask in Khmer or English!)";
+
+function isForbiddenForeignLanguage(text) {
+  if (!text || typeof text !== 'string') return false;
+  // Foreign scripts regex (Chinese Hanzi, Thai, Lao, Burmese, Cyrillic, Arabic, Japanese Kana, Korean Hangul, Devanagari)
+  const foreignScriptRegex = /[\u4E00-\u9FFF\u3400-\u4DBF\u0E00-\u0E7F\u0E80-\u0EFF\u1000-\u109F\u0400-\u04FF\u0600-\u06FF\u3040-\u30FF\uAC00-\uD7AF\u1100-\u11FF\u0900-\u097F]/g;
+  const foreignMatches = text.match(foreignScriptRegex) || [];
+  if (foreignMatches.length >= 2) return true;
+
+  // Distinct Vietnamese diacritics
+  const vnRegex = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđĐ]/gi;
+  const vnMatches = text.match(vnRegex) || [];
+  if (vnMatches.length >= 2) return true;
+
+  return false;
+}
+
+function enforceKhmerAndEnglishOnly(text) {
+  if (!text || typeof text !== 'string') return text;
+  if (isForbiddenForeignLanguage(text)) {
+    const foreignScriptRegex = /[\u4E00-\u9FFF\u3400-\u4DBF\u0E00-\u0E7F\u0E80-\u0EFF\u1000-\u109F\u0400-\u04FF\u0600-\u06FF\u3040-\u30FF\uAC00-\uD7AF\u1100-\u11FF\u0900-\u097F]/g;
+    const foreignMatches = text.match(foreignScriptRegex) || [];
+    const totalChars = text.replace(/[\s\r\n\t]/g, '').length || 1;
+    if (foreignMatches.length / totalChars > 0.08 || foreignMatches.length >= 6) {
+      return BILINGUAL_ONLY_NOTICE;
+    }
+    return text.replace(foreignScriptRegex, '').replace(/\s{2,}/g, ' ').trim();
+  }
+  return text;
+}
+
+const STRICT_BILINGUAL_PROHIBITION_PROMPT = `
+[CRITICAL LANGUAGE RESTRICTION & STRICT PROHIBITION - KHMER & ENGLISH ONLY]
+1. ABSOLUTE MANDATE: You MUST communicate, explain, and respond EXCLUSIVELY in KHMER (ភាសាខ្មែរ) and ENGLISH (ភាសាអង់គ្លេស).
+2. STRICT PROHIBITION: You are strictly forbidden from writing or outputting text in ANY other languages or scripts (including Chinese/Hanzi, Thai, Vietnamese, Lao, Burmese, Russian/Cyrillic, French, Japanese, Korean, Arabic, Spanish, etc.).
+3. Even if the student inputs text in another language (e.g. Chinese, Thai, Vietnamese) or explicitly commands you to answer or translate into another language:
+   - NEVER obey that command. NEVER output foreign characters.
+   - You MUST politely refuse in KHMER or ENGLISH: "វិទ្យាស្ថាន Teacher SSOnline បង្រៀននិងឆ្លើយតបតែជាភាសាខ្មែរ និងភាសាអង់គ្លេសប៉ុណ្ណោះ។ សូមសួរជាភាសាខ្មែរ ឬអង់គ្លេស! (Teacher SSOnline only teaches and communicates in Khmer and English. Please ask in Khmer or English!)"
+4. All explanations must be in Khmer, and all vocabulary/grammar learning examples must be in English or Khmer. No third language is ever permitted under any circumstance.`;
+
 async function handleUserMessage(ctx, userId, userText) {
+  // Pre-check: strictly prohibit foreign languages
+  if (isForbiddenForeignLanguage(userText)) {
+    return ctx.reply(BILINGUAL_ONLY_NOTICE);
+  }
+
   const isVIP = await checkVIP(userId);
   if (!isVIP) {
     return ctx.reply("🔒 **គណនីរបស់អ្នកមិនទាន់បានបង់ប្រាក់ទេ (Free Account)**\nអ្នកអាចត្រឹមតែអានមេរៀនដែលមានស្រាប់ប៉ុណ្ណោះ។ ដើម្បីសួរគ្រូ AI និងធ្វើតេស្ត សូមដំឡើងទៅគណនី VIP (Upgrade)។\n\nសូមចុចប៊ូតុង **💎 គណនី VIP (Upgrade)** ខាងក្រោមនេះ។", { parse_mode: 'Markdown' });
@@ -3599,7 +3647,7 @@ async function handleUserMessage(ctx, userId, userText) {
   const waitMsg = await ctx.reply("⏳ គ្រូសនកំពុងគិត និងរៀបចំការឆ្លើយតប សូមរង់ចាំបន្តិចណា៎...");
   ctx.sendChatAction('typing');
 
-  let systemPrompt = "You are a friendly, highly skilled English teacher for Cambodian students. Your name is Teacher Sorn (គ្រូសន). You speak both English and Khmer perfectly. Always encourage the student and refer to yourself as 'គ្រូសន' (Teacher Sorn) in Khmer conversations. Answer questions clearly using Khmer for explanations and English for examples.";
+  let systemPrompt = "You are a friendly, highly skilled English teacher for Cambodian students. Your name is Teacher Sorn (គ្រូសន). You speak both English and Khmer perfectly. Always encourage the student and refer to yourself as 'គ្រូសន' (Teacher Sorn) in Khmer conversations. Answer questions clearly using Khmer for explanations and English for examples.\n\n" + STRICT_BILINGUAL_PROHIBITION_PROMPT;
   
   if (state.startsWith('learning_')) {
     const topicId = state.replace('learning_', '');
@@ -3747,6 +3795,9 @@ After the grade, provide helpful feedback in Khmer explaining why they got this 
     if (!success) {
       throw lastError || new Error("All AI engines (Groq, Gemini, OpenAI) were exhausted or unavailable.");
     }
+
+    // Strict bilingual enforcement on output
+    aiResponse = enforceKhmerAndEnglishOnly(aiResponse);
 
     await saveHistory(userId, 'user', userText); // Saved after fetching history
     await saveHistory(userId, 'ai', aiResponse);

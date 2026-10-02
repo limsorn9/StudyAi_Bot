@@ -381,11 +381,37 @@ function translateKhToEn(text) {
     .trim();
 }
 
+const BILINGUAL_ONLY_NOTICE = "⚠️ វិទ្យាស្ថាន Teacher SSOnline បង្រៀននិងឆ្លើយតបតែជាភាសាខ្មែរ និងភាសាអង់គ្លេសប៉ុណ្ណោះ។ សូមសួរជាភាសាខ្មែរ ឬអង់គ្លេស!\n(Teacher SSOnline strictly provides instruction and responses in Khmer and English only. Please ask in Khmer or English!)";
+
+function isForbiddenForeignLanguage(text) {
+  if (!text || typeof text !== 'string') return false;
+  const foreignScriptRegex = /[\u4E00-\u9FFF\u3400-\u4DBF\u0E00-\u0E7F\u0E80-\u0EFF\u1000-\u109F\u0400-\u04FF\u0600-\u06FF\u3040-\u30FF\uAC00-\uD7AF\u1100-\u11FF\u0900-\u097F]/g;
+  const foreignMatches = text.match(foreignScriptRegex) || [];
+  if (foreignMatches.length >= 2) return true;
+
+  const vnRegex = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđĐ]/gi;
+  const vnMatches = text.match(vnRegex) || [];
+  if (vnMatches.length >= 2) return true;
+
+  return false;
+}
+
 // ══════════════════════════════════════════
 // MAIN TRANSLATE FUNCTION
 // ══════════════════════════════════════════
 function translate(text, direction = 'auto') {
   if (!text || !text.trim()) throw new Error('No text provided');
+
+  // Check forbidden foreign languages (Chinese, Thai, Vietnamese, Russian, etc.)
+  if (isForbiddenForeignLanguage(text)) {
+    return {
+      translated: BILINGUAL_ONLY_NOTICE,
+      fromLabel: 'ភាសាផ្សេង',
+      toLabel: 'ខ្មែរ / English',
+      fromLang: 'Foreign',
+      toLang: 'Khmer/English'
+    };
+  }
 
   const lang = detectLanguage(text);
   let fromLang, toLang, fromLabel, toLabel;
