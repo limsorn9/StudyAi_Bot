@@ -4640,16 +4640,25 @@ async function submitQuiz() {
     }
   }
 
+  const submitBtn = document.getElementById('submitQuizBtn');
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `<span>⏳ កំពុងបញ្ជូនចម្លើយ...</span>`;
+  }
+
   try {
     showToast('⏳ កំពុងត្រួតពិនិត្យ និងវាយតម្លៃពិន្ទុ...', 'info');
+
+    const effectiveUserId = STATE.currentUser?.id || (STATE.currentUser?.telegramId ? STATE.currentUser.telegramId.toString() : null) || 'guest_' + Date.now();
+    const effectiveName = STATE.currentUser?.name || STATE.currentUser?.khmerName || 'សិស្ស';
 
     const res = await fetch('/api/quiz/submit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         sessionId: STATE.quizSession.sessionId,
-        userId: STATE.currentUser?.id || 'guest_' + Date.now(),
-        studentName: STATE.currentUser?.name || 'សិស្ស',
+        userId: effectiveUserId,
+        studentName: effectiveName,
         answers: STATE.userAnswers
       })
     });
@@ -4661,7 +4670,13 @@ async function submitQuiz() {
     showQuizResultModal(data);
     refreshUserProfile();
   } catch (err) {
-    showToast(err.message, 'error');
+    console.error('Quiz submit error:', err);
+    showToast(err.message || 'មានបញ្ហាក្នុងការបញ្ជូនចម្លើយ សូមព្យាយាមម្តងទៀត!', 'error');
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = `<span>✅ បញ្ជូនចម្លើយ (Submit)</span>`;
+    }
   }
 }
 

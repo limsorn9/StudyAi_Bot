@@ -2983,8 +2983,8 @@ Provide practical English pronunciation coaching:
         options: q.options
       }));
 
-      // Store in memory for secure verification
-      activeQuizSessions.set(sessionId, {
+      // Store in memory and persistent DB for secure verification
+      const sessionData = {
         rawQuestions: normalizedQuestions,
         createdAt: Date.now(),
         type,
@@ -2994,7 +2994,12 @@ Provide practical English pronunciation coaching:
         subjectKey,
         quizTitle,
         examMonth: type === 'elementary_exam' ? parseInt(req.query.month || '1') : null
-      });
+      };
+
+      activeQuizSessions.set(sessionId, sessionData);
+      if (db) {
+        db.ref(`quiz_sessions/${sessionId}`).set(sessionData).catch(() => {});
+      }
 
       res.json({
         success: true,
@@ -3019,7 +3024,16 @@ Provide practical English pronunciation coaching:
         return res.status(400).json({ error: 'Missing quiz submission parameters' });
       }
 
-      const session = activeQuizSessions.get(sessionId);
+      let session = activeQuizSessions.get(sessionId);
+      if (!session && db) {
+        try {
+          const snap = await db.ref(`quiz_sessions/${sessionId}`).once('value');
+          session = snap.val();
+        } catch (e) {
+          console.warn('Fallback quiz session fetch error:', e.message);
+        }
+      }
+
       if (!session) {
         return res.status(400).json({ error: 'Quiz session has expired. Please restart the quiz.' });
       }
@@ -3055,6 +3069,7 @@ Provide practical English pronunciation coaching:
       const isPassed = total === 1 ? score === 1 : ['A', 'B', 'C'].includes(grade);
       const isAnnualExam = type === 'annual';
       const isBeginnerFinal = type === 'beginner_final';
+      const isElementaryExam = type === 'elementary_exam';
 
       let certId = null;
       let certData = null;
@@ -3229,6 +3244,9 @@ Provide practical English pronunciation coaching:
 
       // Remove session
       activeQuizSessions.delete(sessionId);
+      if (db) {
+        db.ref(`quiz_sessions/${sessionId}`).remove().catch(() => {});
+      }
 
       res.json({
         success: true,
