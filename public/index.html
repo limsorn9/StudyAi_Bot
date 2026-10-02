@@ -26,7 +26,7 @@
   <link rel="icon" type="image/png" href="/school_logo.png">
   <link rel="apple-touch-icon" href="/school_logo.png">
 
-  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/style.css?v=2.2_dict">
 </head>
 <body class="night-mode-full">
   <!-- Top Ambient Glow -->
@@ -52,6 +52,11 @@
         <!-- School Admin Dashboard Portal Button (Strictly restricted to verified Admins) -->
         <button id="headerAdminBtn" class="header-action-icon-btn hidden" style="display: none !important;" onclick="navigateTo('admin')" title="ផ្ទាំងគ្រប់គ្រងសាលារៀន (School Admin Portal)">
           <span class="action-icon">🏫</span>
+        </button>
+
+        <!-- Dictionary Quick Icon -->
+        <button class="header-action-icon-btn" onclick="navigateTo('dictionary')" title="វចនានុក្រម & ប្រព័ន្ធបកប្រែ (Dictionary)">
+          <span class="action-icon">📖</span>
         </button>
 
         <!-- Quick Search -->
@@ -108,6 +113,10 @@
                 <button class="btn-ai-chatbot" onclick="navigateTo('ai-tutor')">
                   <span class="btn-icon">🤖</span>
                   <span>Ai Chatbot</span>
+                </button>
+                <button class="btn-dictionary" onclick="navigateTo('dictionary')" style="background: linear-gradient(135deg, #0284c7, #0d9488); color: white; border: none; padding: 10px 16px; border-radius: 12px; font-weight: 700; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; box-shadow: 0 4px 15px rgba(2, 132, 199, 0.3);">
+                  <span class="btn-icon">📖</span>
+                  <span>វចនានុក្រម (Dictionary)</span>
                 </button>
               </div>
             </div>
@@ -243,6 +252,16 @@
             <button class="dash-action-pill pill-purple" onclick="navigateTo('annual-exams')">
               <span class="pill-icon">👾</span>
               <span class="pill-title">តេស្ត AI ប្រចាំថ្ងៃ</span>
+            </button>
+          </div>
+          <div class="dash-pills-row" style="margin-top: 8px;">
+            <button class="dash-action-pill pill-cyan" onclick="navigateTo('dictionary')">
+              <span class="pill-icon">📖</span>
+              <span class="pill-title">វចនានុក្រម & បកប្រែ</span>
+            </button>
+            <button class="dash-action-pill pill-gold" onclick="navigateTo('dictionary'); switchDictPageSection('verbs');">
+              <span class="pill-icon">⚡</span>
+              <span class="pill-title">កិរិយាសព្ទ (Verbs)</span>
             </button>
           </div>
         </div>
@@ -801,9 +820,150 @@
       </section>
 
       <!-- ==============================================
-           7. IRREGULAR VERBS TAB
+           7. DICTIONARY & TRANSLATION TAB (FULL PAGE)
+      ============================================== -->
+      <section id="tab-dictionary" class="tab-pane">
+        <div class="section-header-row mb-3" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <button class="courses-back-btn" onclick="navigateTo('dashboard')" title="ត្រឡប់ទៅផ្ទាំងដើម">‹ ត្រឡប់</button>
+          <span class="badge badge-emerald text-xs">⚡ ស្តង់ដាជាតិ MoEYS • Offline 100%</span>
+        </div>
+
+        <div class="section-title">
+          <h2>📖 វចនានុក្រម & ប្រព័ន្ធបកប្រែ (English ↔ ខ្មែរ)</h2>
+          <p>ប្រព័ន្ធបកប្រែ Offline, វាក្យសព្ទ ៤៩ ប្រធានបទ និងតារាងកិរិយាសព្ទប្រែប្រួលពេញលេញ</p>
+        </div>
+
+        <!-- 3-Way Sub-tabs Navigation: Translator / 49 Topics / Irregular Verbs -->
+        <div class="dict-page-nav-tabs">
+          <button id="dictPageTabTranslate" class="dict-page-tab-btn active" onclick="switchDictPageSection('translate')">
+            <span>🔤 បកប្រែភាសា (Translator)</span>
+          </button>
+          <button id="dictPageTabVocab" class="dict-page-tab-btn" onclick="switchDictPageSection('vocab')">
+            <span>📚 វាក្យសព្ទ ៤៩ ប្រធានបទ</span>
+          </button>
+          <button id="dictPageTabVerbs" class="dict-page-tab-btn" onclick="switchDictPageSection('verbs')">
+            <span>⚡ កិរិយាសព្ទ (Verbs)</span>
+          </button>
+        </div>
+
+        <!-- Section 1: Offline Translator -->
+        <div id="dictSectionTranslate" class="dict-section-content active">
+          <div class="glass-panel p-4 rounded-2xl mb-4">
+            <div class="flex items-center justify-between mb-3 gap-2 flex-wrap">
+              <div class="flex items-center gap-2">
+                <span class="text-sm font-bold text-cyan-400">ទិសដៅបកប្រែ៖</span>
+                <select id="dictPageDirectionSelect" class="form-input text-xs font-semibold py-1.5 px-3 rounded-lg bg-slate-800 text-white border border-cyan-500/30">
+                  <option value="auto">🔄 ស្វ័យប្រវត្តិ (Auto-Detect)</option>
+                  <option value="en_to_kh">🇬🇧 English ➔ 🇰🇭 ខ្មែរ</option>
+                  <option value="kh_to_en">🇰🇭 ខ្មែរ ➔ 🇬🇧 English</option>
+                </select>
+              </div>
+              <span class="text-xs text-emerald-400 font-semibold">⚡ ១,៣៦៥+ ពាក្យ • Zero AI Quota</span>
+            </div>
+
+            <div class="mb-3">
+              <textarea id="dictPageSourceText" class="form-input w-full rounded-xl p-3 text-sm text-white bg-slate-900/80 border border-slate-700/60 focus:border-cyan-400" rows="3" placeholder="វាយពាក្យ ឬប្រយោគដែលចង់បកប្រែ... (ឧទាហរណ៍: hello, Good morning, I study English every day, សួស្តី, ខ្ញុំរៀនភាសាអង់គ្លេស...)"></textarea>
+            </div>
+
+            <!-- Quick Phrases Chips -->
+            <div class="dict-quick-chips-row mb-3 flex flex-wrap gap-1.5">
+              <span class="text-xs text-slate-400 py-1">ឃ្លាពេញនិយម:</span>
+              <button class="chip-btn" onclick="setDictPageQuery('Good morning')">Good morning</button>
+              <button class="chip-btn" onclick="setDictPageQuery('How are you?')">How are you?</button>
+              <button class="chip-btn" onclick="setDictPageQuery('Thank you very much')">Thank you</button>
+              <button class="chip-btn" onclick="setDictPageQuery('I study English every day.')">I study English</button>
+              <button class="chip-btn" onclick="setDictPageQuery('Do you speak English?')">Do you speak English?</button>
+            </div>
+
+            <div class="flex items-center gap-3">
+              <button class="btn btn-primary btn-md flex-1 font-bold shadow-lg" onclick="runDictPageTranslate()">
+                <span>🌍 បកប្រែឥឡូវនេះ (Translate)</span>
+              </button>
+              <button class="btn btn-outline btn-md" onclick="clearDictPageTranslate()" title="សម្អាត">
+                <span>🗑️ សម្អាត</span>
+              </button>
+            </div>
+
+            <!-- Result Box -->
+            <div id="dictPageResultBox" class="dict-page-result-card hidden mt-4 p-4 rounded-xl border border-cyan-500/40 bg-slate-900/90 shadow-xl">
+              <div class="flex items-center justify-between mb-2">
+                <span id="dictPageResultDirBadge" class="text-xs font-bold text-cyan-400 bg-cyan-950/60 px-2.5 py-1 rounded-md border border-cyan-500/30">English ➔ ខ្មែរ</span>
+                <div class="flex items-center gap-2">
+                  <button id="dictPageSpeakBtn" class="btn btn-xs btn-outline" onclick="playDictPageAudio()" title="ស្តាប់សំឡេង">
+                    <span>🔊 ស្តាប់សំឡេង (Audio)</span>
+                  </button>
+                  <button class="btn btn-xs btn-outline" onclick="copyDictPageResult(this)" title="ចម្លងអត្ថបទ">
+                    <span>📋 ចម្លង</span>
+                  </button>
+                </div>
+              </div>
+              <div id="dictPageResultText" class="text-lg font-bold text-white leading-relaxed pt-1"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 2: Thematic Vocabulary Categories (49 Topics) -->
+        <div id="dictSectionVocab" class="dict-section-content hidden">
+          <div class="glass-panel p-4 rounded-2xl mb-4">
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-4">
+              <div class="flex-1">
+                <input type="text" id="dictPageVocabSearch" class="form-input text-sm w-full rounded-xl p-2.5 bg-slate-900/80 border border-slate-700" placeholder="🔍 ស្វែងរកពាក្យក្នុងវាក្យសព្ទ ៤៩ ប្រធានបទ..." oninput="filterDictPageVocab(this.value)">
+              </div>
+              <div class="sm:w-72">
+                <select id="dictPageCategorySelect" class="form-input text-xs w-full font-medium py-2 rounded-xl bg-slate-800 text-cyan-300 border border-cyan-500/30" onchange="renderDictPageCategory(this.value)">
+                  <!-- 49 categories -->
+                </select>
+              </div>
+            </div>
+
+            <div id="dictPageVocabGrid" class="dict-vocab-modern-grid max-h-[500px] overflow-y-auto pr-1">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 3: Irregular Verbs (V1, V2, V3) -->
+        <div id="dictSectionVerbs" class="dict-section-content hidden">
+          <div class="glass-panel p-4 rounded-2xl mb-4">
+            <div class="verbs-search-box mb-3">
+              <input type="text" id="dictPageVerbsSearch" class="form-input text-sm w-full rounded-xl p-2.5 bg-slate-900/80 border border-slate-700" placeholder="🔍 ស្វែងរកកិរិយាសព្ទ (ឧ. Go, Went, Gone, Do, See...)" oninput="filterDictPageVerbs(this.value)">
+              <div class="verbs-group-buttons mt-2 flex flex-wrap gap-1.5">
+                <button class="verb-filter-btn active" data-group="all" onclick="filterDictPageVerbGroup('all')">ទាំងអស់</button>
+                <button class="verb-filter-btn" data-group="verbs_A_C" onclick="filterDictPageVerbGroup('verbs_A_C')">A - C</button>
+                <button class="verb-filter-btn" data-group="verbs_D_F" onclick="filterDictPageVerbGroup('verbs_D_F')">D - F</button>
+                <button class="verb-filter-btn" data-group="verbs_G_L" onclick="filterDictPageVerbGroup('verbs_G_L')">G - L</button>
+                <button class="verb-filter-btn" data-group="verbs_M_R" onclick="filterDictPageVerbGroup('verbs_M_R')">M - R</button>
+                <button class="verb-filter-btn" data-group="verbs_S_W" onclick="filterDictPageVerbGroup('verbs_S_W')">S - W</button>
+              </div>
+            </div>
+
+            <div class="verbs-table-card glass-panel overflow-x-auto">
+              <table class="modern-table w-full">
+                <thead>
+                  <tr>
+                    <th>V1 (Infinitive)</th>
+                    <th>V2 (Past Simple)</th>
+                    <th>V3 (Past Participle)</th>
+                    <th>ប្រែជាភាសាខ្មែរ</th>
+                    <th>សំឡេង</th>
+                  </tr>
+                </thead>
+                <tbody id="dictPageVerbsTableBody">
+                  <!-- Populated by JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==============================================
+           8. IRREGULAR VERBS TAB
       ============================================== -->
       <section id="tab-verbs" class="tab-pane">
+        <div class="section-header-row mb-3" style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+          <button class="courses-back-btn" onclick="navigateTo('dashboard')" title="ត្រឡប់ទៅផ្ទាំងដើម">‹ ត្រឡប់</button>
+        </div>
         <div class="section-title">
           <h2>⚡ តារាងកិរិយាសព្ទប្រែប្រួល (Irregular Verbs)</h2>
           <p>តារាងកិរិយាសព្ទប្រែប្រួលពេញលេញ V1, V2, V3 និងអត្ថន័យជាភាសាខ្មែរ</p>
@@ -1455,6 +1615,10 @@
         </div>
         <span class="m-label">ភ្នាក់ងារ AI</span>
       </button>
+      <button class="m-nav-item" data-tab="dictionary" onclick="navigateTo('dictionary')">
+        <span class="m-icon">📖</span>
+        <span class="m-label">វចនានុក្រម</span>
+      </button>
       <button class="m-nav-item" data-tab="annual-exams" onclick="navigateTo('annual-exams')">
         <span class="m-icon">📝</span>
         <span class="m-label">វិញ្ញាសា</span>
@@ -1501,6 +1665,84 @@
       </div>
       <div class="p-4 space-y-3" id="promptPickerModalBody">
         <!-- Dynamically injected with English and Khmer prompt boxes and actions -->
+      </div>
+    </div>
+  <!-- DICTIONARY & TRANSLATION MODAL -->
+  <div id="dictionaryModal" class="modal-overlay hidden">
+    <div class="modal-card glass-panel max-w-lg dictionary-modal-card">
+      <div class="modal-header">
+        <div class="modal-title font-bold flex items-center gap-2">
+          <span>🌍</span>
+          <span>វចនានុក្រម & ប្រព័ន្ធបកប្រែ (Dictionary)</span>
+        </div>
+        <button class="modal-close" onclick="closeModal('dictionaryModal')">✕</button>
+      </div>
+
+      <!-- Dictionary Modal Tabs -->
+      <div class="dict-modal-tabs">
+        <button id="dictTabTranslateBtn" class="dict-tab-btn active" onclick="switchDictTab('translate')">
+          <span>🔤 បកប្រែ (Translate)</span>
+        </button>
+        <button id="dictTabVocabBtn" class="dict-tab-btn" onclick="switchDictTab('vocab')">
+          <span>📚 វាក្យសព្ទ ៤៩ ប្រធានបទ</span>
+        </button>
+        <button id="dictTabVerbsBtn" class="dict-tab-btn" onclick="closeModal('dictionaryModal'); navigateTo('verbs');">
+          <span>⚡ កិរិយាសព្ទ (Verbs)</span>
+        </button>
+      </div>
+
+      <!-- Tab Content 1: Translation Tool -->
+      <div id="dictPaneTranslate" class="dict-pane active p-4 space-y-3">
+        <div class="dict-dir-row flex items-center justify-between gap-2">
+          <select id="dictDirectionSelect" class="form-input text-xs font-semibold py-1.5 flex-1">
+            <option value="auto">🔄 ស្វ័យប្រវត្តិ (Auto Detect)</option>
+            <option value="en_to_kh">🇬🇧 English ➔ 🇰🇭 ខ្មែរ</option>
+            <option value="kh_to_en">🇰🇭 ខ្មែរ ➔ 🇬🇧 English</option>
+          </select>
+          <span class="badge badge-emerald text-xs">⚡ Offline 100%</span>
+        </div>
+
+        <div class="dict-input-wrap">
+          <textarea id="dictSourceText" class="form-input text-sm w-full h-24" placeholder="វាយពាក្យ ឬល្បះដែលចង់បកប្រែ... (ឧ. hello, Good morning, I study English)"></textarea>
+        </div>
+
+        <div class="flex items-center justify-between gap-2">
+          <button class="btn btn-primary btn-sm flex-1 font-bold" onclick="runDictTranslate()">
+            <span>🌍 បកប្រែឥឡូវនេះ</span>
+          </button>
+          <button class="btn btn-glass btn-sm" onclick="clearDictTranslate()" title="សម្អាត">
+            <span>🗑️</span>
+          </button>
+        </div>
+
+        <!-- Translation Result Box -->
+        <div id="dictResultBox" class="dict-result-card hidden p-3 rounded-xl border border-cyan-500/30 bg-slate-900/60 mt-2">
+          <div class="flex items-center justify-between mb-1.5">
+            <span id="dictResultDirBadge" class="text-xs font-semibold text-cyan-400">English ➔ ខ្មែរ</span>
+            <div class="flex items-center gap-1.5">
+              <button id="dictSpeakBtn" class="btn btn-xs btn-outline" onclick="playDictAudio()" title="ស្តាប់សំឡេង">
+                <span>🔊 ស្តាប់</span>
+              </button>
+              <button class="btn btn-xs btn-outline" onclick="copyDictResult(this)" title="ចម្លង">
+                <span>📋 ចម្លង</span>
+              </button>
+            </div>
+          </div>
+          <div id="dictResultText" class="text-base font-semibold text-white leading-relaxed"></div>
+        </div>
+      </div>
+
+      <!-- Tab Content 2: Vocabulary Categories (49 Categories) -->
+      <div id="dictPaneVocab" class="dict-pane hidden p-4 space-y-3">
+        <div class="flex items-center gap-2">
+          <input type="text" id="dictVocabSearchInput" class="form-input text-xs flex-1" placeholder="🔍 ស្វែងរកពាក្យក្នុងវចនានុក្រម..." oninput="filterVocabCategories(this.value)">
+          <select id="dictCategorySelect" class="form-input text-xs w-48 font-medium" onchange="renderSelectedVocabCategory(this.value)">
+            <!-- Populated with 49 categories -->
+          </select>
+        </div>
+        <div id="dictVocabListContainer" class="max-h-72 overflow-y-auto space-y-1.5 pr-1">
+          <!-- Populated with vocabulary cards -->
+        </div>
       </div>
     </div>
   </div>
@@ -2241,6 +2483,6 @@
   <!-- Toast Notification Container -->
   <div id="toastContainer" class="toast-container"></div>
 
-  <script src="/app.js"></script>
+  <script src="/app.js?v=2.2_dict"></script>
 </body>
 </html>

@@ -436,6 +436,8 @@ function navigateTo(tabName) {
     loadAnnualExams();
   } else if (tabName === 'certificates') {
     loadUserCertificates();
+  } else if (tabName === 'dictionary') {
+    initDictionaryTab();
   } else if (tabName === 'verbs') {
     renderVerbsTable();
   } else if (tabName === 'admin') {
@@ -5135,6 +5137,451 @@ function openRegisterModal() {
 
 function openSyncModal() {
   startTelegramOneClickLogin();
+}
+
+// ==========================================
+// DICTIONARY & TRANSLATION MODAL & FULL-PAGE HANDLERS
+// ==========================================
+let dictVocabDataCache = null;
+let dictLastTranslatedResult = null;
+
+function initDictionaryTab() {
+  switchDictPageSection('translate');
+  if (!dictVocabDataCache) {
+    loadDictPageVocab();
+  }
+  if (!STATE.allVerbsData || Object.keys(STATE.allVerbsData).length === 0) {
+    fetch('/api/verbs').then(r => r.json()).then(d => {
+      if (d.success) {
+        STATE.allVerbsData = d.verbs;
+        renderDictPageVerbsTable();
+      }
+    }).catch(e => console.error(e));
+  } else {
+    renderDictPageVerbsTable();
+  }
+}
+
+function switchDictPageSection(section) {
+  const tabs = ['translate', 'vocab', 'verbs'];
+  tabs.forEach(t => {
+    const btn = document.getElementById('dictPageTab' + t.charAt(0).toUpperCase() + t.slice(1));
+    const sec = document.getElementById('dictSection' + t.charAt(0).toUpperCase() + t.slice(1));
+    if (t === section) {
+      btn?.classList.add('active');
+      sec?.classList.remove('hidden');
+    } else {
+      btn?.classList.remove('active');
+      sec?.classList.add('hidden');
+    }
+  });
+
+  if (section === 'translate') {
+    setTimeout(() => document.getElementById('dictPageSourceText')?.focus(), 150);
+  } else if (section === 'vocab') {
+    if (!dictVocabDataCache) loadDictPageVocab();
+  } else if (section === 'verbs') {
+    renderDictPageVerbsTable();
+  }
+}
+
+function setDictPageQuery(text) {
+  const input = document.getElementById('dictPageSourceText');
+  if (input) {
+    input.value = text;
+    runDictPageTranslate();
+  }
+}
+
+async function runDictPageTranslate() {
+  const textInput = document.getElementById('dictPageSourceText');
+  const text = (textInput?.value || '').trim();
+  if (!text) {
+    showToast('⚠️ សូមបញ្ចូលពាក្យ ឬអត្ថបទដែលត្រូវបកប្រែ!', 'warning');
+    return;
+  }
+
+  const dirSelect = document.getElementById('dictPageDirectionSelect');
+  const direction = dirSelect?.value || 'auto';
+  const resultBox = document.getElementById('dictPageResultBox');
+  const resultText = document.getElementById('dictPageResultText');
+  const dirBadge = document.getElementById('dictPageResultDirBadge');
+
+  if (resultBox) resultBox.classList.remove('hidden');
+  if (resultText) resultText.innerHTML = '<span class="text-slate-400">⏳ កំពុងបកប្រែ (ស្តង់ដាជាតិ)...</span>';
+
+  try {
+    const res = await fetch('/api/ai/translate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text,
+        direction,
+        offline: true,
+        userId: STATE.currentUser?.id || 'web-guest'
+      })
+    });
+    const data = await res.json();
+    if (data.success && data.translation) {
+      dictLastTranslatedResult = data;
+      if (resultText) resultText.textContent = data.translation;
+      if (dirBadge) dirBadge.textContent = data.direction || (data.toLang === 'English' ? 'ខ្មែរ ➔ English' : 'English ➔ ខ្មែរ');
+    } else {
+      if (resultText) resultText.textContent = '❌ មិនអាចបកប្រែបានទេ សូមសាកល្បងម្ដងទៀត';
+    }
+  } catch (err) {
+    console.error('Page translation error:', err);
+    if (resultText) resultText.textContent = '❌ មានបញ្ហាក្នុងការតភ្ជាប់ សូមព្យាយាមម្ដងទៀត';
+  }
+}
+
+function clearDictPageTranslate() {
+  const input = document.getElementById('dictPageSourceText');
+  const resultBox = document.getElementById('dictPageResultBox');
+  const resultText = document.getElementById('dictPageResultText');
+  if (input) input.value = '';
+  if (resultBox) resultBox.classList.add('hidden');
+  if (resultText) resultText.textContent = '';
+}
+
+function playDictPageAudio() {
+  if (!dictLastTranslatedResult) return;
+  const toSpeak = dictLastTranslatedResult.toLang === 'English'
+    ? dictLastTranslatedResult.translation
+    : dictLastTranslatedResult.originalText;
+  if (toSpeak) {
+    speakEnglish(toSpeak, document.getElementById('dictPageSpeakBtn'));
+  }
+}
+
+function copyDictPageResult(btn) {
+  const resultText = document.getElementById('dictPageResultText')?.textContent || '';
+  if (!resultText) return;
+  navigator.clipboard.writeText(resultText).then(() => {
+    const oldText = btn.innerHTML;
+    btn.innerHTML = '<span>✅ បានចម្លង</span>';
+    setTimeout(() => { btn.innerHTML = oldText; }, 1500);
+  });
+}
+
+async function loadDictPageVocab() {
+  try {
+    const res = await fetch('/api/vocab');
+    const data = await res.json();
+    if (data.success && Array.isArray(data.categories)) {
+      dictVocabDataCache = data.categories;
+      const select = document.getElementById('dictPageCategorySelect');
+      if (select) {
+        select.innerHTML = data.categories.map((c, idx) => `<option value="${idx}">${c.name}</option>`).join('');
+      }
+      renderDictPageCategory(0);
+    }
+  } catch (e) {
+    console.error('Failed to load dict page vocab:', e);
+  }
+}
+
+function renderDictPageCategory(index) {
+  if (!dictVocabDataCache) return;
+  const cat = dictVocabDataCache[index];
+  if (!cat) return;
+  renderDictPageVocabCards(cat.words);
+}
+
+function renderDictPageVocabCards(words) {
+  const container = document.getElementById('dictPageVocabGrid');
+  if (!container) return;
+  if (!words || words.length === 0) {
+    container.innerHTML = '<div class="text-center text-slate-400 py-6 text-sm col-span-full">រកមិនឃើញពាក្យទេ</div>';
+    return;
+  }
+
+  container.innerHTML = words.map(item => {
+    const parts = item.split('=');
+    const en = parts[0]?.trim() || '';
+    const kh = parts.slice(1).join('=').trim() || '';
+    const logo = getWordVisualLogo(en, kh);
+    return `
+      <div class="dict-vocab-card-item">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span class="pro-word-logo-badge" style="width:32px;height:32px;min-width:32px;font-size:18px;">${logo}</span>
+          <div>
+            <div class="dict-vocab-card-en">${escapeHtml(en)}</div>
+            <div class="dict-vocab-card-kh">${escapeHtml(kh)}</div>
+          </div>
+        </div>
+        <button class="btn btn-xs btn-outline" onclick="speakEnglish('${escapeHtml(en).replace(/'/g, "\\'")}', this)" title="ស្តាប់សំឡេង">🔊</button>
+      </div>
+    `;
+  }).join('');
+}
+
+function filterDictPageVocab(query) {
+  if (!dictVocabDataCache) return;
+  const q = (query || '').toLowerCase().trim();
+  if (!q) {
+    const select = document.getElementById('dictPageCategorySelect');
+    const idx = select ? parseInt(select.value) || 0 : 0;
+    renderDictPageCategory(idx);
+    return;
+  }
+
+  let matchedWords = [];
+  dictVocabDataCache.forEach(cat => {
+    (cat.words || []).forEach(w => {
+      if (w.toLowerCase().includes(q)) {
+        matchedWords.push(w);
+      }
+    });
+  });
+
+  renderDictPageVocabCards(matchedWords);
+}
+
+function filterDictPageVerbGroup(groupKey) {
+  document.querySelectorAll('#dictSectionVerbs .verb-filter-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.group === groupKey);
+  });
+  const q = document.getElementById('dictPageVerbsSearch')?.value || '';
+  renderDictPageVerbsTable(groupKey, q);
+}
+
+function filterDictPageVerbs(q) {
+  const activeBtn = document.querySelector('#dictSectionVerbs .verb-filter-btn.active');
+  const group = activeBtn?.dataset.group || 'all';
+  renderDictPageVerbsTable(group, q);
+}
+
+function renderDictPageVerbsTable(filterKey = 'all', query = '') {
+  const tbody = document.getElementById('dictPageVerbsTableBody');
+  if (!tbody) return;
+
+  if (!STATE.allVerbsData || Object.keys(STATE.allVerbsData).length === 0) {
+    fetch('/api/verbs').then(r => r.json()).then(d => {
+      if (d.success) {
+        STATE.allVerbsData = d.verbs;
+        renderDictPageVerbsTable(filterKey, query);
+      }
+    }).catch(e => console.error(e));
+    return;
+  }
+
+  let flatList = [];
+  if (filterKey === 'all') {
+    Object.values(STATE.allVerbsData).forEach(arr => {
+      if (Array.isArray(arr)) flatList.push(...arr);
+    });
+  } else if (STATE.allVerbsData[filterKey]) {
+    flatList = STATE.allVerbsData[filterKey];
+  }
+
+  if (query) {
+    const q = query.toLowerCase().trim();
+    flatList = flatList.filter(v =>
+      (v.v1 && v.v1.toLowerCase().includes(q)) ||
+      (v.v2 && v.v2.toLowerCase().includes(q)) ||
+      (v.v3 && v.v3.toLowerCase().includes(q)) ||
+      (v.kh && v.kh.includes(q))
+    );
+  }
+
+  if (flatList.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 20px;">រកមិនឃើញទិន្នន័យកិរិយាសព្ទទេ</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = flatList.map(v => {
+    const logo = getWordVisualLogo(v.v1, v.kh);
+    return `
+      <tr>
+        <td>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span class="pro-word-logo-badge" style="width:28px;height:28px;min-width:28px;font-size:16px;">${logo}</span>
+            <strong style="color: #38bdf8;">${v.v1}</strong>
+          </div>
+        </td>
+        <td>${v.v2}</td>
+        <td>${v.v3}</td>
+        <td><span style="color: #cbd5e1;">${v.kh}</span></td>
+        <td>
+          <button class="btn btn-xs btn-outline" onclick="playSingleWordAudio('${v.v1}', this)">🔊</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function openTranslateModal() {
+  openModal('dictionaryModal');
+  switchDictTab('translate');
+  if (!dictVocabDataCache) {
+    loadVocabCategories();
+  }
+}
+
+function switchDictTab(tab) {
+  const btnTranslate = document.getElementById('dictTabTranslateBtn');
+  const btnVocab = document.getElementById('dictTabVocabBtn');
+  const paneTranslate = document.getElementById('dictPaneTranslate');
+  const paneVocab = document.getElementById('dictPaneVocab');
+
+  if (tab === 'translate') {
+    btnTranslate?.classList.add('active');
+    btnVocab?.classList.remove('active');
+    paneTranslate?.classList.remove('hidden');
+    paneVocab?.classList.add('hidden');
+    setTimeout(() => document.getElementById('dictSourceText')?.focus(), 150);
+  } else if (tab === 'vocab') {
+    btnVocab?.classList.add('active');
+    btnTranslate?.classList.remove('active');
+    paneVocab?.classList.remove('hidden');
+    paneTranslate?.classList.add('hidden');
+    if (!dictVocabDataCache) {
+      loadVocabCategories();
+    }
+  }
+}
+
+async function runDictTranslate() {
+  const textInput = document.getElementById('dictSourceText');
+  const text = (textInput?.value || '').trim();
+  if (!text) {
+    showToast('⚠️ សូមបញ្ចូលពាក្យ ឬអត្ថបទដែលត្រូវបកប្រែ!', 'warning');
+    return;
+  }
+
+  const dirSelect = document.getElementById('dictDirectionSelect');
+  const direction = dirSelect?.value || 'auto';
+  const resultBox = document.getElementById('dictResultBox');
+  const resultText = document.getElementById('dictResultText');
+  const dirBadge = document.getElementById('dictResultDirBadge');
+
+  if (resultBox) resultBox.classList.remove('hidden');
+  if (resultText) resultText.innerHTML = '<span class="text-slate-400">⏳ កំពុងបកប្រែ...</span>';
+
+  try {
+    const res = await fetch('/api/ai/translate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text,
+        direction,
+        offline: true,
+        userId: STATE.currentUser?.id || 'web-guest'
+      })
+    });
+    const data = await res.json();
+    if (data.success && data.translation) {
+      dictLastTranslatedResult = data;
+      if (resultText) resultText.textContent = data.translation;
+      if (dirBadge) dirBadge.textContent = data.direction || (data.toLang === 'English' ? 'ខ្មែរ ➔ English' : 'English ➔ ខ្មែរ');
+    } else {
+      if (resultText) resultText.textContent = '❌ មិនអាចបកប្រែបានទេ សូមសាកល្បងម្ដងទៀត';
+    }
+  } catch (err) {
+    console.error('Translation error:', err);
+    if (resultText) resultText.textContent = '❌ មានបញ្ហាក្នុងការតភ្ជាប់ សូមព្យាយាមម្ដងទៀត';
+  }
+}
+
+function clearDictTranslate() {
+  const input = document.getElementById('dictSourceText');
+  const resultBox = document.getElementById('dictResultBox');
+  const resultText = document.getElementById('dictResultText');
+  if (input) input.value = '';
+  if (resultBox) resultBox.classList.add('hidden');
+  if (resultText) resultText.textContent = '';
+  dictLastTranslatedResult = null;
+}
+
+function playDictAudio() {
+  if (!dictLastTranslatedResult) return;
+  const toSpeak = dictLastTranslatedResult.toLang === 'English'
+    ? dictLastTranslatedResult.translation
+    : dictLastTranslatedResult.originalText;
+  if (toSpeak) {
+    speakEnglish(toSpeak, document.getElementById('dictSpeakBtn'));
+  }
+}
+
+function copyDictResult(btn) {
+  const resultText = document.getElementById('dictResultText')?.textContent || '';
+  if (!resultText) return;
+  navigator.clipboard.writeText(resultText).then(() => {
+    const oldText = btn.innerHTML;
+    btn.innerHTML = '<span>✅ បានចម្លង</span>';
+    setTimeout(() => { btn.innerHTML = oldText; }, 1500);
+  });
+}
+
+async function loadVocabCategories() {
+  try {
+    const res = await fetch('/api/vocab');
+    const data = await res.json();
+    if (data.success && Array.isArray(data.categories)) {
+      dictVocabDataCache = data.categories;
+      const select = document.getElementById('dictCategorySelect');
+      if (select) {
+        select.innerHTML = data.categories.map((c, idx) => `<option value="${idx}">${c.name}</option>`).join('');
+      }
+      renderSelectedVocabCategory(0);
+    }
+  } catch (e) {
+    console.error('Failed to load vocab categories:', e);
+  }
+}
+
+function renderSelectedVocabCategory(index) {
+  if (!dictVocabDataCache) return;
+  const cat = dictVocabDataCache[index];
+  if (!cat) return;
+  renderVocabWordsList(cat.words);
+}
+
+function renderVocabWordsList(words) {
+  const container = document.getElementById('dictVocabListContainer');
+  if (!container) return;
+  if (!words || words.length === 0) {
+    container.innerHTML = '<div class="text-center text-slate-400 py-4 text-xs">រកមិនឃើញពាក្យទេ</div>';
+    return;
+  }
+
+  container.innerHTML = words.map(item => {
+    const parts = item.split('=');
+    const en = parts[0]?.trim() || '';
+    const kh = parts.slice(1).join('=').trim() || '';
+    return `
+      <div class="dict-vocab-item">
+        <div class="flex items-center gap-2">
+          <span class="dict-vocab-en">${escapeHtml(en)}</span>
+          <span class="dict-vocab-kh">${escapeHtml(kh)}</span>
+        </div>
+        <button class="btn btn-xs btn-outline" onclick="speakEnglish('${escapeHtml(en).replace(/'/g, "\\'")}', this)" title="ស្តាប់">🔊</button>
+      </div>
+    `;
+  }).join('');
+}
+
+function filterVocabCategories(query) {
+  if (!dictVocabDataCache) return;
+  const q = (query || '').toLowerCase().trim();
+  if (!q) {
+    const select = document.getElementById('dictCategorySelect');
+    const idx = select ? parseInt(select.value) || 0 : 0;
+    renderSelectedVocabCategory(idx);
+    return;
+  }
+
+  let matchedWords = [];
+  dictVocabDataCache.forEach(cat => {
+    (cat.words || []).forEach(w => {
+      if (w.toLowerCase().includes(q)) {
+        matchedWords.push(w);
+      }
+    });
+  });
+
+  renderVocabWordsList(matchedWords);
 }
 
 function openProfileModal() {

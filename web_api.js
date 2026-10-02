@@ -24,6 +24,8 @@ const irregularVerbs = require('./irregular_verbs.js');
 const { sendOtpEmail, sendConfirmEmail } = require('./mailer.js');
 const beginnerCourse = require('./beginner_curriculum.js');
 const elementaryCourse = require('./elementary_curriculum.js');
+const translationEngine = require('./translation_engine.js');
+const vocabData = require('./vocab_data.js');
 
 function hashPassword(password) {
   return crypto.createHash('sha256').update(password + '_studyai_secret_salt_2026').digest('hex');
@@ -3564,24 +3566,53 @@ Provide practical English pronunciation coaching:
     }
   });
 
-  // 5. Smart Bilingual Translation Tool
+  // 5. Smart Bilingual Translation Tool (MoEYS Standard - 100% Offline Capable & AI with Fallback)
   router.post('/ai/translate', async (req, res) => {
     try {
-      const { text, userId } = req.body;
+      const { text, userId, offline, direction } = req.body;
       if (!text || !text.trim()) return res.status(400).json({ error: 'Missing text parameter' });
 
-      const result = await generateAIAnswer(text.trim(), {
-        userId,
-        mode: 'translate',
-        preferredAI: 'auto'
-      });
+      // Direct offline engine mode
+      if (offline) {
+        const offRes = translationEngine.translate(text.trim(), direction || 'auto');
+        return res.json({
+          success: true,
+          originalText: text,
+          translation: offRes.translated,
+          direction: `${offRes.fromLabel} → ${offRes.toLabel}`,
+          fromLang: offRes.fromLang,
+          toLang: offRes.toLang,
+          provider: 'offline-engine-moe'
+        });
+      }
 
-      res.json({
-        success: true,
-        originalText: text,
-        translation: result.reply,
-        provider: result.provider
-      });
+      // Try AI first, then fallback seamlessly to offline engine
+      try {
+        const result = await generateAIAnswer(text.trim(), {
+          userId,
+          mode: 'translate',
+          preferredAI: 'auto'
+        });
+
+        return res.json({
+          success: true,
+          originalText: text,
+          translation: result.reply,
+          provider: result.provider
+        });
+      } catch (aiErr) {
+        console.warn('[Web API] AI translate error, falling back to offline translation engine:', aiErr.message);
+        const offRes = translationEngine.translate(text.trim(), direction || 'auto');
+        return res.json({
+          success: true,
+          originalText: text,
+          translation: offRes.translated,
+          direction: `${offRes.fromLabel} → ${offRes.toLabel}`,
+          fromLang: offRes.fromLang,
+          toLang: offRes.toLang,
+          provider: 'offline-engine-fallback'
+        });
+      }
     } catch (err) {
       res.status(500).json({ error: 'Translation failed' });
     }
@@ -3745,6 +3776,21 @@ Provide practical English pronunciation coaching:
 
   router.get('/verbs', (req, res) => {
     res.json({ success: true, verbs: irregularVerbs });
+  });
+
+  router.get('/vocab', (req, res) => {
+    res.json({ success: true, categories: vocabData });
+  });
+
+  router.get('/dictionary/lookup', (req, res) => {
+    const q = (req.query.q || '').trim();
+    if (!q) return res.status(400).json({ error: 'Missing query parameter q' });
+    const result = translationEngine.lookupWord(q);
+    res.json({ success: true, query: q, result });
+  });
+
+  router.get('/dictionary/stats', (req, res) => {
+    res.json({ success: true, stats: translationEngine.getDictionaryStats() });
   });
 
   // ==========================================

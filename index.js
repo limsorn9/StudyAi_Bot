@@ -36,6 +36,12 @@ const {
   findNextLesson
 } = require('./certificate_generator.js');
 
+// ════════════════════════════════════════
+// OFFLINE TRANSLATION ENGINE
+// 100% ក្រៅប្រព័ន្ធ - Zero AI - Zero Internet
+// ════════════════════════════════════════
+const offlineTranslator = require('./translation_engine.js');
+
 
 // In-memory quiz state: { userId: { questions, currentQ, score, lessonId, answers } }
 const quizState = {};
@@ -482,6 +488,7 @@ const generateAndSendTTS = async (ctx, text) => {
 const mainMenuKeyboard = Markup.keyboard([
   ['📚 បញ្ជីមេរៀន (Lessons)', '🎓 ប្រឡងបញ្ចប់មុខវិជ្ជា'],
   ['🌐 បើក Web App (Study Online)', '📜 វិញ្ញាបនបត្ររបស់ខ្ញុំ'],
+  ['🌍 បកប្រែ (Translate EN↔KH)', '🔊 ស្តាប់ English (Listen EN)'],
   ['🕰️ ប្រវត្តិសិក្សា', '💎 គណនី VIP (Upgrade)'],
   ['🔗 យកកូដភ្ជាប់ Web (Link)', '❓ ជំនួយ (Help)']
 ]).resize();
@@ -1854,8 +1861,12 @@ bot.action(/beginner_lesson_(.+)_(.+)/, async (ctx) => {
   }
 
   const keyboardRows = [];
-  // 1. Audio TTS button
-  keyboardRows.push([Markup.button.callback('🔊 ស្តាប់អ្នកគ្រូអាន (Teacher Piseth)', `tts_${userId}`)]);
+  // 1. Audio TTS buttons (KH + EN)
+  keyboardRows.push([
+    Markup.button.callback('🔊 ខ្មែរ (Teacher Piseth)', `tts_${userId}`),
+    Markup.button.callback('🔊 English (Listen EN)', `tts_en_${userId}`)
+  ]);
+  keyboardRows.push([Markup.button.callback('🌍 បកប្រែ EN↔KH (Translate)', `translate_beginner_${weekId}_${lessonId}`)]);
 
   // 2. Adjacent Previous and Next Lesson navigation buttons
   const navRow = [];
@@ -1990,8 +2001,12 @@ async function displayLessonContent(ctx, monthId, weekId, lessonId, userId) {
   const isCompleted = !!compSnap.val();
 
   const keyboardRows = [
-    [Markup.button.callback(isVIP ? '🔊 អានជាសំឡេង (Listen)' : '🔒 🔊 អានជាសំឡេង (VIP)', `tts_${userId}`)],
-    [Markup.button.callback(isVIP ? '📝 ប្រឡងបញ្ចប់មេរៀន (Quiz)' : '🔒 📝 ប្រឡងបញ្ចប់មេរៀន (VIP)', `quiz_start_${monthId}-${weekId}-${lessonId}`)]
+    [
+      Markup.button.callback(isVIP ? '🔊 ខ្មែរ (Listen KH)' : '🔒 🔊 ខ្មែរ (VIP)', `tts_${userId}`),
+      Markup.button.callback(isVIP ? '🔊 English (Listen EN)' : '🔒 🔊 EN (VIP)', `tts_en_${userId}`)
+    ],
+    [Markup.button.callback(isVIP ? '📝 ប្រឡងបញ្ចប់មេរៀន (Quiz)' : '🔒 📝 ប្រឡងបញ្ចប់មេរៀន (VIP)', `quiz_start_${monthId}-${weekId}-${lessonId}`)],
+    [Markup.button.callback('🌍 បកប្រែ EN↔KH (Translate)', `translate_lesson_${monthId}-${weekId}-${lessonId}`)]
   ];
 
   if (isCompleted) {
@@ -3861,7 +3876,9 @@ bot.on('text', async (ctx, next) => {
     '🕰️ ប្រវត្តិសិក្សា',
     '🔗 យកកូដភ្ជាប់ Web (Link)',
     '❓ ជំនួយ (Help)',
-    '💎 គណនី VIP (Upgrade)'
+    '💎 គណនី VIP (Upgrade)',
+    '🌍 បកប្រែ (Translate EN↔KH)',
+    '🔊 ស្តាប់ English (Listen EN)'
   ];
   if (menuOptions.includes(userText)) return next ? next() : undefined;
 
@@ -3994,6 +4011,108 @@ bot.on('text', async (ctx, next) => {
           ]).reply_markup
         }
       );
+    }
+  }
+
+  // ❌ Cancel command for any active state
+  if (userText === '/cancel') {
+    await setUserState(userId, 'none');
+    return ctx.reply("❌ បានបោះបង់ប្រតិបត្តិការ។");
+  }
+
+  // 🌍 Translation States (100% offline — accessible to everyone)
+  if (['awaiting_translate', 'awaiting_translate_en_to_kh', 'awaiting_translate_kh_to_en'].includes(userState)) {
+    await setUserState(userId, 'none');
+    let dir = 'auto';
+    if (userState === 'awaiting_translate_en_to_kh') dir = 'en_to_kh';
+    else if (userState === 'awaiting_translate_kh_to_en') dir = 'kh_to_en';
+
+    await ctx.reply('⏳ *កំពុងបកប្រែ (ស្តង់ដាជាតិ)...*', { parse_mode: 'Markdown' });
+    ctx.sendChatAction('typing');
+
+    try {
+      const result = await translateText(userText, dir);
+      const { translated, fromLabel, toLabel } = result;
+      const fullMsg = `🌍 *ការបកប្រែ (${fromLabel} → ${toLabel})*\n\n*ដើម:* ${userText}\n\n*បកប្រែ:*\n${translated}`;
+
+      if (result.toLang === 'English') {
+        userTranslationCache.set(userId, { enText: translated, khText: userText });
+        setLatestResponse(userId, translated, 'sorn');
+      } else {
+        userTranslationCache.set(userId, { enText: userText, khText: translated });
+        setLatestResponse(userId, translated, 'sorn');
+      }
+
+      const buttons = [];
+      if (result.toLang === 'English') {
+        buttons.push([Markup.button.callback('🔊 ស្តាប់ English (Native)', `tts_en_${userId}`)]);
+      }
+      buttons.push([Markup.button.callback('🔊 ស្តាប់ខ្មែរ', `tts_${userId}`)]);
+      buttons.push([Markup.button.callback('🌍 បកប្រែម្ដងទៀត', 'translate_mode_auto')]);
+
+      const maxLen = 3900;
+      if (fullMsg.length > maxLen) {
+        await ctx.reply(fullMsg.substring(0, maxLen), { parse_mode: 'Markdown' });
+        return ctx.reply(fullMsg.substring(maxLen), {
+          parse_mode: 'Markdown',
+          reply_markup: Markup.inlineKeyboard(buttons).reply_markup
+        });
+      } else {
+        return ctx.reply(fullMsg, {
+          parse_mode: 'Markdown',
+          reply_markup: Markup.inlineKeyboard(buttons).reply_markup
+        });
+      }
+    } catch (err) {
+      console.error('[Translate Error]', err);
+      return ctx.reply('❌ មិនអាចបកប្រែបានទេ! សូមព្យាយាមម្ដងទៀត!');
+    }
+  }
+
+  // 🔊 English Pronunciation Direct State (awaiting_en_tts)
+  if (userState === 'awaiting_en_tts') {
+    await setUserState(userId, 'none');
+    const isAdmin = SUPER_ADMIN_IDS.includes(userId);
+    const isVIPUser = isAdmin || (await checkVIP(userId));
+    if (!isVIPUser && !isAdmin) {
+      return ctx.reply(
+        `🔊 *មុខងារស្តាប់ English (Listen EN) សម្រាប់ VIP ប៉ុណ្ណោះ!* 💎\n\n` +
+        `💰 *តម្លៃ: 3$/ខែ | 30$/ឆ្នាំ*`,
+        {
+          parse_mode: 'Markdown',
+          reply_markup: Markup.inlineKeyboard([
+            [Markup.button.callback('💎 Upgrade VIP', 'vip_upgrade')],
+            [Markup.button.callback('🔑 បញ្ចូល License Key', 'enter_license_key')]
+          ]).reply_markup
+        }
+      );
+    }
+
+    if (!isAdmin) {
+      const limitCheck = checkTTSLimit(userId, true);
+      if (!limitCheck.allowed) {
+        return ctx.reply(limitCheck.message, { parse_mode: 'Markdown' });
+      }
+    }
+
+    await ctx.reply('🔊 *កំពុងបង្កើតសំឡេង English Pronunciation...*', { parse_mode: 'Markdown' });
+    ctx.sendChatAction('record_voice');
+    recordTTSStart(userId);
+
+    try {
+      const cleanEn = userText.replace(/[\u1780-\u17FF\u19E0-\u19FF]+/g, '').trim() || userText;
+      const buffer = await synthesizeSpeechBuffer(cleanEn.substring(0, 500), "en-US-GuyNeural");
+      if (!buffer) throw new Error("No audio generated");
+      setLatestResponse(userId, userText, 'sorn');
+      return ctx.replyWithVoice(
+        { source: buffer },
+        { caption: `🇺🇸 English Pronunciation by Teacher Sorn AI\n\n"${userText.substring(0, 200)}"` }
+      );
+    } catch (e) {
+      console.error('En TTS state error:', e);
+      return ctx.reply('❌ មិនអាចបង្កើតសំឡេងបានទេ។ សូមព្យាយាមម្តងទៀត!');
+    } finally {
+      recordTTSDone();
     }
   }
 
@@ -4138,6 +4257,453 @@ bot.action(/tts_(.+)/, async (ctx) => {
     ctx.reply("❌ មិនអាចបង្កើតសម្លេងបានទេពេលនេះ។ សូមព្យាយាមម្តងទៀត!");
   } finally {
     recordTTSDone();
+  }
+});
+
+// ==========================================
+// ENGLISH-ONLY TTS HANDLER (tts_en_USERID)
+// ==========================================
+bot.action(/tts_en_(.+)/, async (ctx) => {
+  const userId = ctx.match[1];
+  if (ctx.from.id.toString() !== userId) return ctx.answerCbQuery("អ្នកមិនអាចស្តាប់សម្លេងនេះបានទេ។");
+
+  const isAdmin = SUPER_ADMIN_IDS.includes(userId.toString());
+  const isVIP = isAdmin || (await checkVIP(userId));
+
+  // VIP Gate (Beginner course is free to listen)
+  const cached = userLatestResponseCache.get(userId.toString());
+  const tutor = cached?.tutor || null;
+  const isPiseth = tutor === 'piseth';
+
+  if (!isVIP && !isPiseth && !isAdmin) {
+    await ctx.answerCbQuery('🔒 VIP ប៉ុណ្ណោះ!');
+    return ctx.reply(
+      `🔊 *មុខងារស្តាប់ English (Listen EN) សម្រាប់ VIP ប៉ុណ្ណោះ!* 💎\n\n` +
+      `💰 *តម្លៃ: 3$/ខែ | 30$/ឆ្នាំ*`,
+      {
+        parse_mode: 'Markdown',
+        reply_markup: Markup.inlineKeyboard([
+          [Markup.button.callback('💎 Upgrade VIP', 'vip_upgrade')],
+          [Markup.button.callback('🔑 បញ្ចូល License Key', 'enter_license_key')]
+        ]).reply_markup
+      }
+    );
+  }
+
+  // Rate limit check
+  if (!isAdmin) {
+    const limitCheck = checkTTSLimit(userId, isVIP || isPiseth);
+    if (!limitCheck.allowed) {
+      await ctx.answerCbQuery('⛔ ប្រើប្រាស់ច្រើន!');
+      return ctx.reply(limitCheck.message, { parse_mode: 'Markdown' });
+    }
+  }
+
+  // Retrieve cached lesson text
+  let text = cached?.text || null;
+  if (!text && db) {
+    try {
+      const snap = await db.ref(`users/${userId}/latestResponse`).once('value');
+      text = snap.val();
+    } catch (e) {}
+  }
+
+  if (!text) {
+    await ctx.answerCbQuery('❌ រកមិនឃើញអត្ថបទ!');
+    return ctx.reply("❌ រកមិនឃើញអត្ថបទដើម្បីអានទេ។ សូមចុចបើកមេរៀនជាថ្មី!");
+  }
+
+  await ctx.answerCbQuery("🔊 កំពុងបង្កើតសម្លេង English...");
+  ctx.sendChatAction('record_voice');
+  recordTTSStart(userId);
+
+  try {
+    // Extract only English portions of the text (lines with significant English)
+    const lines = text.split('\n');
+    const englishLines = lines.filter(line => {
+      const latinCount = (line.match(/[a-zA-Z]/g) || []).length;
+      const totalLen = line.replace(/\s/g, '').length || 1;
+      return latinCount / totalLen > 0.3 && latinCount > 3;
+    });
+
+    let enText = englishLines.join('\n').trim();
+    if (!enText) {
+      enText = text.replace(/[\u1780-\u17FF\u19E0-\u19FF]+/g, '').replace(/\s+/g, ' ').trim();
+    }
+    if (!enText || enText.length < 3) {
+      return ctx.reply("❌ រកមិនឃើញអត្ថបទភាសាអង់គ្លេស! មេរៀននេះប្រហែលជាមានភាសាខ្មែរច្រើនជាង។");
+    }
+
+    // Cap text
+    enText = enText.substring(0, 1200);
+
+    const buffer = await synthesizeSpeechBuffer(enText, "en-US-GuyNeural");
+    if (!buffer) throw new Error("No audio generated");
+
+    await ctx.replyWithVoice(
+      { source: buffer },
+      { caption: '🇺🇸 English Pronunciation by Teacher Sorn AI (Native English Voice)' }
+    );
+  } catch (error) {
+    console.error("English TTS Error:", error);
+    ctx.reply("❌ មិនអាចបង្កើតសម្លេង English បានទេ។ សូមព្យាយាមម្តងទៀត!");
+  } finally {
+    recordTTSDone();
+  }
+});
+
+// ==========================================
+// TRANSLATION SYSTEM (EN ↔ KH) - NATIONAL STANDARD
+// ==========================================
+
+// Helper: Use AI to translate text (bidirectional)
+/**
+ * translateText — ប្រព័ន្ធបកប្រែ 100% Offline
+ * ❌ Zero AI  ❌ Zero Internet  ✅ Works always
+ * ស្តង់ដាជាតិ • ក្រសួងអប់រំ យុវជន និងកីឡា
+ */
+function translateText(text, direction) {
+  // direction: 'en_to_kh' | 'kh_to_en' | 'auto'
+  try {
+    const result = offlineTranslator.translate(text, direction || 'auto');
+    console.log(`[Offline Translate] ${result.fromLabel}→${result.toLabel} | ${text.substring(0, 40)}...`);
+    return Promise.resolve(result);
+  } catch (err) {
+    console.error('[Offline Translate Error]', err.message);
+    return Promise.reject(new Error('ប្រព័ន្ធបកប្រែ: ' + err.message));
+  }
+}
+
+// Helper: Cache user's latest EN text for en-TTS
+const userTranslationCache = new Map(); // userId -> { enText, khText }
+
+// ── Translate Menu (keyboard button) ──
+bot.hears('🌍 បកប្រែ (Translate EN↔KH)', async (ctx) => {
+  const userId = ctx.from.id.toString();
+  await setUserState(userId, 'awaiting_translate');
+  await ctx.reply(
+    `🌍 *ប្រព័ន្ធបកប្រែ English ↔ ខ្មែរ (Translation System)*\n\n` +
+    `📋 *ស្តង់ដាជាតិ (National Standard)* • ក្រសួងអប់រំ យុវជន និងកីឡា\n\n` +
+    `✅ *បកប្រែបាន៖*\n` +
+    `• ភាសាអង់គ្លេស ➜ ភាសាខ្មែរ (EN → KH)\n` +
+    `• ភាសាខ្មែរ ➜ ភាសាអង់គ្លេស (KH → EN)\n` +
+    `• ចាប់ភាសាដោយស្វ័យប្រវត្តិ (Auto-detect)\n\n` +
+    `🔊 *លក្ខណៈពិសេស (Features)๗*\n` +
+    `• ស្ដាប់ការបញ្ចេញសំឡេង English (Native Pronunciation)\n` +
+    `• ស្ដាប់ភាសាខ្មែរ (Khmer TTS)\n` +
+    `• ចំណាំបច្ចេកទេស (Technical Terms) ត្រូវបានរក្សាទុក\n\n` +
+    `✍️ *សូមវាយអត្ថបទដែលអ្នកចង់បកប្រែ:*\n` +
+    `_(ភាសាអង់គ្លេស ឬ ភាសាខ្មែរ - ប្រព័ន្ធនឹងកំណត់ដោយស្វ័យប្រវត្តិ)_`,
+    {
+      parse_mode: 'Markdown',
+      reply_markup: Markup.inlineKeyboard([
+        [Markup.button.callback('🔤 EN → ខ្មែរ (English to Khmer)', 'translate_mode_en_to_kh')],
+        [Markup.button.callback('🔡 ខ្មែរ → EN (Khmer to English)', 'translate_mode_kh_to_en')],
+        [Markup.button.callback('🔄 ស្វ័យប្រវត្តិ (Auto-detect)', 'translate_mode_auto')],
+        [Markup.button.callback('❌ បោះបង់ (Cancel)', 'translate_cancel')]
+      ]).reply_markup
+    }
+  );
+});
+
+// ── Listen English keyboard button ──
+bot.hears('🔊 ស្តាប់ English (Listen EN)', async (ctx) => {
+  const userId = ctx.from.id.toString();
+  const isAdmin = SUPER_ADMIN_IDS.includes(userId);
+  const isVIP = isAdmin || (await checkVIP(userId));
+
+  if (!isVIP && !isAdmin) {
+    return ctx.reply(
+      `🔊 *មុខងារស្តាប់ English (Listen EN) សម្រាប់ VIP ប៉ុណ្ណោះ!* 💎\n\n` +
+      `💡 ស្តាប់ការបញ្ចេញសំឡេងពាក្យ/ឃ្លា English ដោយ Native American Voice\n\n` +
+      `💰 *តម្លៃ: 3$/ខែ | 30$/ឆ្នាំ*`,
+      {
+        parse_mode: 'Markdown',
+        reply_markup: Markup.inlineKeyboard([
+          [Markup.button.callback('💎 Upgrade VIP', 'vip_upgrade')],
+          [Markup.button.callback('🔑 បញ្ចូល License Key', 'enter_license_key')]
+        ]).reply_markup
+      }
+    );
+  }
+
+  await setUserState(userId, 'awaiting_en_tts');
+  await ctx.reply(
+    `🔊 *ស្តាប់ English Pronunciation (Native Voice)*\n\n` +
+    `✍️ សូមវាយពាក្យ ឬឃ្លា English ដែលអ្នកចង់ស្តាប់:\n` +
+    `_(ឧទាហរណ៍: "Good morning", "I am studying English", "The Present Perfect Tense")_`,
+    {
+      parse_mode: 'Markdown',
+      reply_markup: Markup.inlineKeyboard([
+        [Markup.button.callback('❌ បោះបង់', 'translate_cancel')]
+      ]).reply_markup
+    }
+  );
+});
+
+// ── Translate mode selection actions ──
+bot.action('translate_mode_en_to_kh', async (ctx) => {
+  await ctx.answerCbQuery();
+  const userId = ctx.from.id.toString();
+  await setUserState(userId, 'awaiting_translate_en_to_kh');
+  await ctx.reply('🔤 *English → ខ្មែរ*\n\nសូមវាយ ឬ Paste អត្ថបទ English ដែលអ្នកចង់បកប្រែ:', { parse_mode: 'Markdown' });
+});
+
+bot.action('translate_mode_kh_to_en', async (ctx) => {
+  await ctx.answerCbQuery();
+  const userId = ctx.from.id.toString();
+  await setUserState(userId, 'awaiting_translate_kh_to_en');
+  await ctx.reply('🔡 *ខ្មែរ → English*\n\nសូមវាយ ឬ Paste អត្ថបទខ្មែរ ដែលអ្នកចង់បកប្រែ:', { parse_mode: 'Markdown' });
+});
+
+bot.action('translate_mode_auto', async (ctx) => {
+  await ctx.answerCbQuery();
+  const userId = ctx.from.id.toString();
+  await setUserState(userId, 'awaiting_translate');
+  await ctx.reply('🔄 *Auto-detect Language*\n\nសូមវាយ ឬ Paste អត្ថបទ (English ឬ ខ្មែរ) ដែលអ្នកចង់បកប្រែ:', { parse_mode: 'Markdown' });
+});
+
+bot.action('translate_cancel', async (ctx) => {
+  await ctx.answerCbQuery();
+  const userId = ctx.from.id.toString();
+  await setUserState(userId, 'none');
+  await ctx.reply('❌ បានបោះបង់ការបកប្រែ។');
+});
+
+// ── Translate Lesson Button Actions ──
+bot.action(/translate_lesson_([^-]+)-([^-]+)-(.+)/, async (ctx) => {
+  await ctx.answerCbQuery('🌍 កំពុងបកប្រែ...');
+  const monthId = ctx.match[1];
+  const weekId = ctx.match[2];
+  const lessonId = ctx.match[3];
+  const userId = ctx.from.id.toString();
+
+  const isAdmin = SUPER_ADMIN_IDS.includes(userId);
+  const isVIP = isAdmin || (await checkVIP(userId));
+
+  const monthData = curriculum.months.find(m => m.id === monthId);
+  const weekData = monthData?.weeks.find(w => w.id === weekId);
+  const lessonData = weekData?.lessons.find(l => l.id === lessonId);
+  if (!lessonData) return ctx.reply('❌ រកមិនឃើញមេរៀន!');
+
+  // Show translate options for this lesson
+  await ctx.reply(
+    `🌍 *បកប្រែមេរៀន: ${lessonData.title}*\n\nសូមជ្រើសរើសទិសដៅបកប្រែ:`,
+    {
+      parse_mode: 'Markdown',
+      reply_markup: Markup.inlineKeyboard([
+        [Markup.button.callback('🔤 EN → ខ្មែរ (Translate Lesson)', `tr_lesson_en_kh_${monthId}-${weekId}-${lessonId}`)],
+        [Markup.button.callback('🔡 ខ្មែរ → EN (Key Terms)', `tr_lesson_kh_en_${monthId}-${weekId}-${lessonId}`)],
+        [Markup.button.callback('🔙 ត្រឡប់ក្រោយ', 'back_to_months')]
+      ]).reply_markup
+    }
+  );
+});
+
+bot.action(/tr_lesson_(en_kh|kh_en)_([^-]+)-([^-]+)-(.+)/, async (ctx) => {
+  await ctx.answerCbQuery('⏳ កំពុងបកប្រែ...');
+  const direction = ctx.match[1]; // 'en_kh' or 'kh_en'
+  const monthId = ctx.match[2];
+  const weekId = ctx.match[3];
+  const lessonId = ctx.match[4];
+  const userId = ctx.from.id.toString();
+
+  const isAdmin = SUPER_ADMIN_IDS.includes(userId);
+  const isVIP = isAdmin || (await checkVIP(userId));
+  if (!isVIP && !isAdmin) {
+    return ctx.reply(
+      '🔒 *ការបកប្រែមេរៀនសម្រាប់ VIP ប៉ុណ្ណោះ!*\n\n💰 *3$/ខែ | 30$/ឆ្នាំ*',
+      {
+        parse_mode: 'Markdown',
+        reply_markup: Markup.inlineKeyboard([
+          [Markup.button.callback('💎 Upgrade VIP', 'vip_upgrade')]
+        ]).reply_markup
+      }
+    );
+  }
+
+  const monthData = curriculum.months.find(m => m.id === monthId);
+  const weekData = monthData?.weeks.find(w => w.id === weekId);
+  const lessonData = weekData?.lessons.find(l => l.id === lessonId);
+  if (!lessonData) return ctx.reply('❌ រកមិនឃើញមេរៀន!');
+
+  await ctx.reply('⏳ *AI (ស្តង់ដាជាតិ) កំពុងបកប្រែ... រង់ចាំបន្តិច...*', { parse_mode: 'Markdown' });
+  ctx.sendChatAction('typing');
+
+  try {
+    const dirKey = direction === 'en_kh' ? 'en_to_kh' : 'kh_to_en';
+    // Limit lesson content for translation (first 1000 chars)
+    const textToTranslate = lessonData.content.substring(0, 1000);
+    const result = await translateText(textToTranslate, dirKey);
+
+    const { translated, fromLabel, toLabel } = result;
+    const msgHeader = `🌍 *ការបកប្រែ (${fromLabel} → ${toLabel})*\n📚 *${lessonData.title}*\n\n`;
+    const fullMsg = msgHeader + translated;
+
+    // Cache EN text for TTS
+    if (result.toLang === 'English') {
+      userTranslationCache.set(userId, { enText: translated, khText: textToTranslate });
+      setLatestResponse(userId, translated, 'sorn');
+    } else {
+      userTranslationCache.set(userId, { enText: textToTranslate, khText: translated });
+      setLatestResponse(userId, translated, 'sorn');
+    }
+
+    const buttons = [];
+    if (result.toLang === 'English') {
+      buttons.push([Markup.button.callback('🔊 ស្តាប់ English (Native Voice)', `tts_en_${userId}`)]);
+    } else {
+      buttons.push([Markup.button.callback('🔊 ស្តាប់ខ្មែរ (Khmer Voice)', `tts_${userId}`)]);
+    }
+    buttons.push([Markup.button.callback('🔄 បកប្រែ​ ​ ​ម្ដងទៀត', `translate_lesson_${monthId}-${weekId}-${lessonId}`)]);
+    buttons.push([Markup.button.callback('🔙 ត្រឡប់', 'back_to_months')]);
+
+    const maxLen = 3900;
+    if (fullMsg.length > maxLen) {
+      await ctx.reply(fullMsg.substring(0, maxLen), { parse_mode: 'Markdown' });
+      await ctx.reply(fullMsg.substring(maxLen), {
+        parse_mode: 'Markdown',
+        reply_markup: Markup.inlineKeyboard(buttons).reply_markup
+      });
+    } else {
+      await ctx.reply(fullMsg, {
+        parse_mode: 'Markdown',
+        reply_markup: Markup.inlineKeyboard(buttons).reply_markup
+      });
+    }
+  } catch (err) {
+    console.error('[Translate Lesson Error]', err);
+    ctx.reply('❌ មិនអាចបកប្រែបានទេពេលនេះ។ សូមព្យាយាមម្ដងទៀត!');
+  }
+});
+
+// ── Translate Beginner Lesson Actions ──
+bot.action(/translate_beginner_([^_]+)_(.+)/, async (ctx) => {
+  await ctx.answerCbQuery('🌍 កំពុងបកប្រែ...');
+  const weekId = ctx.match[1];
+  const lessonId = ctx.match[2];
+  const userId = ctx.from.id.toString();
+
+  const allLessons = getAllBeginnerLessons();
+  const item = allLessons.find(i => i.lesson.id === lessonId && i.weekId === weekId);
+  if (!item) return ctx.reply('❌ រកមិនឃើញមេរៀន!');
+
+  await ctx.reply(
+    `🌍 *បកប្រែមេរៀន: ${item.lesson.title}*\n\nជ្រើសរើសទិសដៅ:`,
+    {
+      parse_mode: 'Markdown',
+      reply_markup: Markup.inlineKeyboard([
+        [Markup.button.callback('🔤 EN → ខ្មែរ', `tr_beg_en_kh_${weekId}_${lessonId}`)],
+        [Markup.button.callback('🔡 ខ្មែរ → EN', `tr_beg_kh_en_${weekId}_${lessonId}`)],
+        [Markup.button.callback('🔙 ត្រឡប់', 'beginner_menu')]
+      ]).reply_markup
+    }
+  );
+});
+
+bot.action(/tr_beg_(en_kh|kh_en)_([^_]+)_(.+)/, async (ctx) => {
+  await ctx.answerCbQuery('⏳ កំពុងបកប្រែ...');
+  const direction = ctx.match[1];
+  const weekId = ctx.match[2];
+  const lessonId = ctx.match[3];
+  const userId = ctx.from.id.toString();
+
+  const allLessons = getAllBeginnerLessons();
+  const item = allLessons.find(i => i.lesson.id === lessonId && i.weekId === weekId);
+  if (!item) return ctx.reply('❌ រកមិនឃើញមេរៀន!');
+
+  await ctx.reply('⏳ *AI (ស្តង់ដាជាតិ) កំពុងបកប្រែ...*', { parse_mode: 'Markdown' });
+  ctx.sendChatAction('typing');
+
+  try {
+    const dirKey = direction === 'en_kh' ? 'en_to_kh' : 'kh_to_en';
+    const textToTranslate = item.lesson.content.substring(0, 1000);
+    const result = await translateText(textToTranslate, dirKey);
+
+    const { translated, fromLabel, toLabel } = result;
+    const fullMsg = `🌍 *ការបកប្រែ (${fromLabel} → ${toLabel})*\n📚 *${item.lesson.title}*\n\n${translated}`;
+
+    if (result.toLang === 'English') {
+      setLatestResponse(userId, translated, 'sorn');
+    } else {
+      setLatestResponse(userId, translated, 'piseth');
+    }
+
+    const ttsBtn = result.toLang === 'English'
+      ? Markup.button.callback('🔊 ស្តាប់ English', `tts_en_${userId}`)
+      : Markup.button.callback('🔊 ស្តាប់ខ្មែរ', `tts_${userId}`);
+
+    const maxLen = 3900;
+    if (fullMsg.length > maxLen) {
+      await ctx.reply(fullMsg.substring(0, maxLen), { parse_mode: 'Markdown' });
+      await ctx.reply(fullMsg.substring(maxLen), {
+        parse_mode: 'Markdown',
+        reply_markup: Markup.inlineKeyboard([[ttsBtn], [Markup.button.callback('🔙 ត្រឡប់', 'beginner_menu')]]).reply_markup
+      });
+    } else {
+      await ctx.reply(fullMsg, {
+        parse_mode: 'Markdown',
+        reply_markup: Markup.inlineKeyboard([[ttsBtn], [Markup.button.callback('🔙 ត្រឡប់', 'beginner_menu')]]).reply_markup
+      });
+    }
+  } catch (err) {
+    ctx.reply('❌ មិនអាចបកប្រែបានទេ! សូមព្យាយាមម្ដងទៀត!');
+  }
+});
+
+// ── /translate command (VIP only for arbitrary text) ──
+bot.command(['translate', 'tr'], async (ctx) => {
+  const userId = ctx.from.id.toString();
+  const isAdmin = SUPER_ADMIN_IDS.includes(userId);
+  const isVIP = isAdmin || (await checkVIP(userId));
+
+  const text = ctx.message.text.replace(/^\/(translate|tr)\s*/i, '').trim();
+  
+  if (!text) {
+    await setUserState(userId, 'awaiting_translate');
+    return ctx.reply(
+      '🌍 *ប្រព័ន្ធបកប្រែ (Translation)*\n\nសូមវាយអត្ថបទបន្ទាប់ពី /translate:\n`/translate Good morning`\n`/translate សួស្តី`\n\nឬ ចុចប៊ូតុង 🌍 **បកប្រែ** នៅ menu ខាងក្រោម!',
+      { parse_mode: 'Markdown' }
+    );
+  }
+
+  if (!isVIP && !isAdmin) {
+    return ctx.reply(
+      '🔒 *ការបកប្រែអត្ថបទតាម Command សម្រាប់ VIP ប៉ុណ្ណោះ!*\n\n💡 Free users: ចុច 🌍 **បកប្រែ** ពី menu ខាងក្រោម (ចំពោះពាក្យ/ឃ្លាខ្លីៗ)\n\n💰 *3$/ខែ | 30$/ឆ្នាំ*',
+      {
+        parse_mode: 'Markdown',
+        reply_markup: Markup.inlineKeyboard([[Markup.button.callback('💎 Upgrade VIP', 'vip_upgrade')]]).reply_markup
+      }
+    );
+  }
+
+  await ctx.reply('⏳ *AI (ស្តង់ដាជាតិ) កំពុងបកប្រែ...*', { parse_mode: 'Markdown' });
+  ctx.sendChatAction('typing');
+
+  try {
+    const result = await translateText(text, 'auto');
+    const { translated, fromLabel, toLabel } = result;
+    const fullMsg = `🌍 *ការបកប្រែ (${fromLabel} → ${toLabel})*\n\n*ដើម:* ${text}\n\n*បកប្រែ:*\n${translated}`;
+
+    if (result.toLang === 'English') {
+      setLatestResponse(userId, translated, 'sorn');
+    } else {
+      setLatestResponse(userId, translated, 'sorn');
+    }
+
+    const buttons = [];
+    if (result.toLang === 'English') {
+      buttons.push([Markup.button.callback('🔊 ស្តាប់ English (Native)', `tts_en_${userId}`)]);
+    }
+    buttons.push([Markup.button.callback('🔊 ស្តាប់ (TTS)', `tts_${userId}`)]);
+    buttons.push([Markup.button.callback('🌍 បកប្រែម្ដងទៀត', 'translate_mode_auto')]);
+
+    await ctx.reply(fullMsg, {
+      parse_mode: 'Markdown',
+      reply_markup: Markup.inlineKeyboard(buttons).reply_markup
+    });
+  } catch (err) {
+    ctx.reply('❌ មិនអាចបកប្រែបានទេ! សូមព្យាយាមម្ដងទៀត!');
   }
 });
 
