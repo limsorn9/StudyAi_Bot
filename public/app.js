@@ -617,30 +617,25 @@ function escapeHtml(str) {
 }
 
 function handleProfileNavClick() {
-  console.log('[DEBUG] handleProfileNavClick fired! currentUser=', STATE.currentUser ? STATE.currentUser.id : 'null');
   try {
     if (STATE.currentUser) {
-      console.log('[DEBUG] -> calling openProfileModal()');
       const modal = document.getElementById('profileModal');
       if (!modal) {
-        console.error('[DEBUG] profileModal element NOT FOUND in DOM!');
-        alert('DEBUG: profileModal element missing from DOM. Please report this error.');
+        console.error('[Profile] profileModal element not found in DOM');
         return;
       }
       openProfileModal();
     } else {
-      console.log('[DEBUG] -> calling openLoginModal()');
       const loginModal = document.getElementById('loginModal');
       if (!loginModal) {
-        console.error('[DEBUG] loginModal element NOT FOUND in DOM!');
-        alert('DEBUG: loginModal element missing from DOM. Please report this error.');
+        console.error('[Profile] loginModal element not found in DOM');
         return;
       }
       openLoginModal();
     }
   } catch(err) {
-    console.error('[DEBUG] handleProfileNavClick ERROR:', err);
-    alert('DEBUG ERROR: ' + err.message);
+    console.error('handleProfileNavClick error:', err);
+    showToast('មានបញ្ហាក្នុងការបើក Profile: ' + (err.message || 'សូមព្យាយាមម្តងទៀត'), 'error');
   }
 }
 
@@ -5895,6 +5890,7 @@ function openProfileModal() {
   const uname = u.username ? `@${u.username}` : (u.isTelegram ? `ID: ${u.id}` : '');
   const gmail = u.gmail || 'មិនមាន';
   const isVerified = !!u.gmailVerified;
+  const isTg = (u.isTelegram || u.telegramId) ? '🔗 បានភ្ជាប់ (Linked)' : '❌ មិនទាន់ភ្ជាប់';
   const isSuperAdmin = verifyIsSuperAdmin();
   const isLifetime = !isSuperAdmin && !!(
     u.isLifetime ||
