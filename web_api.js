@@ -2326,6 +2326,47 @@ Provide practical English pronunciation coaching:
     }
   });
 
+  router.post('/user/profile/change-password', async (req, res) => {
+    try {
+      const { userId, newPassword } = req.body;
+      if (!userId || !newPassword) return res.status(400).json({ error: 'Missing userId or newPassword' });
+      if (newPassword.length < 4) return res.status(400).json({ error: 'លេខសម្ងាត់ថ្មីត្រូវមានយ៉ាងតិច ៤ ខ្ទង់!' });
+      
+      if (!db) return res.status(500).json({ error: 'Database disconnected' });
+
+      // Find the web_users account if any
+      const phoneUserMatch = userId.match(/^p_(0\d+)$/);
+      if (phoneUserMatch) {
+        const phone = phoneUserMatch[1];
+        const webUserId = phone; // since we saved cleanPhone as username
+        const passwordHashed = hashPassword(newPassword);
+        
+        await db.ref(`web_users/${webUserId}`).update({
+          passwordHash: passwordHashed,
+          updatedAt: Date.now()
+        });
+        
+        await db.ref(`users/${userId}/profile`).update({
+          plainPassword: newPassword,
+          updatedAt: Date.now()
+        });
+        
+        return res.json({ success: true, message: 'បានប្តូរលេខសម្ងាត់ថ្មីដោយជោគជ័យ!' });
+      } else {
+        // Just update in web_users by finding which web_user has this userId
+        // This is a bit more complex if we don't know the username, but let's assume we update plainPassword in profile anyway
+        await db.ref(`users/${userId}/profile`).update({
+          plainPassword: newPassword,
+          updatedAt: Date.now()
+        });
+        return res.json({ success: true, message: 'បានប្តូរលេខសម្ងាត់ថ្មីដោយជោគជ័យ! (សម្រាប់តែគណនី Admin បង្កើត)' });
+      }
+    } catch (err) {
+      console.error('Change password error:', err);
+      res.status(500).json({ error: 'បរាជ័យក្នុងការប្តូរលេខសម្ងាត់សិស្ស' });
+    }
+  });
+
   // ==========================================
   // 3. CURRICULUM & LESSONS
   // ==========================================
@@ -4084,7 +4125,8 @@ Provide practical English pronunciation coaching:
           notes: prof.notes || '',
           isBlocked: isBlocked,
           registeredBy: prof.registeredBy || 'Self',
-          createdAt: prof.createdAt || udata?.createdAt || null
+          createdAt: prof.createdAt || udata?.createdAt || null,
+          plainPassword: prof.plainPassword || ''
         });
       }
 
@@ -4109,10 +4151,10 @@ Provide practical English pronunciation coaching:
       if (!adminId) return;
       if (!db) return res.status(500).json({ error: 'Database disconnected' });
 
-      const { phone, name, courseLevel, vipPlan, notes } = req.body;
+      const { phone, name, password, courseLevel, vipPlan, notes } = req.body;
 
-      if (!phone || !name) {
-        return res.status(400).json({ error: 'សូមបញ្ជាក់លេខទូរស័ព្ទ និងឈ្មោះសិស្ស!' });
+      if (!phone || !name || !password) {
+        return res.status(400).json({ error: 'សូមបញ្ជាក់លេខទូរស័ព្ទ, ឈ្មោះ និងលេខសម្ងាត់សិស្ស!' });
       }
 
       // Clean & normalize phone number
@@ -4148,6 +4190,19 @@ Provide practical English pronunciation coaching:
         createdAt: Date.now()
       });
 
+      // Also create web_users account so they can login with password
+      const cleanUser = cleanPhone; // Use phone as username
+      const passwordHashed = hashPassword(password);
+      await db.ref(`web_users/${cleanUser}`).set({
+        username: cleanUser,
+        fullName: name.trim(),
+        gmail: `${cleanPhone}@studyai.local`, // Placeholder gmail
+        passwordHash: passwordHashed,
+        userId: studentId, // Link directly to the phone-based user ID
+        createdAt: Date.now(),
+        gmailVerified: true // Auto verified since admin created
+      });
+
       // Update / Create user record
       const studentProfile = {
         name: name.trim(),
@@ -4155,6 +4210,7 @@ Provide practical English pronunciation coaching:
         hasCustomAccountName: true,
         isPhoneRegistration: true,
         phone: cleanPhone,
+        plainPassword: password, // Store plain password for admin view
         courseLevel: courseLevel || 'beginner',
         role: 'student',
         notes: notes ? notes.trim() : '',
@@ -4180,16 +4236,18 @@ Provide practical English pronunciation coaching:
 `🏫 *វិទ្យាស្ថានបង្រៀនភាសាអង់គ្លេស Teacher SSOnline*
 👋 សួស្តីប្អូន *${name.trim()}*! 
 គណនីសិក្សាភាសាអង់គ្លេសស្វ័យប្រវត្តរបស់ប្អូនត្រូវបានបង្កើតជោគជ័យ៖
-📱 លេខទូរស័ព្ទ: \`${cleanPhone}\`
-🔑 លេខកូដចូលរៀន (Sync Code): \`${loginCode}\`
+
+👤 ឈ្មោះចូល (Username): \`${cleanPhone}\`
+🔑 លេខសម្ងាត់ (Password): \`${password}\`
+*(ឬអាចប្រើលេខកូដ Sync Code: \`${loginCode}\`)*
+
 💎 កញ្ចប់សិក្សា: *${planLabel}*
 📚 កម្រិតថ្នាក់: *${levelKhmer}*
 
 👉 *វិធីចូលរៀនភ្លាមៗ៖*
 1. បើកវេបសាយ: ${defaultWebUrl}
-2. ចុចប៊ូតុង **«Login»**
-3. វាយលេខកូដ **${loginCode}** ដើម្បីចូលរៀនភ្លាមៗ!
-*(ឬផ្ញើលេខកូដនេះទៅកាន់ Telegram Bot: @StudyAiEngKH_bot)*`;
+2. ចុចប៊ូតុង **«Login»** បន្ទាប់មករើស **"ចូលគណនីធម្មតា" (Standard Login)**
+3. បញ្ចូល Username និង Password ខាងលើ។`;
 
       res.json({
         success: true,

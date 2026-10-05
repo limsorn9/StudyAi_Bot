@@ -5840,6 +5840,42 @@ function selectPresetAvatar(emoji) {
   showToast(`✨ បានជ្រើសរើសរូបតំណាង ${emoji}`, 'success');
 }
 
+async function handleChangePasswordSubmit() {
+  const pwdInput = document.getElementById('changePasswordInput');
+  const newPassword = pwdInput?.value?.trim();
+  
+  if (!newPassword || newPassword.length < 4) {
+    showToast('⚠️ លេខសម្ងាត់ត្រូវមានយ៉ាងតិច ៤ ខ្ទង់!', 'warning');
+    return;
+  }
+  
+  if (!STATE.currentUser || !STATE.currentUser.id) return;
+  
+  const btn = document.getElementById('btnSubmitChangePassword');
+  if (btn) btn.disabled = true;
+  
+  try {
+    const res = await fetch('/api/user/profile/change-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: STATE.currentUser.id, newPassword })
+    });
+    const data = await res.json();
+    
+    if (data.success) {
+      showToast(data.message || 'បានប្តូរលេខសម្ងាត់ថ្មីដោយជោគជ័យ!', 'success');
+      closeModal('changePasswordModal');
+      if (pwdInput) pwdInput.value = '';
+    } else {
+      showToast(data.error || 'បរាជ័យក្នុងការប្តូរលេខសម្ងាត់សិស្ស', 'error');
+    }
+  } catch (err) {
+    showToast('❌ មានបញ្ហាក្នុងការភ្ជាប់ទៅកាន់ម៉ាស៊ីន', 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
 function openStudentProfileSetupModal(isNew = false) {
   if (!STATE.currentUser) {
     openLoginModal();
@@ -6929,7 +6965,10 @@ function renderAdminStudentsTable(students) {
             </div>
           </div>
         </td>
-        <td>${phoneDisplay}</td>
+        <td>
+          ${phoneDisplay}
+          ${s.plainPassword ? `<div class="text-[11px] text-amber-400 font-mono font-bold mt-1" title="លេខសម្ងាត់សិស្ស">🔑 PWD: ${escapeHtml(s.plainPassword)}</div>` : ''}
+        </td>
         <td>
           <span class="badge-level">${escapeHtml(s.courseLevel || 'beginner')}</span>
         </td>
@@ -6979,6 +7018,7 @@ async function handleAdminCreateStudentByPhone(e) {
 
   const phoneInput = document.getElementById('admNewStudentPhone');
   const nameInput = document.getElementById('admNewStudentName');
+  const passwordInput = document.getElementById('admNewStudentPassword');
   const levelInput = document.getElementById('admNewStudentLevel');
   const planInput = document.getElementById('admNewStudentPlan');
   const notesInput = document.getElementById('admNewStudentNotes');
@@ -6986,12 +7026,18 @@ async function handleAdminCreateStudentByPhone(e) {
 
   const phone = phoneInput?.value?.trim();
   const name = nameInput?.value?.trim();
+  const password = passwordInput?.value?.trim();
   const courseLevel = levelInput?.value || 'beginner';
   const vipPlan = planInput?.value || '1m';
   const notes = notesInput?.value?.trim() || '';
 
-  if (!phone || !name) {
-    showToast('⚠️ សូមបញ្ចូលលេខទូរស័ព្ទ និងឈ្មោះសិស្សឱ្យបានត្រឹមត្រូវ!', 'warning');
+  if (!phone || !name || !password) {
+    showToast('⚠️ សូមបញ្ចូលលេខទូរស័ព្ទ, ឈ្មោះសិស្ស និងលេខសម្ងាត់ឱ្យបានត្រឹមត្រូវ!', 'warning');
+    return;
+  }
+  
+  if (password.length < 4) {
+    showToast('⚠️ លេខសម្ងាត់ត្រូវមានយ៉ាងតិច ៤ ខ្ទង់!', 'warning');
     return;
   }
 
@@ -7005,7 +7051,7 @@ async function handleAdminCreateStudentByPhone(e) {
     const res = await fetch('/api/admin/students/create-by-phone', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ adminId, phone, name, courseLevel, vipPlan, notes })
+      body: JSON.stringify({ adminId, phone, name, password, courseLevel, vipPlan, notes })
     });
 
     const data = await res.json();
@@ -7018,6 +7064,7 @@ async function handleAdminCreateStudentByPhone(e) {
       // Reset form
       if (phoneInput) phoneInput.value = '';
       if (nameInput) nameInput.value = '';
+      if (passwordInput) passwordInput.value = '';
       if (notesInput) notesInput.value = '';
 
       // Reload directory & overview

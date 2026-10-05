@@ -1310,6 +1310,13 @@
                     <input type="text" id="admNewStudentName" class="form-input text-base font-semibold" placeholder="ឧទាហរណ៍៖ Chantha Sok ឬ សុខ ចាន់ថា" required>
                   </div>
                 </div>
+                <div class="form-group mb-3">
+                  <label class="form-label font-bold text-slate-200">
+                    🔑 លេខសម្ងាត់ (Password) <span class="text-red-400">*</span>
+                  </label>
+                  <input type="text" id="admNewStudentPassword" class="form-input text-base font-semibold" placeholder="បញ្ជូលលេខសម្ងាត់យ៉ាងតិច ៤ ខ្ទង់..." required>
+                  <div class="text-[11px] text-slate-400 mt-1">លេខសម្ងាត់សម្រាប់ឱ្យសិស្ស Login (លោកគ្រូអាចមើលឃើញបាន)</div>
+                </div>
 
                 <div class="form-grid-2">
                   <div class="form-group mb-3">
@@ -2220,12 +2227,32 @@
         <button id="profSyncTelegramBtn" class="btn btn-cyan btn-block" onclick="closeModal('profileModal'); startTelegramOneClickLogin();">
           <span>📱 ភ្ជាប់ជាមួយ Telegram Bot (ចុចយល់ព្រមភ្ជាប់)</span>
         </button>
+        <button class="btn btn-outline btn-block font-semibold" onclick="closeModal('profileModal'); openModal('changePasswordModal');">
+          🔑 ប្តូរលេខសម្ងាត់ (Change Password)
+        </button>
         <button class="btn btn-outline btn-block font-semibold" onclick="closeModal('profileModal'); openThemeSelectorModal();">
           🎨 ប្តូររចនាបថ Theme (iOS 18, Android 15, OLED...)
         </button>
         <button class="btn btn-outline-danger btn-block" onclick="handleLogout()">
           🚪 ចាកចេញពីឧបករណ៍នេះ (Logout This Device)
         </button>
+      </div>
+    </div>
+  </div>
+  <!-- CHANGE PASSWORD MODAL -->
+  <div id="changePasswordModal" class="modal-overlay hidden">
+    <div class="modal-card glass-panel max-w-sm">
+      <div class="modal-header">
+        <div class="modal-title">🔑 ប្តូរលេខសម្ងាត់ (Change Password)</div>
+        <button class="modal-close" onclick="closeModal('changePasswordModal')">✕</button>
+      </div>
+      <div class="mt-4">
+        <div class="form-group mb-4">
+          <label class="form-label text-slate-300">លេខសម្ងាត់ថ្មី (New Password)</label>
+          <input type="text" id="changePasswordInput" class="form-input text-lg font-semibold tracking-widest text-center" placeholder="យ៉ាងតិច ៤ ខ្ទង់..." minlength="4">
+        </div>
+        <button id="btnSubmitChangePassword" class="btn btn-primary btn-block" onclick="handleChangePasswordSubmit()">✅ រក្សាទុកលេខសម្ងាត់ថ្មី</button>
+        <button class="btn btn-outline btn-block mt-2" onclick="closeModal('changePasswordModal')">ថយក្រោយ</button>
       </div>
     </div>
   </div>
