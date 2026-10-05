@@ -1156,6 +1156,64 @@ function isLessonFree(monthId, weekId, lessonId) {
   return false;
 }
 
+// Special Course-Based Access Helper:
+// When a student purchases / enrolls in a course, they can study the lessons and take exams forever,
+// even if the subscription expiration date has passed! (Only AI features require active VIP).
+function hasUserCourseAccess(courseType) {
+  if (verifyIsAdmin()) return true;
+  const u = STATE.currentUser;
+  if (!u) return false;
+  if (u.isVIP) return true; // Active VIP has access to all courses
+
+  const enrolled = u.unlockedCourses || {};
+  if (enrolled.all || enrolled.yearly || enrolled.lifetime) return true;
+
+  const plan = (u.plan || u.vipDetails?.plan || '').toLowerCase();
+  const isYearlyOrLifetime = (
+    u.isLifetime ||
+    plan.includes('lifetime') ||
+    plan.includes('មួយជីវិត') ||
+    plan.includes('1 ឆ្នាំ') ||
+    plan.includes('1y') ||
+    plan.includes('year') ||
+    plan.includes('30$') ||
+    plan.includes('ទូទៅ')
+  );
+  if (isYearlyOrLifetime) return true;
+
+  const isSecondary = (
+    plan.includes('6m') ||
+    plan.includes('6 ខែ') ||
+    plan.includes('18$') ||
+    plan.includes('អនុវិទ្យាល័យ')
+  );
+  if (isSecondary) return true;
+
+  const isElem = (
+    plan.includes('3m') ||
+    plan.includes('3 ខែ') ||
+    plan.includes('9$') ||
+    plan.includes('បឋម')
+  );
+  if (isElem && (courseType === 'beginner' || courseType === 'elementary')) return true;
+
+  const isBeg = (
+    plan.includes('1m') ||
+    plan.includes('1 ខែ') ||
+    plan.includes('3$') ||
+    plan.includes('ដំបូង') ||
+    u.plan === 'VIP'
+  );
+  if (isBeg && courseType === 'beginner') return true;
+
+  const userLevel = (u.courseLevel || '').toLowerCase();
+  if (userLevel === 'standard' || userLevel === 'all') return true;
+  if (userLevel === 'elementary' && (courseType === 'beginner' || courseType === 'elementary')) return true;
+  if (userLevel === 'beginner' && courseType === 'beginner') return true;
+
+  return false;
+}
+
 function openVipLessonLockModal(lessonTitle = '', levelName = '') {
   const titleEl = document.getElementById('vipLockLessonTitle');
   if (titleEl) {
@@ -1265,8 +1323,8 @@ function renderBeginnerWeeks() {
 
       const lessonNum = parseInt((l.id || '').replace('bl', ''));
       const isFree = isLessonFree('beginner', w.id, l.id);
-      const isVipUser = !!(STATE.currentUser?.isVIP);
-      const isVipLocked = !isAdmin && !isVipUser && !isFree;
+      const hasAccess = hasUserCourseAccess('beginner');
+      const isVipLocked = !isAdmin && !hasAccess && !isFree;
 
       const isUnlocked = isAdmin || lessonNum <= 1 || passedLessons.has(`bl${lessonNum - 1}`);
       const isLocked = !isUnlocked;
@@ -1513,8 +1571,8 @@ function renderElementaryWeeks() {
       const lessonNum = parseInt((l.id || '').replace('el', ''));
       const isComp = passedLessons.has(l.id) || !!completed[`elementary-${w.id}-${l.id}`] || !!completed[`${currentMonth.id}-${w.id}-${l.id}`];
       const isFree = isLessonFree(currentMonth.id, w.id, l.id);
-      const isVipUser = !!(STATE.currentUser?.isVIP);
-      const isVipLocked = !isAdmin && !isVipUser && !isFree;
+      const hasAccess = hasUserCourseAccess('elementary');
+      const isVipLocked = !isAdmin && !hasAccess && !isFree;
 
       const isUnlocked = isAdmin || lessonNum <= 1 || passedLessons.has(`el${lessonNum - 1}`);
       const isLocked = !isUnlocked;
@@ -1786,7 +1844,8 @@ function renderCurriculumWeeks() {
     const isLocked = !isUnlocked;
 
     const isFree = isLessonFree(l.monthId, l.weekId, l.id);
-    const isVipLocked = !isAdmin && !isVipUser && !isFree;
+    const hasAccess = hasUserCourseAccess('standard');
+    const isVipLocked = !isAdmin && !hasAccess && !isFree;
     const isCurrent = !isComp && isUnlocked && !isVipLocked;
 
     let badgeHTML = '';
@@ -4185,6 +4244,24 @@ async function sendStudioChatMessage() {
     });
 
     const data = await res.json();
+    if (!res.ok || data.isVipRequired) {
+      thinkBubble.innerHTML = `
+        <div class="ai-bubble-header">
+          <span class="ai-bubble-author">${teacherEmoji} ${teacherName}</span>
+          <span class="ai-bubble-badge text-amber-400">🔒 VIP Required</span>
+        </div>
+        <div class="ai-bubble-content p-3.5 bg-amber-500/10 rounded-xl border border-amber-500/30">
+          <div class="font-bold text-amber-300 text-xs mb-1">🔒 សុពលភាព VIP បានផុតកំណត់កាលបរិច្ឆេទ!</div>
+          <div class="text-xs text-slate-300 mb-3 leading-relaxed">
+            💡 <strong>ដំណឹងល្អ៖</strong> អ្នកនៅតែអាចរៀនមេរៀន និងប្រឡងក្នុងវគ្គរបស់អ្នកបានធម្មតាជារៀងរហូត! ប៉ុន្តែដើម្បីបន្តសន្ទនា និងសួរគ្រូ AI សូមបន្តកញ្ចប់ VIP របស់អ្នក (Renew VIP)។
+          </div>
+          <button class="btn btn-gold btn-xs font-bold" onclick="navigateTo('vip')">👑 បន្តកញ្ចប់ VIP (Renew VIP)</button>
+        </div>
+      `;
+      chatBox.scrollTop = chatBox.scrollHeight;
+      return;
+    }
+
     const cleanReply = data.reply || 'សូមអភ័យទោស ខ្ញុំមិនអាចឆ្លើយបានទេ។';
     const provider = data.provider || 'AI';
     const model = data.model ? ` • ${data.model}` : '';

@@ -2649,29 +2649,117 @@ Provide practical English pronunciation coaching:
     return null;
   }
 
+  /**
+   * Helper: Check if student has purchased / unlocked access to a specific course level.
+   * Special Policy: If purchased/enrolled in a course, they can study the lessons and take exams forever,
+   * even if the VIP subscription period is now expired! (Only AI features require active VIP).
+   */
+  async function hasCourseAccess(userId, monthId) {
+    if (!userId) return false;
+    const strId = userId.toString().trim();
+    if (await isUserAdmin(strId)) return true;
+    if (await checkVIPCrossLinked(strId)) return true;
+
+    if (!db) return false;
+    try {
+      const uSnap = await db.ref(`users/${strId}`).once('value');
+      const udata = uSnap.val() || {};
+      const sub = udata.subscription || {};
+      const prof = udata.profile || {};
+      const unlocked = udata.unlocked_courses || {};
+
+      const isBeginner = (monthId === 'beginner' || monthId === 'm0');
+      const isElementary = (monthId === 'elementary' || (typeof monthId === 'string' && monthId.startsWith('em')));
+      const isStandard = (!isBeginner && !isElementary);
+
+      // Direct unlocked courses flags
+      if (unlocked.all || unlocked.yearly || unlocked.lifetime) return true;
+      if (isBeginner && (unlocked.beginner || unlocked.elementary || unlocked.standard || unlocked.secondary)) return true;
+      if (isElementary && (unlocked.elementary || unlocked.standard || unlocked.secondary)) return true;
+      if (isStandard && (unlocked.standard || unlocked.secondary)) return true;
+
+      // Subscription plan purchase history
+      const plan = (sub.plan || '').toLowerCase();
+      const isYearlyOrLifetime = (
+        sub.isLifetime === true ||
+        plan.includes('lifetime') ||
+        plan.includes('មួយជីវិត') ||
+        plan.includes('1 ឆ្នាំ') ||
+        plan.includes('1y') ||
+        plan.includes('year') ||
+        plan.includes('30$') ||
+        plan.includes('ទូទៅ') ||
+        sub.isYearly === true
+      );
+      if (isYearlyOrLifetime) return true;
+
+      const isSecondary = (
+        plan.includes('6m') ||
+        plan.includes('6 ខែ') ||
+        plan.includes('18$') ||
+        plan.includes('អនុវិទ្យាល័យ')
+      );
+      if (isSecondary) return true;
+
+      const isElem = (
+        plan.includes('3m') ||
+        plan.includes('3 ខែ') ||
+        plan.includes('9$') ||
+        plan.includes('បឋម')
+      );
+      if (isElem && (isBeginner || isElementary)) return true;
+
+      const isBeg = (
+        plan.includes('1m') ||
+        plan.includes('1 ខែ') ||
+        plan.includes('3$') ||
+        plan.includes('ដំបូង') ||
+        sub.status === 'paid' ||
+        sub.expiresAt > 0
+      );
+      if (isBeg && isBeginner) return true;
+
+      // Profile courseLevel assigned by teacher/admin
+      const studentLevel = (prof.courseLevel || '').toLowerCase();
+      if (studentLevel === 'standard' || studentLevel === 'all') return true;
+      if (studentLevel === 'elementary' && (isBeginner || isElementary)) return true;
+      if (studentLevel === 'beginner' && isBeginner) return true;
+
+      // Historical purchase in payments_log
+      const pSnap = await db.ref('payments_log').orderByChild('userId').equalTo(strId).limitToLast(10).once('value');
+      const pLogs = pSnap.val();
+      if (pLogs) {
+        for (const log of Object.values(pLogs)) {
+          const lPlan = ((log.durationLabel || '') + ' ' + (log.plan || '')).toLowerCase();
+          if (lPlan.includes('1 ឆ្នាំ') || lPlan.includes('1y') || lPlan.includes('30$') || lPlan.includes('lifetime') || lPlan.includes('ទូទៅ')) return true;
+          if (lPlan.includes('6m') || lPlan.includes('6 ខែ') || lPlan.includes('18$') || lPlan.includes('អនុវិទ្យាល័យ')) return true;
+          if ((lPlan.includes('3m') || lPlan.includes('3 ខែ') || lPlan.includes('9$') || lPlan.includes('បឋម')) && (isBeginner || isElementary)) return true;
+          if ((lPlan.includes('1m') || lPlan.includes('1 ខែ') || lPlan.includes('3$') || lPlan.includes('ដំបូង')) && isBeginner) return true;
+          if (log.daysAdded >= 360) return true;
+          if (log.daysAdded >= 180) return true;
+          if (log.daysAdded >= 90 && (isBeginner || isElementary)) return true;
+          if (log.daysAdded >= 30 && isBeginner) return true;
+        }
+      }
+    } catch (e) {
+      console.error('hasCourseAccess error:', e.message);
+    }
+    return false;
+  }
+
   router.get('/lesson/:monthId/:weekId/:lessonId', async (req, res) => {
     try {
       const { monthId, weekId, lessonId } = req.params;
       const userId = req.query.userId || req.headers['x-user-id'];
 
       // Permission check: First 3 lessons of each course level are free for all.
-      // Lessons 4+ require VIP (or Super Admin).
+      // Lessons 4+ require that student has purchased access to this course (accessible forever!).
       const isFree = isLessonFree(monthId, weekId, lessonId);
       if (!isFree) {
-        let isAuthorized = false;
-        if (userId) {
-          const adminAuth = await isUserAdmin(userId);
-          if (adminAuth) {
-            isAuthorized = true;
-          } else {
-            const vipAuth = await checkVIPCrossLinked(userId);
-            if (vipAuth) isAuthorized = true;
-          }
-        }
-
-        if (!isAuthorized) {
+        const canAccess = await hasCourseAccess(userId, monthId);
+        if (!canAccess) {
           return res.status(403).json({
-            error: '🔒 មេរៀននេះសម្រាប់តែសមាជិក VIP ប៉ុណ្ណោះ! គណនី Free អាចរៀនសាកល្បងឥតគិតថ្លៃបាន ៣ មេរៀនដំបូងនៃកម្រិតនីមួយៗ។ សូមដំឡើង VIP ដើម្បីរៀនបន្តដោយគ្មានដែនកំណត់!',
+            error: '🔒 មេរៀននេះសម្រាប់តែសិស្សដែលបានចុះឈ្មោះវគ្គនេះ ឬសមាជិក VIP ប៉ុណ្ណោះ! គណនី Free អាចរៀនសាកល្បងឥតគិតថ្លៃបាន ៣ មេរៀនដំបូង។ សូមចុះឈ្មោះចូលរៀន ឬដំឡើង VIP ដើម្បីរៀនបន្ត!',
             isVipLocked: true,
             isFree: false,
             monthId,
@@ -2954,10 +3042,10 @@ Provide practical English pronunciation coaching:
         // VIP Check: Lessons 4+ require VIP to take the quiz
         const isFree = isLessonFree(monthId, weekId, lessonId);
         if (!isFree && !callerIsAdmin) {
-          const vipAuth = userId ? await checkVIPCrossLinked(userId) : false;
-          if (!vipAuth) {
+          const canAccess = await hasCourseAccess(userId, monthId);
+          if (!canAccess) {
             return res.status(403).json({
-              error: '🔒 ការប្រឡង Quiz មេរៀននេះ គឺសម្រាប់តែសមាជិក VIP ប៉ុណ្ណោះ! គណនី Free អាចរៀន និងប្រឡងបាន ៣ មេរៀនដំបូងនៃកម្រិតនីមួយៗ។ សូមដំឡើង VIP ដើម្បីចូលប្រឡង!',
+              error: '🔒 ការប្រឡង Quiz មេរៀននេះ គឺសម្រាប់តែសិស្សដែលបានចុះឈ្មោះវគ្គនេះ ឬសមាជិក VIP ប៉ុណ្ណោះ! គណនី Free អាចរៀន និងប្រឡងបាន ៣ មេរៀនដំបូង។ សូមចុះឈ្មោះចូលរៀនដើម្បីប្រឡង!',
               isVipLocked: true
             });
           }
@@ -3664,6 +3752,15 @@ Provide practical English pronunciation coaching:
       const { userId, message, lessonTitle, preferredAI, mode, extraContext, clientHistory, tutor } = req.body;
       if (!message || !message.trim()) {
         return res.status(400).json({ error: 'Missing message parameter' });
+      }
+
+      // AI Guard: Only active, unexpired VIP or Admins can use AI
+      const isVIP = userId ? ((await checkVIPCrossLinked(userId)) || (await isUserAdmin(userId))) : false;
+      if (!isVIP) {
+        return res.status(403).json({
+          error: '🔒 មុខងារសន្ទនាជាមួយគ្រូ AI គឺសម្រាប់តែសមាជិក VIP ដែលមានសុពលភាពប៉ុណ្ណោះ!\n💡 សេចក្តីជូនដំណឹង៖ ទោះបីជាផុតសុពលភាព VIP ក៏លោកអ្នកនៅតែអាចរៀនមេរៀន និងប្រឡងក្នុងវគ្គរបស់អ្នកបានធម្មតា។ ដើម្បីបន្តប្រើប្រាស់គ្រូ AI សូមបន្តកញ្ចប់ VIP របស់អ្នក (Renew VIP)!',
+          isVipRequired: true
+        });
       }
 
       const result = await generateAIAnswer(message.trim(), {
