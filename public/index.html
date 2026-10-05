@@ -1841,6 +1841,8 @@
         <!-- Dynamically injected with English and Khmer prompt boxes and actions -->
       </div>
     </div>
+  </div>
+
   <!-- DICTIONARY & TRANSLATION MODAL -->
   <div id="dictionaryModal" class="modal-overlay hidden">
     <div class="modal-card glass-panel max-w-lg dictionary-modal-card">
@@ -2282,11 +2284,11 @@
   <div id="studentProfileSetupModal" class="modal-overlay hidden">
     <div class="modal-card glass-panel max-w-md">
       <div class="modal-header">
-        <div class="modal-title">🧑‍🎓 ព័ត៌មាន និងរូបថតសិស្ស (Student Profile)</div>
+        <div class="modal-title" id="studentSetupModalTitle">🧑‍🎓 ព័ត៌មាន និងរូបថតសិស្ស (Student Profile)</div>
         <button class="modal-close" onclick="closeModal('studentProfileSetupModal')">✕</button>
       </div>
 
-      <div class="text-xs text-slate-300 mb-3 text-center leading-relaxed p-2.5 bg-slate-800/80 border border-slate-700/60 rounded-xl">
+      <div id="studentSetupModalBanner" class="text-xs text-slate-300 mb-3 text-center leading-relaxed p-2.5 bg-slate-800/80 border border-slate-700/60 rounded-xl">
         🎉 សូមស្វាគមន៍! សូមបំពេញឈ្មោះពេញ និងបញ្ចូលរូបថតរបស់អ្នក ដើម្បីបង្ហាញលើ <strong>វិញ្ញាបនបត្រផ្លូវការ (Certificate)</strong> និងគណនីសិក្សា!
       </div>
 
@@ -2609,6 +2611,11 @@
               <span>បិទ</span>
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- VIP LESSON LOCK PROMPT MODAL -->
   <div id="vipLessonLockModal" class="modal-overlay hidden">
     <div class="modal-card glass-panel max-w-md text-center p-6">
@@ -2701,6 +2708,6 @@
   <!-- Toast Notification Container -->
   <div id="toastContainer" class="toast-container"></div>
 
-  <script src="/app.js?v=2.14_nocache_debug"></script>
+  <script src="/app.js?v=2.15_fix_modal_nesting"></script>
 </body>
 </html>
