@@ -69,16 +69,16 @@
           <span class="theme-icon" id="themeIcon">🎨</span>
         </button>
 
-        <!-- User Profile / Settings Trigger -->
-        <button class="header-action-icon-btn" onclick="handleProfileNavClick()" title="គណនី / ការកំណត់">
-          <span class="action-icon">⚙️</span>
-        </button>
-
-        <!-- User Profile Avatar if logged in -->
-        <div id="userProfileBadge" class="user-badge-mini hidden" onclick="openProfileModal()">
-          <div class="avatar-ring-mini" id="userAvatarRing">
-            <img id="userAvatarImg" class="hidden user-avatar-img" alt="Student Avatar">
-            <span id="userAvatarChar">S</span>
+        <!-- Unified Profile / Settings Button (shows ⚙️ when logged out, avatar when logged in) -->
+        <div id="profileHeaderBtn" class="header-action-icon-btn" onclick="handleProfileNavClick()" title="គណនី / ការកំណត់" style="cursor:pointer; padding:0; overflow:hidden; position:relative;">
+          <!-- Logged out: show gear icon -->
+          <span id="profileGearIcon" class="action-icon">⚙️</span>
+          <!-- Logged in: show avatar (hidden by default) -->
+          <div id="userProfileBadge" class="user-badge-mini hidden" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">
+            <div class="avatar-ring-mini" id="userAvatarRing" style="width:32px;height:32px;">
+              <img id="userAvatarImg" class="hidden user-avatar-img" alt="Student Avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
+              <span id="userAvatarChar">S</span>
+            </div>
           </div>
         </div>
 
@@ -2701,6 +2701,6 @@
   <!-- Toast Notification Container -->
   <div id="toastContainer" class="toast-container"></div>
 
-  <script src="/app.js?v=2.11_force_cache_bust"></script>
+  <script src="/app.js?v=2.12_fix_profile_btn"></script>
 </body>
 </html>

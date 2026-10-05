@@ -278,9 +278,16 @@ function updateUserInterface() {
   const userVipStatusBadge = document.getElementById('userVipStatusBadge');
   const syncBanner = document.getElementById('syncNoticeBanner');
 
+  const profileGearIcon = document.getElementById('profileGearIcon');
+
   if (STATE.currentUser) {
     if (authActions) authActions.style.display = 'none';
-    if (userBadge) userBadge.classList.remove('hidden');
+    // Show avatar, hide gear icon
+    if (userBadge) {
+      userBadge.classList.remove('hidden');
+      userBadge.style.display = 'flex';
+    }
+    if (profileGearIcon) profileGearIcon.style.display = 'none';
 
     const name = STATE.currentUser.name || STATE.currentUser.username || 'Student';
     if (userNameDisplay) userNameDisplay.textContent = name;
@@ -324,7 +331,12 @@ function updateUserInterface() {
     }
   } else {
     if (authActions) authActions.style.display = 'flex';
-    if (userBadge) userBadge.classList.add('hidden');
+    // Hide avatar, show gear icon
+    if (userBadge) {
+      userBadge.classList.add('hidden');
+      userBadge.style.display = 'none';
+    }
+    if (profileGearIcon) profileGearIcon.style.display = '';
     if (syncBanner) syncBanner.style.display = 'flex';
     const heroTgBtn = document.getElementById('heroLinkTelegramBtn');
     if (heroTgBtn) heroTgBtn.style.display = 'inline-flex';
