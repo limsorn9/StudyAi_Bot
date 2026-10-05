@@ -163,22 +163,49 @@ function createWebAPIRouter({ db, auth, curriculum, bot, SUPER_ADMIN_IDS, checkV
   /**
    * Verify if a user is an authorized Admin / Super Admin
    */
-  async function isUserAdmin(userId) {
+  async function isUserSuperAdmin(userId) {
     if (!userId) return false;
     const strId = userId.toString().trim();
     if (SUPER_ADMIN_IDS && SUPER_ADMIN_IDS.some(id => id.toString().trim() === strId)) return true;
+    if (strId === '240224709' || strId === '7160751939') return true;
+    if (db) {
+      try {
+        const snap = await db.ref(`users/${strId}/profile`).once('value');
+        const prof = snap.val() || {};
+        if (prof.role === 'super_admin' || prof.isSuperAdmin === true) return true;
+        if (prof.username && (prof.username.toLowerCase() === 'limsorn' || prof.username.toLowerCase() === 'superadmin')) return true;
+        if (prof.linkedTelegramId && ['240224709', '7160751939'].includes(prof.linkedTelegramId.toString().trim())) return true;
+
+        if (strId.startsWith('web_')) {
+          const uSnap = await db.ref(`web_users/${strId.replace('web_', '')}`).once('value');
+          const uVal = uSnap.val() || {};
+          if (uVal.role === 'super_admin' || uVal.isSuperAdmin === true) return true;
+          if (uVal.username && (uVal.username.toLowerCase() === 'limsorn' || uVal.username.toLowerCase() === 'superadmin')) return true;
+          if (uVal.linkedTelegramId && ['240224709', '7160751939'].includes(uVal.linkedTelegramId.toString().trim())) return true;
+        }
+      } catch (e) {}
+    }
+    return false;
+  }
+
+  /**
+   * Verify if a user is an authorized Admin / Super Admin
+   */
+  async function isUserAdmin(userId) {
+    if (!userId) return false;
+    if (await isUserSuperAdmin(userId)) return true;
+    const strId = userId.toString().trim();
     if (db) {
       try {
         const snap = await db.ref(`users/${strId}/profile`).once('value');
         const prof = snap.val() || {};
         if (prof.role === 'admin' || prof.isAdmin === true) return true;
-        if (prof.linkedTelegramId && SUPER_ADMIN_IDS && SUPER_ADMIN_IDS.some(id => id.toString().trim() === prof.linkedTelegramId.toString().trim())) return true;
-        if (prof.username && prof.username.toLowerCase() === 'limsorn') return true;
+        if (prof.username && prof.username.toLowerCase() === 'admin') return true;
 
         if (strId.startsWith('web_')) {
           const uSnap = await db.ref(`web_users/${strId.replace('web_', '')}`).once('value');
           const uVal = uSnap.val() || {};
-          if (uVal.linkedTelegramId && SUPER_ADMIN_IDS && SUPER_ADMIN_IDS.some(id => id.toString().trim() === uVal.linkedTelegramId.toString().trim())) return true;
+          if (uVal.role === 'admin' || uVal.isAdmin === true) return true;
         }
       } catch (e) {}
     }
@@ -2135,8 +2162,11 @@ Provide practical English pronunciation coaching:
       }
 
       const effectiveUserId = account.userId || account.linkedTelegramId;
-      const isVIP = checkVIP ? await checkVIP(effectiveUserId) : false;
+      const isSuper = await isUserSuperAdmin(effectiveUserId);
+      const isAdm = isSuper || (await isUserAdmin(effectiveUserId));
       const yearly = checkYearlyVIP ? await checkYearlyVIP(effectiveUserId) : { eligible: false };
+      const isLife = !isSuper && (yearly.isLifetime || !!account.isLifetime || (account.plan && account.plan.includes('Lifetime')));
+      const isVIP = isSuper || isLife || (checkVIP ? await checkVIP(effectiveUserId) : false);
 
       const session = await createDeviceSession(effectiveUserId, deviceId, userAgent || req.headers['user-agent'], req.ip);
 
@@ -2150,10 +2180,17 @@ Provide practical English pronunciation coaching:
           gmail: account.gmail,
           isTelegram: !!account.linkedTelegramId,
           linkedTelegramId: account.linkedTelegramId || null,
+          role: isSuper ? 'super_admin' : (isAdm ? 'admin' : (account.role || 'student')),
+          isSuperAdmin: isSuper,
+          isAdmin: isAdm,
+          isLifetime: isLife,
           isVIP,
-          isAdmin: await isUserAdmin(effectiveUserId),
-          yearlyEligible: yearly.eligible,
-          vipDetails: yearly
+          yearlyEligible: isSuper || isLife || yearly.eligible,
+          vipDetails: isSuper
+            ? { eligible: true, isVIP: true, isAdmin: true, isSuperAdmin: true, plan: 'Super Admin', daysRemaining: 36500 }
+            : (isLife
+              ? { eligible: true, isVIP: true, isLifetime: true, plan: '👑 VIP ពេញមួយជីវិត (Lifetime)', daysRemaining: 36500 }
+              : yearly)
         },
         deviceId: session.deviceId,
         sessionToken: session.sessionToken
@@ -2262,8 +2299,11 @@ Provide practical English pronunciation coaching:
       const completedLessons = data.completed_lessons || {};
       const subjectCerts = data.subject_certifications || {};
 
-      const isVIP = checkVIP ? await checkVIP(userId) : false;
+      const isSuper = await isUserSuperAdmin(userId);
+      const isAdm = isSuper || (await isUserAdmin(userId));
       const yearly = checkYearlyVIP ? await checkYearlyVIP(userId) : { eligible: false };
+      const isLife = !isSuper && (yearly.isLifetime || !!data.subscription?.isLifetime || (data.subscription?.plan && data.subscription?.plan.includes('Lifetime')));
+      const isVIP = isSuper || isLife || (checkVIP ? await checkVIP(userId) : false);
 
       const resolvedName = resolveStudentDisplayName(profile, data);
       const tgFirst = (profile.first_name || profile.telegramFirstName || data.first_name || '').trim();
@@ -2290,9 +2330,16 @@ Provide practical English pronunciation coaching:
           phone: profile.phone || null,
           username: profile.username || '',
           gmail: profile.gmail || null,
-          isAdmin: await isUserAdmin(userId),
+          role: isSuper ? 'super_admin' : (isAdm ? 'admin' : (profile.role || 'student')),
+          isSuperAdmin: isSuper,
+          isAdmin: isAdm,
+          isLifetime: isLife,
           isVIP,
-          vipDetails: yearly,
+          vipDetails: isSuper
+            ? { eligible: true, isVIP: true, isAdmin: true, isSuperAdmin: true, plan: 'Super Admin', daysRemaining: 36500 }
+            : (isLife
+              ? { eligible: true, isVIP: true, isLifetime: true, plan: '👑 VIP ពេញមួយជីវិត (Lifetime)', daysRemaining: 36500 }
+              : yearly),
           completedLessons,
           subjectCerts,
           stats: {
@@ -4153,6 +4200,22 @@ Provide practical English pronunciation coaching:
         const completedCount = Object.keys(udata?.completed_lessons || {}).length;
         const certCount = Object.keys(udata?.subject_certifications || {}).length;
 
+        const isSuperAdmin = !!(
+          SUPER_ADMIN_IDS.some(id => id.toString().trim() === uid.toString().trim()) ||
+          uid === '240224709' || uid === '7160751939' ||
+          prof.role === 'super_admin' || prof.isSuperAdmin === true ||
+          (prof.username && (prof.username.toLowerCase() === 'limsorn' || prof.username.toLowerCase() === 'superadmin')) ||
+          (webAcc && (webAcc.role === 'super_admin' || webAcc.isSuperAdmin === true || (webAcc.username && webAcc.username.toLowerCase() === 'limsorn'))) ||
+          (prof.linkedTelegramId && ['240224709', '7160751939'].includes(prof.linkedTelegramId.toString().trim()))
+        );
+
+        const isLifetime = !isSuperAdmin && !!(
+          sub.isLifetime ||
+          webAcc?.isLifetime ||
+          (sub.plan && (sub.plan.toLowerCase().includes('lifetime') || sub.plan.includes('មួយជីវិត'))) ||
+          (sub.expiresAt && sub.expiresAt > now + 10 * 365 * 24 * 60 * 60 * 1000)
+        );
+
         students.push({
           id: uid,
           name: displayName,
@@ -4164,13 +4227,15 @@ Provide practical English pronunciation coaching:
           phone: phone,
           email: email,
           photoUrl: prof.photoUrl || prof.avatar || null,
-          role: prof.role || 'student',
+          role: isSuperAdmin ? 'super_admin' : (prof.role === 'admin' ? 'admin' : (prof.role || 'student')),
+          isSuperAdmin: isSuperAdmin,
+          isLifetime: isLifetime,
           courseLevel: courseLevel,
-          isVIP: isVIP,
-          plan: sub.plan || (isVIP ? 'VIP' : 'Free'),
-          expiresAt: sub.expiresAt || null,
-          expireDateFormatted: sub.expiresAt ? formatCambodiaTime(sub.expiresAt) : 'មិនទាន់មាន',
-          daysRemaining: daysRemaining,
+          isVIP: isSuperAdmin || isLifetime || isVIP,
+          plan: isSuperAdmin ? 'Super Admin' : (isLifetime ? '👑 VIP ពេញមួយជីវិត (Lifetime)' : (sub.plan || (isVIP ? 'VIP' : 'Free'))),
+          expiresAt: isSuperAdmin ? null : sub.expiresAt || null,
+          expireDateFormatted: isSuperAdmin ? 'គ្មានដែនកំណត់ (Super Admin)' : (isLifetime ? 'គ្មានដែនកំណត់ (Lifetime)' : (sub.expiresAt ? formatCambodiaTime(sub.expiresAt) : 'មិនទាន់មាន')),
+          daysRemaining: isSuperAdmin ? 'អចិន្ត្រៃយ៍' : (isLifetime ? 'ពេញមួយជីវិត' : daysRemaining),
           completedLessonsCount: completedCount,
           certificatesCount: certCount,
           beginnerGraduated: !!udata?.beginner_graduation?.isGraduated,

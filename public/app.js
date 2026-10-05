@@ -306,20 +306,41 @@ function updateUserInterface() {
       }
     }
 
-    const isVIP = !!STATE.currentUser.isVIP;
+    const u = STATE.currentUser;
+    const isSuperAdmin = verifyIsSuperAdmin();
+    const isLifetime = !isSuperAdmin && !!(
+      u.isLifetime ||
+      (u.plan && (u.plan.toLowerCase().includes('lifetime') || u.plan.includes('មួយជីវិត'))) ||
+      (u.vipDetails?.plan && (u.vipDetails.plan.toLowerCase().includes('lifetime') || u.vipDetails.plan.includes('មួយជីវិត'))) ||
+      (u.vipDetails?.daysRemaining && u.vipDetails.daysRemaining > 3000)
+    );
+    const isVIP = isSuperAdmin || isLifetime || !!u.isVIP;
+
     if (userVipStatusBadge) {
-      userVipStatusBadge.textContent = isVIP ? '💎 VIP Member' : 'Free Account';
-      userVipStatusBadge.className = `user-tier-badge ${isVIP ? 'vip' : 'free'}`;
+      if (isSuperAdmin) {
+        userVipStatusBadge.textContent = '⚡ Super Admin';
+        userVipStatusBadge.className = 'user-tier-badge vip font-bold bg-gradient-to-r from-red-600 via-purple-600 to-amber-500 text-white';
+      } else if (isLifetime) {
+        userVipStatusBadge.textContent = '👑 VIP Lifetime';
+        userVipStatusBadge.className = 'user-tier-badge vip font-black bg-gradient-to-r from-amber-400 to-yellow-300 text-slate-950';
+      } else {
+        userVipStatusBadge.textContent = isVIP ? '💎 VIP Member' : 'Free Account';
+        userVipStatusBadge.className = `user-tier-badge ${isVIP ? 'vip' : 'free'}`;
+      }
     }
 
     // Dashboard Stats update
     const statPlan = document.getElementById('statVipPlan');
     const statDays = document.getElementById('statVipDays');
-    if (statPlan) statPlan.textContent = isVIP ? 'VIP Member' : 'Free';
+    if (statPlan) {
+      if (isSuperAdmin) statPlan.textContent = '⚡ Super Admin';
+      else if (isLifetime) statPlan.textContent = '👑 VIP Lifetime';
+      else statPlan.textContent = isVIP ? 'VIP Member' : 'Free';
+    }
     if (statDays) {
-      statDays.textContent = isVIP
-        ? `នៅសល់ ${STATE.currentUser.vipDetails?.daysRemaining || 30} ថ្ងៃ`
-        : 'មិនទាន់ជា VIP';
+      if (isSuperAdmin) statDays.textContent = 'គ្មានដែនកំណត់ (Unlimited)';
+      else if (isLifetime) statDays.textContent = 'ពេញមួយជីវិត (Lifetime)';
+      else statDays.textContent = isVIP ? `នៅសល់ ${u.vipDetails?.daysRemaining || 30} ថ្ងៃ` : 'មិនទាន់ជា VIP';
     }
 
     const heroTgBtn = document.getElementById('heroLinkTelegramBtn');
@@ -5693,8 +5714,22 @@ function openProfileModal() {
   const uname = u.username ? `@${u.username}` : (u.isTelegram ? `ID: ${u.id}` : '');
   const gmail = u.gmail || 'មិនមាន';
   const isVerified = !!u.gmailVerified;
-  const isTg = u.isTelegram ? '✅ បានភ្ជាប់ Telegram' : '❌ មិនទាន់ភ្ជាប់ Telegram';
-  const isVip = u.isVIP ? `💎 VIP (${u.vipDetails?.daysRemaining || 30} ថ្ងៃ)` : 'Free Account';
+  const isSuperAdmin = verifyIsSuperAdmin();
+  const isLifetime = !isSuperAdmin && !!(
+    u.isLifetime ||
+    (u.plan && (u.plan.toLowerCase().includes('lifetime') || u.plan.includes('មួយជីវិត'))) ||
+    (u.vipDetails?.plan && (u.vipDetails.plan.toLowerCase().includes('lifetime') || u.vipDetails.plan.includes('មួយជីវិត'))) ||
+    (u.vipDetails?.daysRemaining && u.vipDetails.daysRemaining > 3000)
+  );
+
+  let isVip = 'Free Account';
+  if (isSuperAdmin) {
+    isVip = '⚡ Super Admin (ម្ចាស់ប្រព័ន្ធ / សិទ្ធិពេញលេញ)';
+  } else if (isLifetime) {
+    isVip = '👑 VIP ពេញមួយជីវិត (Lifetime)';
+  } else if (u.isVIP) {
+    isVip = `💎 VIP (${u.vipDetails?.daysRemaining || 30} ថ្ងៃ)`;
+  }
 
   const avatar = document.getElementById('profAvatarText');
   const avatarImg = document.getElementById('profAvatarImg');
@@ -6847,10 +6882,9 @@ function getAdminId() {
   return '';
 }
 
-function verifyIsAdmin() {
+function verifyIsSuperAdmin() {
   if (!STATE.currentUser) return false;
-  if (STATE.currentUser.isAdmin === true) return true;
-  if (STATE.currentUser.role === 'admin') return true;
+  if (STATE.currentUser.isSuperAdmin === true || STATE.currentUser.role === 'super_admin') return true;
 
   const uid = (STATE.currentUser.id || '').toString().trim();
   const tgId = (STATE.currentUser.telegramId || '').toString().trim();
@@ -6862,8 +6896,17 @@ function verifyIsAdmin() {
     SUPER_ADMINS.includes(uid) ||
     SUPER_ADMINS.includes(tgId) ||
     SUPER_ADMINS.includes(linkedTg) ||
-    username === 'limsorn'
+    username === 'limsorn' ||
+    username === 'superadmin'
   );
+}
+
+function verifyIsAdmin() {
+  if (!STATE.currentUser) return false;
+  if (verifyIsSuperAdmin()) return true;
+  if (STATE.currentUser.isAdmin === true) return true;
+  if (STATE.currentUser.role === 'admin') return true;
+  return false;
 }
 
 async function initAdminDashboard() {
@@ -7051,9 +7094,15 @@ function renderAdminStudentsTable(students) {
           <span class="badge-level">${escapeHtml(s.courseLevel || 'beginner')}</span>
         </td>
         <td>
-          ${isVip 
-            ? `<span class="badge-vip">💎 ${escapeHtml(s.plan || 'VIP')} (${s.daysRemaining} ថ្ងៃ)</span><div class="text-[10px] text-slate-400 mt-0.5">ផុត: ${escapeHtml(s.expireDateFormatted)}</div>` 
-            : `<span class="badge-free">⚪ Free</span>`
+          ${s.isSuperAdmin
+            ? `<span class="badge badge-primary bg-gradient-to-r from-red-600 via-purple-600 to-amber-500 text-white font-bold text-[11px] px-2.5 py-1 rounded-full shadow-lg shadow-amber-500/20 inline-flex items-center gap-1">⚡ Super Admin</span><div class="text-[10px] text-amber-300 font-semibold mt-0.5">ម្ចាស់ប្រព័ន្ធ / គ្មានដែនកំណត់</div>`
+            : (s.isLifetime
+              ? `<span class="badge badge-warning bg-gradient-to-r from-amber-400 to-yellow-300 text-slate-950 font-black text-[11px] px-2.5 py-1 rounded-full shadow-md inline-flex items-center gap-1">👑 VIP Lifetime</span><div class="text-[10px] text-amber-300 font-semibold mt-0.5">ពេញមួយជីវិត (អចិន្ត្រៃយ៍)</div>`
+              : (isVip 
+                ? `<span class="badge-vip">💎 ${escapeHtml(s.plan || 'VIP')} (${s.daysRemaining} ថ្ងៃ)</span><div class="text-[10px] text-slate-400 mt-0.5">ផុត: ${escapeHtml(s.expireDateFormatted)}</div>` 
+                : `<span class="badge-free">⚪ Free</span>`
+              )
+            )
           }
         </td>
         <td>

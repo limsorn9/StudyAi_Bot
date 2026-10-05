@@ -215,13 +215,15 @@ const saveHistory = async (userId, role, text) => {
 
 // VIP Checking Logic
 const envAdmins = (process.env.SUPER_ADMIN_IDS || "").split(",").map(id => id.trim()).filter(id => id);
-const SUPER_ADMIN_IDS = [...new Set([...envAdmins, "240224709"])]; // Include user's ID by default
+const SUPER_ADMIN_IDS = [...new Set([...envAdmins, "240224709", "7160751939"])]; // Include user's ID by default
 
 const checkVIP = async (userId) => {
   if (SUPER_ADMIN_IDS.includes(userId.toString())) return true;
-  const snap = await db.ref(`users/${userId}/subscription/expiresAt`).once('value');
-  const expiresAt = snap.val();
-  if (expiresAt && expiresAt > Date.now()) return true;
+  const snap = await db.ref(`users/${userId}/subscription`).once('value');
+  const sub = snap.val();
+  if (!sub) return false;
+  if (sub.isLifetime === true) return true;
+  if (sub.expiresAt && sub.expiresAt > Date.now() && sub.status !== 'revoked') return true;
   return false;
 };
 
@@ -230,18 +232,41 @@ const checkVIP = async (userId) => {
  * Eligible if:
  * 1. Super Admin
  * 2. Has an active yearly subscription (1 year / 12 months)
- * 3. OR has accumulated payments totaling at least 1 year (>= 360 days)
+ * 3. Has lifetime subscription
+ * 4. OR has accumulated payments totaling at least 1 year (>= 360 days)
  */
 const checkYearlyVIP = async (userId) => {
   if (SUPER_ADMIN_IDS.includes(userId.toString())) {
-    return { eligible: true, isVIP: true, isAdmin: true, reason: 'ADMIN', plan: 'Super Admin' };
+    return { eligible: true, isVIP: true, isAdmin: true, isSuperAdmin: true, reason: 'ADMIN', plan: 'Super Admin', daysRemaining: 36500 };
   }
   if (!db) return { eligible: false, isVIP: false, reason: 'NO_DB' };
 
   try {
     const snap = await db.ref(`users/${userId}/subscription`).once('value');
     const sub = snap.val();
-    if (!sub || !sub.expiresAt || sub.expiresAt <= Date.now() || sub.status === 'revoked') {
+    if (!sub || sub.status === 'revoked') {
+      return { eligible: false, isVIP: false, reason: 'NOT_VIP', daysRemaining: 0, plan: 'Free' };
+    }
+
+    // Check Lifetime VIP
+    const isLifetime = !!(
+      sub.isLifetime ||
+      (sub.plan && (sub.plan.toLowerCase().includes('lifetime') || sub.plan.includes('មួយជីវិត'))) ||
+      (sub.expiresAt && sub.expiresAt > Date.now() + 10 * 365 * 24 * 60 * 60 * 1000)
+    );
+
+    if (isLifetime) {
+      return {
+        eligible: true,
+        isVIP: true,
+        isLifetime: true,
+        reason: 'LIFETIME_PLAN',
+        plan: '👑 VIP ពេញមួយជីវិត (Lifetime)',
+        daysRemaining: 36500
+      };
+    }
+
+    if (!sub.expiresAt || sub.expiresAt <= Date.now()) {
       return { eligible: false, isVIP: false, reason: 'NOT_VIP', daysRemaining: 0, plan: 'Free' };
     }
 

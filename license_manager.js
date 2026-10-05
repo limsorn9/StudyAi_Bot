@@ -17,6 +17,23 @@ function parseDuration(input) {
   if (!input) return null;
   const str = input.toString().trim().toLowerCase();
 
+  // Support lifetime
+  if (
+    str === 'lifetime' ||
+    str === 'life' ||
+    str === 'forever' ||
+    str.includes('lifetime') ||
+    str.includes('មួយជីវិត')
+  ) {
+    return {
+      durationStr: 'lifetime',
+      label: '👑 VIP ពេញមួយជីវិត (Lifetime)',
+      days: 36500, // 100 years
+      ms: 36500 * 24 * 60 * 60 * 1000,
+      isLifetime: true
+    };
+  }
+
   if (str.endsWith('m')) {
     const months = parseInt(str.replace('m', ''), 10);
     if (isNaN(months) || months <= 0) return null;
@@ -110,7 +127,7 @@ function formatCambodiaTime(timestamp) {
 async function createLicenseKey(db, adminId, durationInput, note = '') {
   const duration = parseDuration(durationInput);
   if (!duration) {
-    return { success: false, message: '❌ រយៈពេលមិនត្រឹមត្រូវ! ឧទាហរណ៍៖ 1m, 3m, 6m, 1y ឬ 30d' };
+    return { success: false, message: '❌ រយៈពេលមិនត្រឹមត្រូវ! ឧទាហរណ៍៖ 1m, 3m, 6m, 1y, lifetime ឬ 30d' };
   }
 
   const key = generateKeyString();
@@ -120,6 +137,7 @@ async function createLicenseKey(db, adminId, durationInput, note = '') {
     label: duration.label,
     days: duration.days,
     ms: duration.ms,
+    isLifetime: !!duration.isLifetime,
     status: 'active', // active | used | revoked
     createdBy: adminId.toString(),
     createdAt: Date.now(),
@@ -135,6 +153,7 @@ async function createLicenseKey(db, adminId, durationInput, note = '') {
     key: key,
     label: duration.label,
     days: duration.days,
+    isLifetime: !!duration.isLifetime,
     licenseData: licenseData
   };
 }
@@ -203,8 +222,9 @@ async function redeemLicenseKey(db, userId, rawKey) {
   const subSnap = await db.ref(`users/${userId}/subscription`).once('value');
   const currentSub = subSnap.val();
 
+  const isLifetime = !!(license.isLifetime || license.durationStr === 'lifetime');
   let newExpiresAt = Date.now() + license.ms;
-  if (currentSub && currentSub.expiresAt && currentSub.expiresAt > Date.now()) {
+  if (!isLifetime && currentSub && currentSub.expiresAt && currentSub.expiresAt > Date.now()) {
     newExpiresAt = currentSub.expiresAt + license.ms;
   }
 
@@ -218,6 +238,7 @@ async function redeemLicenseKey(db, userId, rawKey) {
   // Update User Subscription
   await db.ref(`users/${userId}/subscription`).update({
     status: 'paid',
+    isLifetime: isLifetime,
     expiresAt: newExpiresAt,
     lastUpdated: Date.now(),
     lastLicenseKey: cleanKey,
@@ -231,16 +252,18 @@ async function redeemLicenseKey(db, userId, rawKey) {
     licenseKey: cleanKey,
     durationLabel: license.label,
     daysAdded: license.days,
+    isLifetime: isLifetime,
     timestamp: Date.now()
   });
 
-  const expireDateFormatted = formatCambodiaTime(newExpiresAt);
+  const expireDateFormatted = isLifetime ? 'គ្មានដែនកំណត់ (Lifetime)' : formatCambodiaTime(newExpiresAt);
 
   return {
     success: true,
     key: cleanKey,
     label: license.label,
     days: license.days,
+    isLifetime: isLifetime,
     expiresAt: newExpiresAt,
     expireDateFormatted: expireDateFormatted
   };
@@ -252,19 +275,21 @@ async function redeemLicenseKey(db, userId, rawKey) {
 async function setDirectLicense(db, adminId, targetUserId, durationInput) {
   const duration = parseDuration(durationInput);
   if (!duration) {
-    return { success: false, message: '❌ រយៈពេលមិនត្រឹមត្រូវ! ឧទាហរណ៍៖ 1m, 3m, 6m, 1y ឬ 30d' };
+    return { success: false, message: '❌ រយៈពេលមិនត្រឹមត្រូវ! ឧទាហរណ៍៖ 1m, 3m, 6m, 1y, lifetime ឬ 30d' };
   }
 
   const subSnap = await db.ref(`users/${targetUserId}/subscription`).once('value');
   const currentSub = subSnap.val();
 
+  const isLifetime = !!duration.isLifetime;
   let newExpiresAt = Date.now() + duration.ms;
-  if (currentSub && currentSub.expiresAt && currentSub.expiresAt > Date.now()) {
+  if (!isLifetime && currentSub && currentSub.expiresAt && currentSub.expiresAt > Date.now()) {
     newExpiresAt = currentSub.expiresAt + duration.ms;
   }
 
   await db.ref(`users/${targetUserId}/subscription`).update({
     status: 'paid',
+    isLifetime: isLifetime,
     expiresAt: newExpiresAt,
     lastUpdated: Date.now(),
     setByAdmin: adminId.toString(),
@@ -277,16 +302,18 @@ async function setDirectLicense(db, adminId, targetUserId, durationInput) {
     action: 'SET_DIRECT_LICENSE',
     durationLabel: duration.label,
     daysAdded: duration.days,
+    isLifetime: isLifetime,
     timestamp: Date.now()
   });
 
-  const expireDateFormatted = formatCambodiaTime(newExpiresAt);
+  const expireDateFormatted = isLifetime ? 'គ្មានដែនកំណត់ (Lifetime)' : formatCambodiaTime(newExpiresAt);
 
   return {
     success: true,
     targetUserId: targetUserId.toString(),
     label: duration.label,
     days: duration.days,
+    isLifetime: isLifetime,
     expiresAt: newExpiresAt,
     expireDateFormatted: expireDateFormatted
   };
@@ -298,6 +325,7 @@ async function setDirectLicense(db, adminId, targetUserId, durationInput) {
 async function revokeUserLicense(db, adminId, targetUserId) {
   await db.ref(`users/${targetUserId}/subscription`).update({
     status: 'revoked',
+    isLifetime: false,
     expiresAt: 0,
     revokedBy: adminId.toString(),
     revokedAt: Date.now()
@@ -320,17 +348,64 @@ async function revokeUserLicense(db, adminId, targetUserId) {
  * Get detailed license status for a user
  */
 async function getUserLicenseInfo(db, userId, superAdminIds = []) {
-  const isSuperAdmin = superAdminIds.includes(userId.toString());
+  const strId = (userId || '').toString().trim();
+  const isHardcodedSuper = (
+    superAdminIds.some(id => id.toString().trim() === strId) ||
+    strId === '240224709' ||
+    strId === '7160751939'
+  );
+
+  let userProfile = null;
+  if (db && strId) {
+    try {
+      const pSnap = await db.ref(`users/${strId}/profile`).once('value');
+      userProfile = pSnap.val();
+      if (!userProfile && strId.startsWith('p_')) {
+        const uSnap = await db.ref(`web_users/${strId.replace('p_', '')}`).once('value');
+        userProfile = uSnap.val();
+      }
+    } catch (e) {}
+  }
+
+  const isSuperAdmin = isHardcodedSuper || (
+    userProfile && (
+      userProfile.role === 'super_admin' ||
+      userProfile.isSuperAdmin === true ||
+      (userProfile.username && (userProfile.username.toLowerCase() === 'limsorn' || userProfile.username.toLowerCase() === 'superadmin')) ||
+      (userProfile.linkedTelegramId && ['240224709', '7160751939'].includes(userProfile.linkedTelegramId.toString()))
+    )
+  );
+
   if (isSuperAdmin) {
     return {
       isVIP: true,
       isAdmin: true,
-      status: 'ADMIN',
-      statusKhmer: '💎 Super Admin (សិទ្ធិពេញលេញ)',
+      isSuperAdmin: true,
+      role: 'super_admin',
+      status: 'SUPER_ADMIN',
+      statusKhmer: '⚡ Super Admin (ម្ចាស់ប្រព័ន្ធ / សិទ្ធិពេញលេញ)',
       expiresAt: null,
       expireDateFormatted: 'គ្មានដែនកំណត់ (Unlimited)',
       daysRemaining: 'អចិន្ត្រៃយ៍',
-      hoursRemaining: null
+      hoursRemaining: null,
+      plan: 'Super Admin'
+    };
+  }
+
+  const hasAdminRole = userProfile && (userProfile.role === 'admin' || userProfile.isAdmin === true);
+  if (hasAdminRole) {
+    return {
+      isVIP: true,
+      isAdmin: true,
+      isSuperAdmin: false,
+      role: 'admin',
+      status: 'ADMIN',
+      statusKhmer: '💎 School Admin (អ្នកគ្រប់គ្រង)',
+      expiresAt: null,
+      expireDateFormatted: 'គ្មានដែនកំណត់ (Admin)',
+      daysRemaining: 'អចិន្ត្រៃយ៍',
+      hoursRemaining: null,
+      plan: 'Admin'
     };
   }
 
@@ -342,12 +417,37 @@ async function getUserLicenseInfo(db, userId, superAdminIds = []) {
     return {
       isVIP: false,
       isAdmin: false,
+      isSuperAdmin: false,
+      isLifetime: false,
       status: wasRevoked ? 'REVOKED' : 'FREE',
       statusKhmer: wasRevoked ? '❌ ត្រូវបានដកហូត' : '⚪ Free Account',
       expiresAt: sub?.expiresAt || null,
       expireDateFormatted: sub?.expiresAt ? formatCambodiaTime(sub.expiresAt) : 'មិនទាន់មាន',
       daysRemaining: 0,
-      hoursRemaining: 0
+      hoursRemaining: 0,
+      plan: 'Free'
+    };
+  }
+
+  const isLifetime = !!(
+    sub.isLifetime ||
+    (sub.plan && (sub.plan.toLowerCase().includes('lifetime') || sub.plan.includes('មួយជីវិត'))) ||
+    sub.expiresAt > Date.now() + 10 * 365 * 24 * 60 * 60 * 1000
+  );
+
+  if (isLifetime) {
+    return {
+      isVIP: true,
+      isAdmin: false,
+      isSuperAdmin: false,
+      isLifetime: true,
+      status: 'LIFETIME',
+      statusKhmer: '👑 VIP ពេញមួយជីវិត (Lifetime)',
+      expiresAt: sub.expiresAt,
+      expireDateFormatted: 'គ្មានដែនកំណត់ (Lifetime)',
+      daysRemaining: 'ពេញមួយជីវិត (Lifetime)',
+      hoursRemaining: null,
+      plan: sub.plan || '👑 VIP ពេញមួយជីវិត (Lifetime)'
     };
   }
 
@@ -358,6 +458,8 @@ async function getUserLicenseInfo(db, userId, superAdminIds = []) {
   return {
     isVIP: true,
     isAdmin: false,
+    isSuperAdmin: false,
+    isLifetime: false,
     status: 'VIP',
     statusKhmer: '💎 VIP Active',
     expiresAt: sub.expiresAt,
