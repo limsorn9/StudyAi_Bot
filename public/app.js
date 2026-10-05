@@ -520,12 +520,29 @@ function escapeHtml(str) {
 
 function handleProfileNavClick() {
   console.log('[DEBUG] handleProfileNavClick fired! currentUser=', STATE.currentUser ? STATE.currentUser.id : 'null');
-  if (STATE.currentUser) {
-    console.log('[DEBUG] -> calling openProfileModal()');
-    openProfileModal();
-  } else {
-    console.log('[DEBUG] -> calling openLoginModal()');
-    openLoginModal();
+  try {
+    if (STATE.currentUser) {
+      console.log('[DEBUG] -> calling openProfileModal()');
+      const modal = document.getElementById('profileModal');
+      if (!modal) {
+        console.error('[DEBUG] profileModal element NOT FOUND in DOM!');
+        alert('DEBUG: profileModal element missing from DOM. Please report this error.');
+        return;
+      }
+      openProfileModal();
+    } else {
+      console.log('[DEBUG] -> calling openLoginModal()');
+      const loginModal = document.getElementById('loginModal');
+      if (!loginModal) {
+        console.error('[DEBUG] loginModal element NOT FOUND in DOM!');
+        alert('DEBUG: loginModal element missing from DOM. Please report this error.');
+        return;
+      }
+      openLoginModal();
+    }
+  } catch(err) {
+    console.error('[DEBUG] handleProfileNavClick ERROR:', err);
+    alert('DEBUG ERROR: ' + err.message);
   }
 }
 
