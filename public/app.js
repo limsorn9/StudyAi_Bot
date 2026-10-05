@@ -519,9 +519,12 @@ function escapeHtml(str) {
 }
 
 function handleProfileNavClick() {
+  console.log('[DEBUG] handleProfileNavClick fired! currentUser=', STATE.currentUser ? STATE.currentUser.id : 'null');
   if (STATE.currentUser) {
+    console.log('[DEBUG] -> calling openProfileModal()');
     openProfileModal();
   } else {
+    console.log('[DEBUG] -> calling openLoginModal()');
     openLoginModal();
   }
 }
@@ -5664,7 +5667,10 @@ function filterVocabCategories(query) {
 }
 
 function openProfileModal() {
+  console.log('[DEBUG] openProfileModal() called. currentUser=', STATE.currentUser ? STATE.currentUser.id : 'null');
   if (!STATE.currentUser) return openLoginModal();
+  const modalEl = document.getElementById('profileModal');
+  console.log('[DEBUG] profileModal element=', modalEl, 'classes=', modalEl ? modalEl.className : 'NOT FOUND');
   const u = STATE.currentUser;
   const name = u.name || u.username || 'Student';
   const uname = u.username ? `@${u.username}` : (u.isTelegram ? `ID: ${u.id}` : '');
