@@ -40,9 +40,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   initTheme();
   initTelegramWebApp();
   initFirebaseClient();
-  loadSavedUserSession();
-  updateUserInterface(); // Ensure UI permissions applied immediately on load
-  initSelectionTTSTooltip(); // Enable click & select pronunciation anywhere on page
+  await loadSavedUserSession(); // FIXED: await so STATE.currentUser is ready before UI update
+  updateUserInterface();
+  initSelectionTTSTooltip();
   await loadCurriculum();
   await loadVerbsData();
   setupEventListeners();
@@ -507,14 +507,10 @@ function escapeHtml(str) {
 }
 
 function handleProfileNavClick() {
-  try {
-    if (STATE.currentUser) {
-      openProfileModal();
-    } else {
-      openLoginModal();
-    }
-  } catch (err) {
-    alert("Error in handleProfileNavClick: " + err.message);
+  if (STATE.currentUser) {
+    openProfileModal();
+  } else {
+    openLoginModal();
   }
 }
 
@@ -5656,81 +5652,72 @@ function filterVocabCategories(query) {
 }
 
 function openProfileModal() {
-  try {
-    if (!STATE.currentUser) return openLoginModal();
-    const u = STATE.currentUser;
-    const name = u.name || u.username || 'Student';
-    const uname = u.username ? `@${u.username}` : (u.isTelegram ? `ID: ${u.id}` : '');
-    const gmail = u.gmail || 'មិនមាន';
-    const isVerified = !!u.gmailVerified;
-    const isTg = u.isTelegram ? '✅ បានភ្ជាប់ Telegram' : '❌ មិនទាន់ភ្ជាប់ Telegram';
-    const isVip = u.isVIP ? `💎 VIP (${u.vipDetails?.daysRemaining || 30} ថ្ងៃ)` : 'Free Account';
+  if (!STATE.currentUser) return openLoginModal();
+  const u = STATE.currentUser;
+  const name = u.name || u.username || 'Student';
+  const uname = u.username ? `@${u.username}` : (u.isTelegram ? `ID: ${u.id}` : '');
+  const gmail = u.gmail || 'មិនមាន';
+  const isVerified = !!u.gmailVerified;
+  const isTg = u.isTelegram ? '✅ បានភ្ជាប់ Telegram' : '❌ មិនទាន់ភ្ជាប់ Telegram';
+  const isVip = u.isVIP ? `💎 VIP (${u.vipDetails?.daysRemaining || 30} ថ្ងៃ)` : 'Free Account';
 
-    const avatar = document.getElementById('profAvatarText');
-    const avatarImg = document.getElementById('profAvatarImg');
-    const nameTxt = document.getElementById('profNameText');
-    const khmerTxt = document.getElementById('profKhmerNameText');
-    const unameTxt = document.getElementById('profUsernameText');
-    const gmailTxt = document.getElementById('profGmailText');
-    const tgTxt = document.getElementById('profTelegramStatus');
-    const vipTxt = document.getElementById('profVipStatus');
-    const fBadge = document.getElementById('profFirebaseStatusBadge');
-    const vBtn = document.getElementById('profVerifyEmailBtn');
+  const avatar = document.getElementById('profAvatarText');
+  const avatarImg = document.getElementById('profAvatarImg');
+  const nameTxt = document.getElementById('profNameText');
+  const khmerTxt = document.getElementById('profKhmerNameText');
+  const unameTxt = document.getElementById('profUsernameText');
+  const gmailTxt = document.getElementById('profGmailText');
+  const tgTxt = document.getElementById('profTelegramStatus');
+  const vipTxt = document.getElementById('profVipStatus');
+  const fBadge = document.getElementById('profFirebaseStatusBadge');
+  const vBtn = document.getElementById('profVerifyEmailBtn');
 
-    // Display student photo if exists
-    if (u.photoUrl && avatarImg) {
-      avatarImg.src = u.photoUrl;
-      avatarImg.classList.remove('hidden');
-      if (avatar) avatar.classList.add('hidden');
-    } else {
-      if (avatarImg) avatarImg.classList.add('hidden');
-      if (avatar) {
-        avatar.classList.remove('hidden');
-        avatar.textContent = name.charAt(0).toUpperCase();
-      }
+  if (u.photoUrl && avatarImg) {
+    avatarImg.src = u.photoUrl;
+    avatarImg.classList.remove('hidden');
+    if (avatar) avatar.classList.add('hidden');
+  } else {
+    if (avatarImg) avatarImg.classList.add('hidden');
+    if (avatar) {
+      avatar.classList.remove('hidden');
+      avatar.textContent = name.charAt(0).toUpperCase();
     }
-
-    if (nameTxt) nameTxt.textContent = name;
-    if (khmerTxt) {
-      if (u.khmerName) {
-        khmerTxt.textContent = `ឈ្មោះខ្មែរ៖ ${u.khmerName}`;
-        khmerTxt.classList.remove('hidden');
-      } else {
-        khmerTxt.textContent = '';
-        khmerTxt.classList.add('hidden');
-      }
-    }
-    if (unameTxt) unameTxt.textContent = uname;
-    if (gmailTxt) gmailTxt.textContent = gmail;
-    if (tgTxt) tgTxt.textContent = isTg;
-    if (vipTxt) vipTxt.textContent = isVip;
-
-    if (fBadge) {
-      if (isVerified) {
-        fBadge.textContent = '✅ Verified (Firebase)';
-        fBadge.className = 'badge-status verified';
-        if (vBtn) vBtn.classList.add('hidden');
-      } else {
-        fBadge.textContent = '⚠️ មិនទាន់ផ្ទៀងផ្ទាត់ (Not Verified)';
-        fBadge.className = 'badge-status unverified';
-        if (vBtn && u.gmail) vBtn.classList.remove('hidden');
-      }
-    }
-
-    const syncTgBtn = document.getElementById('profSyncTelegramBtn');
-    if (syncTgBtn) {
-      if (u.isTelegram) {
-        syncTgBtn.classList.add('hidden');
-      } else {
-        syncTgBtn.classList.remove('hidden');
-      }
-    }
-
-    openModal('profileModal');
-    loadUserDevices();
-  } catch (err) {
-    alert("Error in openProfileModal: " + err.message);
   }
+
+  if (nameTxt) nameTxt.textContent = name;
+  if (khmerTxt) {
+    if (u.khmerName) {
+      khmerTxt.textContent = `ឈ្មោះខ្មែរ៖ ${u.khmerName}`;
+      khmerTxt.classList.remove('hidden');
+    } else {
+      khmerTxt.textContent = '';
+      khmerTxt.classList.add('hidden');
+    }
+  }
+  if (unameTxt) unameTxt.textContent = uname;
+  if (gmailTxt) gmailTxt.textContent = gmail;
+  if (tgTxt) tgTxt.textContent = isTg;
+  if (vipTxt) vipTxt.textContent = isVip;
+
+  if (fBadge) {
+    if (isVerified) {
+      fBadge.textContent = '✅ Verified (Firebase)';
+      fBadge.className = 'badge-status verified';
+      if (vBtn) vBtn.classList.add('hidden');
+    } else {
+      fBadge.textContent = '⚠️ មិនទាន់ផ្ទៀងផ្ទាត់ (Not Verified)';
+      fBadge.className = 'badge-status unverified';
+      if (vBtn && u.gmail) vBtn.classList.remove('hidden');
+    }
+  }
+
+  const syncTgBtn = document.getElementById('profSyncTelegramBtn');
+  if (syncTgBtn) {
+    syncTgBtn.classList.toggle('hidden', !!u.isTelegram);
+  }
+
+  openModal('profileModal');
+  loadUserDevices();
 }
 
 function handleLogout(silent = false) {
@@ -6548,23 +6535,19 @@ async function handleStandardLoginSubmit() {
     });
     
     const data = await res.json();
-    if (data.success) {
-      if (data.sessionToken) {
-        localStorage.setItem('studyai_session_token', data.sessionToken);
-      }
-      STATE.currentUser = data.user;
+    if (data.success && data.user) {
+      // Use setCurrentUser so session is saved to localStorage and UI updates
+      setCurrentUser(data.user, data.sessionToken, deviceId);
       showToast('✅ ចូលគណនីបានជោគជ័យ!', 'success');
       closeModal('loginModal');
-      
-      // Update UI
-      if (typeof updateNavProfileBadge === 'function') updateNavProfileBadge();
-      if (typeof renderProfileData === 'function') renderProfileData();
-      if (typeof refreshUserProfile === 'function') refreshUserProfile();
+      refreshUserProfile();
+      loadBeginnerStatus();
+      loadElementaryStatus();
       
       // Clear inputs
       if (userInput) userInput.value = '';
       if (pwdInput) pwdInput.value = '';
-      togglePasswordLogin(); // hide form again
+      togglePasswordLogin();
     } else {
       showToast(data.error || 'បរាជ័យក្នុងការចូលគណនី!', 'error');
     }
@@ -6574,6 +6557,7 @@ async function handleStandardLoginSubmit() {
     if (btn) btn.disabled = false;
   }
 }
+
 
 // ------------------------------------------
 // TELEGRAM AUTHENTICATION & SYNC
