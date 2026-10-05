@@ -38,6 +38,7 @@ const STATE = {
 
 document.addEventListener('DOMContentLoaded', async () => {
   initTheme();
+  initDeviceMode();
   initTelegramWebApp();
   initFirebaseClient();
   await loadSavedUserSession(); // FIXED: await so STATE.currentUser is ready before UI update
@@ -144,6 +145,82 @@ function updateThemeModalIndicators(activeTheme) {
 
 function toggleNightMode() {
   openThemeSelectorModal();
+}
+
+// ==========================================
+// DEVICE MODE SYSTEM (Phone Mode vs Desktop Mode)
+// ==========================================
+
+function initDeviceMode() {
+  const savedMode = localStorage.getItem('studyai_device_mode');
+  if (savedMode === 'desktop' || savedMode === 'phone') {
+    applyDeviceMode(savedMode, false);
+  } else {
+    // Smart auto-detection: wide screens default to desktop, mobile screens default to phone
+    const autoMode = (window.innerWidth >= 1024) ? 'desktop' : 'phone';
+    applyDeviceMode(autoMode, false);
+  }
+}
+
+function applyDeviceMode(mode, showNotification = false) {
+  const body = document.body;
+  const icon = document.getElementById('deviceModeIcon');
+  const btn = document.getElementById('deviceModeToggleBtn');
+  const badge = document.getElementById('currentDeviceModeBadge');
+  const phoneBtn = document.getElementById('btnSetPhoneMode');
+  const desktopBtn = document.getElementById('btnSetDesktopMode');
+
+  body.classList.remove('mode-phone', 'mode-desktop');
+
+  if (mode === 'desktop') {
+    body.classList.add('mode-desktop');
+    localStorage.setItem('studyai_device_mode', 'desktop');
+
+    if (icon) icon.textContent = '📱';
+    if (btn) {
+      btn.setAttribute('title', 'ប្តូរទៅ Phone Mode (ទម្រង់ទូរសព្ទដៃ)');
+      btn.classList.add('active-desktop');
+    }
+    if (badge) {
+      badge.textContent = '💻 Desktop Mode';
+      badge.className = 'badge-mini text-emerald-400 font-semibold text-xs';
+    }
+    if (phoneBtn) phoneBtn.classList.remove('active');
+    if (desktopBtn) desktopBtn.classList.add('active');
+
+    if (showNotification && typeof showToast === 'function') {
+      showToast('💻 បានប្តូរទៅ Desktop Mode (ទម្រង់កុំព្យូទ័រពេញអេក្រង់)');
+    }
+  } else {
+    body.classList.add('mode-phone');
+    localStorage.setItem('studyai_device_mode', 'phone');
+
+    if (icon) icon.textContent = '💻';
+    if (btn) {
+      btn.setAttribute('title', 'ប្តូរទៅ Desktop Mode (ទម្រង់កុំព្យូទ័រ)');
+      btn.classList.remove('active-desktop');
+    }
+    if (badge) {
+      badge.textContent = '📱 Phone Mode';
+      badge.className = 'badge-mini text-sky-400 font-semibold text-xs';
+    }
+    if (phoneBtn) phoneBtn.classList.add('active');
+    if (desktopBtn) desktopBtn.classList.remove('active');
+
+    if (showNotification && typeof showToast === 'function') {
+      showToast('📱 បានប្តូរទៅ Phone Mode (ទម្រង់ទូរសព្ទដៃស្អាត)');
+    }
+  }
+}
+
+function toggleDeviceMode() {
+  const currentMode = document.body.classList.contains('mode-desktop') ? 'desktop' : 'phone';
+  const newMode = (currentMode === 'desktop') ? 'phone' : 'desktop';
+  applyDeviceMode(newMode, true);
+}
+
+function setDeviceMode(mode) {
+  applyDeviceMode(mode, true);
 }
 
 async function initFirebaseClient() {

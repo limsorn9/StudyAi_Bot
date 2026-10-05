@@ -8814,7 +8814,270 @@ body.day-mode .lesson-locked {
   box-shadow: 0 0 8px rgba(56, 189, 248, 0.2);
 }
 
+/* ==========================================================================
+   DEVICE MODE SYSTEM: PHONE MODE VS DESKTOP MODE
+   ========================================================================== */
 
+/* 1. Common Switcher Controls */
+.device-mode-btn {
+  position: relative;
+  font-size: 16px !important;
+}
 
+.device-mode-btn.active-desktop {
+  border-color: rgba(56, 189, 248, 0.6) !important;
+  background: rgba(56, 189, 248, 0.2) !important;
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.4) !important;
+}
 
+.device-mode-setting-box {
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 12px;
+  margin-bottom: 10px;
+}
 
+.device-mode-pill-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.btn-device-mode {
+  padding: 10px 8px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #94a3b8;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.btn-device-mode:hover {
+  background: rgba(56, 189, 248, 0.12);
+  color: #38bdf8;
+  border-color: rgba(56, 189, 248, 0.35);
+}
+
+.btn-device-mode.active {
+  background: linear-gradient(135deg, rgba(2, 132, 199, 0.35), rgba(37, 99, 235, 0.35));
+  border-color: #38bdf8;
+  color: #ffffff;
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.3);
+}
+
+/* 2. Phone Mode (Centered Smartphone Frame) */
+body.mode-phone .app-container {
+  max-width: 480px !important;
+  margin: 0 auto !important;
+  box-shadow: 0 0 60px rgba(0, 0, 0, 0.85) !important;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+body.mode-phone .main-content {
+  max-width: 100% !important;
+  padding: 12px 14px 95px 14px !important;
+}
+
+body.mode-phone .mobile-bottom-nav {
+  max-width: 520px !important;
+}
+
+/* 3. Desktop Mode (Full-Width Responsive Architecture) */
+body.mode-desktop .app-container {
+  max-width: 1440px !important;
+  width: 100% !important;
+  margin: 0 auto !important;
+  box-shadow: none !important;
+  border-left: 1px solid rgba(255, 255, 255, 0.05);
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+body.mode-desktop .main-content {
+  max-width: 1380px !important;
+  padding: 22px 32px 110px 32px !important;
+}
+
+body.mode-desktop .mobile-app-header {
+  padding: 12px 32px;
+}
+
+body.mode-desktop .header-brand-title {
+  font-size: 19px;
+}
+
+body.mode-desktop .header-brand-sub {
+  font-size: 12.5px;
+}
+
+/* Desktop Hero Card */
+body.mode-desktop .mobile-hero-card {
+  grid-template-columns: 1fr 200px;
+  padding: 28px 36px;
+  border-radius: 28px;
+}
+
+body.mode-desktop .mobile-hero-title {
+  font-size: 26px;
+  margin-bottom: 8px;
+}
+
+body.mode-desktop .mobile-hero-subtitle {
+  font-size: 14px;
+  margin-bottom: 18px;
+}
+
+body.mode-desktop .mobile-hero-actions {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+body.mode-desktop .mobile-hero-actions button {
+  padding: 10px 22px;
+  font-size: 13px;
+}
+
+body.mode-desktop .hero-illustration-frame {
+  width: 180px;
+  height: 180px;
+  border-radius: 24px;
+}
+
+/* Desktop Dashboard Grids */
+body.mode-desktop .dashboard-compact-2x2-grid {
+  grid-template-columns: repeat(4, 1fr) !important;
+  gap: 16px;
+}
+
+body.mode-desktop .dash-stat-compact-card {
+  padding: 18px 16px;
+}
+
+body.mode-desktop .dash-pills-row {
+  grid-template-columns: repeat(4, 1fr) !important;
+  gap: 14px;
+}
+
+body.mode-desktop .dash-action-pill {
+  padding: 12px 18px;
+  font-size: 13px;
+}
+
+/* Desktop Course Categories Carousel */
+body.mode-desktop .categories-carousel-scroll {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+  overflow-x: visible;
+  scroll-snap-type: none;
+}
+
+body.mode-desktop .category-card-item {
+  flex: none;
+  width: 100%;
+}
+
+body.mode-desktop .category-card-thumb {
+  height: 110px;
+}
+
+/* Desktop Course Level Switcher & Weeks */
+body.mode-desktop .course-level-switcher-5 {
+  grid-template-columns: repeat(5, 1fr) !important;
+  gap: 12px;
+}
+
+body.mode-desktop .course-level-btn-pill {
+  padding: 12px 16px;
+  font-size: 13.5px;
+}
+
+body.mode-desktop .beginner-weeks-container,
+body.mode-desktop .elementary-weeks-container,
+body.mode-desktop .curriculum-weeks-container {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)) !important;
+  gap: 18px !important;
+}
+
+body.mode-desktop .week-accordion-card,
+body.mode-desktop .week-card {
+  margin-bottom: 0 !important;
+}
+
+/* Desktop Lesson Layout Side-by-Side */
+body.mode-desktop .lesson-layout {
+  display: grid !important;
+  grid-template-columns: 1fr 380px !important;
+  gap: 24px !important;
+  align-items: start !important;
+}
+
+body.mode-desktop .ai-tutor-card {
+  position: sticky !important;
+  top: 80px !important;
+  height: calc(100vh - 120px) !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+body.mode-desktop .ai-tutor-card .chat-messages {
+  flex: 1 !important;
+  overflow-y: auto !important;
+}
+
+/* Desktop AI Studio Tab */
+body.mode-desktop .ai-studio-container {
+  max-width: 960px;
+  margin: 0 auto;
+  height: calc(100vh - 150px);
+  display: flex;
+  flex-direction: column;
+}
+
+body.mode-desktop .ai-studio-chat-box {
+  flex: 1;
+}
+
+/* Desktop VIP Plans Grid */
+body.mode-desktop .vip-plans-grid {
+  grid-template-columns: repeat(4, 1fr) !important;
+  gap: 20px !important;
+}
+
+/* Desktop Practice Modules & Cards */
+body.mode-desktop .practice-modules-grid,
+body.mode-desktop .vocab-categories-grid,
+body.mode-desktop .grammar-topics-grid,
+body.mode-desktop .dialogue-list-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)) !important;
+  gap: 16px !important;
+}
+
+/* Desktop Bottom Navigation Bar */
+body.mode-desktop .mobile-bottom-nav {
+  max-width: 860px !important;
+  padding: 8px 18px !important;
+  bottom: 18px !important;
+  border-radius: 36px !important;
+}
+
+body.mode-desktop .mobile-bottom-nav .m-nav-item {
+  padding: 6px 14px !important;
+  font-size: 11px !important;
+}
+
+body.mode-desktop .mobile-bottom-nav .m-nav-item .m-icon {
+  font-size: 19px !important;
+}

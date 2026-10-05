@@ -64,6 +64,11 @@
           <span class="action-icon">🔍</span>
         </button>
 
+        <!-- Device Mode Switcher (Phone vs Desktop Mode) -->
+        <button id="deviceModeToggleBtn" class="header-action-icon-btn device-mode-btn" onclick="toggleDeviceMode()" title="ប្តូររវាង Phone Mode និង Desktop Mode">
+          <span id="deviceModeIcon">💻</span>
+        </button>
+
         <!-- Theme Selector (iOS 18, Android 15, OLED, Gold...) -->
         <button id="themeToggleBtn" class="header-action-icon-btn" onclick="openThemeSelectorModal()" title="ប្តូរ Theme & OS Style (iOS 18, Android 15, OLED...)">
           <span class="theme-icon" id="themeIcon">🎨</span>
@@ -2282,6 +2287,22 @@
         <button class="btn btn-outline btn-block font-semibold" onclick="closeModal('profileModal'); openModal('changePasswordModal');">
           🔑 ប្តូរលេខសម្ងាត់ (Change Password)
         </button>
+        <!-- Device Display Mode Selector (Phone Mode vs Desktop Mode) -->
+        <div class="device-mode-setting-box">
+          <div class="flex items-center justify-between mb-1.5">
+            <span class="font-bold text-xs text-slate-300">🖥️ ទម្រង់បង្ហាញ (Display Mode)</span>
+            <span id="currentDeviceModeBadge" class="badge-mini text-sky-400 font-semibold text-xs">📱 Phone Mode</span>
+          </div>
+          <div class="device-mode-pill-group">
+            <button type="button" id="btnSetPhoneMode" class="btn-device-mode active" onclick="setDeviceMode('phone')">
+              <span>📱 Phone Mode</span>
+            </button>
+            <button type="button" id="btnSetDesktopMode" class="btn-device-mode" onclick="setDeviceMode('desktop')">
+              <span>💻 Desktop Mode</span>
+            </button>
+          </div>
+        </div>
+
         <button class="btn btn-outline btn-block font-semibold" onclick="closeModal('profileModal'); openThemeSelectorModal();">
           🎨 ប្តូររចនាបថ Theme (iOS 18, Android 15, OLED...)
         </button>
@@ -2795,6 +2816,6 @@
   <!-- Toast Notification Container -->
   <div id="toastContainer" class="toast-container"></div>
 
-  <script src="/app.js?v=2.18_course_tiered_access"></script>
+  <script src="/app.js?v=2.19_device_mode"></script>
 </body>
 </html>
