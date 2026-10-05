@@ -2310,10 +2310,14 @@ Provide practical English pronunciation coaching:
       const tgLast = (profile.last_name || profile.telegramLastName || data.last_name || '').trim();
       const tgFullName = (profile.telegramFullName || [tgFirst, tgLast].filter(Boolean).join(' ') || '').trim();
 
-      // Calculate total quiz points
+      // Calculate passed lessons and total quiz points
+      let passedLessonsCount = 0;
       let totalQuizScore = 0;
       let totalPossible = 0;
       Object.values(completedLessons).forEach(l => {
+        if (l && (l.isPassed || ['A', 'B', 'C'].includes(l.grade) || (l.percent && l.percent >= 70))) {
+          passedLessonsCount++;
+        }
         totalQuizScore += l.score || 0;
         totalPossible += l.total || 10;
       });
@@ -2343,7 +2347,7 @@ Provide practical English pronunciation coaching:
           completedLessons,
           subjectCerts,
           stats: {
-            completedLessonsCount: Object.keys(completedLessons).length,
+            completedLessonsCount: passedLessonsCount,
             certificatesCount: Object.keys(subjectCerts).length,
             totalScore: totalQuizScore,
             totalPossible

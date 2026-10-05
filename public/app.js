@@ -1233,6 +1233,12 @@ function isLessonFree(monthId, weekId, lessonId) {
   return false;
 }
 
+// Helper: Check if a lesson completion record represents a passing grade (A, B, C or >= 70%)
+function isLessonRecordPassed(record) {
+  if (!record) return false;
+  return !!(record.isPassed || ['A', 'B', 'C'].includes(record.grade) || (record.percent && record.percent >= 70));
+}
+
 // Special Course-Based Access Helper:
 // When a student purchases / enrolls in a course, they can study the lessons and take exams forever,
 // even if the subscription expiration date has passed! (Only AI features require active VIP).
@@ -1371,7 +1377,7 @@ function renderBeginnerWeeks() {
   const weeksHTML = course.weeks.map((w, wIdx) => {
     let filteredLessons = w.lessons.filter(l => {
       const dbKey = `beginner-${w.id}-${l.id}`;
-      const isComp = !!completed[dbKey] || passedLessons.has(l.id);
+      const isComp = passedLessons.has(l.id) || isLessonRecordPassed(completed[dbKey]);
       const lessonNum = parseInt((l.id || '').replace('bl', ''));
       const isUnlocked = isAdmin || lessonNum <= 1 || passedLessons.has(`bl${lessonNum - 1}`);
       const isLocked = !isUnlocked;
@@ -1395,7 +1401,7 @@ function renderBeginnerWeeks() {
 
     const lessonsHTML = filteredLessons.map(l => {
       const dbKey = `beginner-${w.id}-${l.id}`;
-      const isComp = !!completed[dbKey] || passedLessons.has(l.id);
+      const isComp = passedLessons.has(l.id) || isLessonRecordPassed(completed[dbKey]);
       const grade = isComp ? (completed[dbKey]?.grade || 'A') : null;
 
       const lessonNum = parseInt((l.id || '').replace('bl', ''));
@@ -1625,7 +1631,8 @@ function renderElementaryWeeks() {
   const weeksHTML = currentMonth.weeks.map((w, wIdx) => {
     let filteredLessons = w.lessons.filter(l => {
       const lessonNum = parseInt((l.id || '').replace('el', ''));
-      const isComp = passedLessons.has(l.id) || !!completed[`elementary-${w.id}-${l.id}`] || !!completed[`${currentMonth.id}-${w.id}-${l.id}`];
+      const comp = completed[`elementary-${w.id}-${l.id}`] || completed[`${currentMonth.id}-${w.id}-${l.id}`];
+      const isComp = passedLessons.has(l.id) || isLessonRecordPassed(comp);
       const isUnlocked = isAdmin || lessonNum <= 1 || passedLessons.has(`el${lessonNum - 1}`);
       const isLocked = !isUnlocked;
 
@@ -1646,7 +1653,8 @@ function renderElementaryWeeks() {
 
     const lessonsHTML = filteredLessons.map(l => {
       const lessonNum = parseInt((l.id || '').replace('el', ''));
-      const isComp = passedLessons.has(l.id) || !!completed[`elementary-${w.id}-${l.id}`] || !!completed[`${currentMonth.id}-${w.id}-${l.id}`];
+      const comp = completed[`elementary-${w.id}-${l.id}`] || completed[`${currentMonth.id}-${w.id}-${l.id}`];
+      const isComp = passedLessons.has(l.id) || isLessonRecordPassed(comp);
       const isFree = isLessonFree(currentMonth.id, w.id, l.id);
       const hasAccess = hasUserCourseAccess('elementary');
       const isVipLocked = !isAdmin && !hasAccess && !isFree;
@@ -1899,8 +1907,8 @@ function renderCurriculumWeeks() {
 
   // Filter lessons
   let filteredLessons = currentSubject.lessons.filter((l, idx) => {
-    const isComp = !!completed[l.dbKey];
-    const isUnlocked = isAdmin || idx === 0 || !!completed[currentSubject.lessons[idx - 1].dbKey];
+    const isComp = isLessonRecordPassed(completed[l.dbKey]);
+    const isUnlocked = isAdmin || idx === 0 || isLessonRecordPassed(completed[currentSubject.lessons[idx - 1].dbKey]);
     const isLocked = !isUnlocked;
 
     if (filter === 'completed' && !isComp) return false;
@@ -1916,8 +1924,8 @@ function renderCurriculumWeeks() {
 
   const lessonsHTML = filteredLessons.map(l => {
     const idx = currentSubject.lessons.findIndex(x => x.dbKey === l.dbKey);
-    const isComp = !!completed[l.dbKey];
-    const isUnlocked = isAdmin || idx <= 0 || !!completed[currentSubject.lessons[idx - 1].dbKey];
+    const isComp = isLessonRecordPassed(completed[l.dbKey]);
+    const isUnlocked = isAdmin || idx <= 0 || isLessonRecordPassed(completed[currentSubject.lessons[idx - 1].dbKey]);
     const isLocked = !isUnlocked;
 
     const isFree = isLessonFree(l.monthId, l.weekId, l.id);
@@ -3072,10 +3080,14 @@ async function openLesson(monthId, weekId, lessonId) {
     const compData = STATE.currentUser?.completedLessons?.[key];
     const certBtn = document.getElementById('lessonCertBtn');
 
-    if (compData) {
-      document.getElementById('lessonStatusBadge').textContent = `✅ បានប្រឡងជាប់ - និទ្ទេស ${compData.grade}`;
+    if (compData && isLessonRecordPassed(compData)) {
+      document.getElementById('lessonStatusBadge').textContent = `✅ បានប្រឡងជាប់ - និទ្ទេស ${compData.grade || 'A'}`;
       document.getElementById('lessonStatusBadge').className = 'badge badge-emerald';
       if (certBtn) certBtn.classList.add('hidden'); // Individual lessons do not award certificates
+    } else if (compData) {
+      document.getElementById('lessonStatusBadge').textContent = `❌ មិនទាន់ជាប់ - និទ្ទេស ${compData.grade || 'F'} (សូមប្រឡងឡើងវិញ)`;
+      document.getElementById('lessonStatusBadge').className = 'badge badge-rose';
+      if (certBtn) certBtn.classList.add('hidden');
     } else {
       document.getElementById('lessonStatusBadge').textContent = '📖 មេរៀនធម្មតា';
       document.getElementById('lessonStatusBadge').className = 'badge badge-cyan';
@@ -3247,7 +3259,7 @@ function getLessonNavInfo() {
   if (nextItem && !isAdmin) {
     const prevKey = flat[idx].key;
     const completed = STATE.currentUser?.completedLessons || {};
-    nextLocked = !completed[prevKey];
+    nextLocked = !isLessonRecordPassed(completed[prevKey]);
   }
 
   return {
@@ -4983,12 +4995,19 @@ function showQuizResultModal(result) {
         </button>
       `;
     } else {
-      feedback.innerHTML = `✅ <strong>ប្រឡងជាប់!</strong> ការប្រឡងត្រូវបានកត់ត្រានៅក្នុងប្រវត្តិ។`;
+      feedback.innerHTML = `✅ <strong>អបអរសាទរ! អ្នកបានប្រឡងជាប់មេរៀននេះ!</strong> (និទ្ទេស ${result.grade} • ${result.score}/${result.total} ពិន្ទុ)<br>ការប្រឡងត្រូវបានកត់ត្រា និងបើកដំណើរការមេរៀនបន្ទាប់ដោយស្វ័យប្រវត្ត។`;
       actions.innerHTML = `
-        <button class="btn btn-primary" onclick="closeModal('quizResultModal'); refreshUserProfile();">
-          <span>📚 បន្ត</span>
+        <button class="btn btn-primary" onclick="closeModal('quizResultModal'); goToNextLesson();">
+          <span>មេរៀនបន្ទាប់ ▶</span>
+        </button>
+        <button class="btn btn-glass" onclick="closeModal('quizResultModal'); returnToLessonList();">
+          <span>🔙 ត្រឡប់ទៅបញ្ជីមេរៀន</span>
+        </button>
+        <button class="btn btn-outline" onclick="closeModal('quizResultModal');">
+          <span>📖 អានមេរៀននេះទៀត</span>
         </button>
       `;
+      refreshUserProfile().then(() => updateLessonNavButtons());
     }
   } else {
     gradeCircle.style.background = 'linear-gradient(135deg, #f43f5e, #e11d48)';
@@ -5034,10 +5053,10 @@ function showQuizResultModal(result) {
         </button>
       `;
     } else {
-      feedback.innerHTML = `💪 <strong>ព្យាយាមម្តងទៀតណា៎!</strong> អ្នកទទួលបាន ${result.percent}%។ ដើម្បីទទួលបានវិញ្ញាបនបត្រ អ្នកត្រូវប្រឡងជាប់ចាប់ពី 70% (និទ្ទេស A, B, ឬ C) ឡើងទៅ។`;
+      feedback.innerHTML = `💪 <strong>ព្យាយាមម្តងទៀតណា៎!</strong> អ្នកទទួលបាន ${result.percent}% (និទ្ទេស ${result.grade})។ ដើម្បីជាប់ អ្នកត្រូវឆ្លើយឱ្យត្រូវចាប់ពី 70% (និទ្ទេស A, B, ឬ C) ឡើងទៅ។`;
       actions.innerHTML = `
         <button class="btn btn-primary" onclick="closeModal('quizResultModal'); startCurrentLessonQuiz();">
-          <span>🔄 ប្រឡងម្តងទៀត</span>
+          <span>🔄 ប្រឡងម្តងទៀត (${result.total} សំណួរ)</span>
         </button>
         <button class="btn btn-outline" onclick="closeModal('quizResultModal');">
           <span>📖 អានមេរៀនឡើងវិញ</span>
