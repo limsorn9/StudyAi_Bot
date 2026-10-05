@@ -3192,18 +3192,25 @@ Provide practical English pronunciation coaching:
       const sessionData = {
         rawQuestions: normalizedQuestions,
         createdAt: Date.now(),
-        type,
-        monthId,
-        weekId,
-        lessonId,
-        subjectKey,
-        quizTitle,
+        type: type || 'lesson',
+        monthId: monthId || null,
+        weekId: weekId || null,
+        lessonId: lessonId || null,
+        subjectKey: subjectKey || null,
+        quizTitle: quizTitle || 'Lesson Quiz',
         examMonth: type === 'elementary_exam' ? parseInt(req.query.month || '1') : null
       };
 
       activeQuizSessions.set(sessionId, sessionData);
       if (db) {
-        db.ref(`quiz_sessions/${sessionId}`).set(sessionData).catch(() => {});
+        try {
+          const cleanSessionData = JSON.parse(JSON.stringify(sessionData));
+          db.ref(`quiz_sessions/${sessionId}`).set(cleanSessionData).catch(err => {
+            console.warn('[quiz_sessions sync error]:', err.message);
+          });
+        } catch (dbErr) {
+          console.warn('[quiz_sessions set error]:', dbErr.message);
+        }
       }
 
       res.json({
@@ -3215,7 +3222,7 @@ Provide practical English pronunciation coaching:
       });
     } catch (err) {
       console.error('Quiz start error:', err);
-      res.status(500).json({ error: 'Failed to start quiz' });
+      res.status(500).json({ error: 'បរាជ័យក្នុងការរៀបចំវិញ្ញាសា Quiz: ' + (err.message || 'សូមព្យាយាមម្តងទៀត') });
     }
   });
 
@@ -3425,20 +3432,22 @@ Provide practical English pronunciation coaching:
           } else {
             // Daily Lesson Quiz: Record completion & unlock progression, but NO CERTIFICATE!
             const lessonKey = `${monthId}-${weekId}-${lessonId}`;
-            await db.ref(`users/${userId}/completed_lessons/${lessonKey}`).set({
+            const compRecord = {
               lessonId: lessonKey,
-              lessonTitle: quizTitle,
-              monthId,
-              weekId,
+              lessonTitle: quizTitle || 'Lesson',
+              monthId: monthId || null,
+              weekId: weekId || null,
               studentName: effectiveName,
-              isPassed,
-              grade,
-              score,
-              total,
-              percent,
-              dateStr,
+              isPassed: !!isPassed,
+              grade: grade || 'F',
+              score: score || 0,
+              total: total || 10,
+              percent: percent || 0,
+              dateStr: dateStr || new Date().toLocaleDateString('km-KH'),
               completedAt: Date.now()
-            });
+            };
+            const cleanCompRecord = JSON.parse(JSON.stringify(compRecord));
+            await db.ref(`users/${userId}/completed_lessons/${lessonKey}`).set(cleanCompRecord);
             certId = null;
             certData = null;
           }

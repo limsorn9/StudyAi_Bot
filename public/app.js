@@ -4711,15 +4711,23 @@ async function startCurrentLessonQuiz() {
 
   try {
     showToast('⏳ កំពុងបង្កើតវិញ្ញាសា Quiz...', 'info');
-    const res = await fetch(`/api/quiz/start?type=lesson&monthId=${monthId}&weekId=${weekId}&lessonId=${lessonId}&userId=${STATE.currentUser?.id || ''}`);
+    const m = encodeURIComponent(monthId || '');
+    const w = encodeURIComponent(weekId || '');
+    const l = encodeURIComponent(lessonId || '');
+    const u = encodeURIComponent(STATE.currentUser?.id || '');
+    const res = await fetch(`/api/quiz/start?type=lesson&monthId=${m}&weekId=${w}&lessonId=${l}&userId=${u}`);
     const data = await res.json();
 
     if (!data.success) {
+      if (data.isLocked) {
+        showToast(data.error || '🔒 មេរៀននេះត្រូវបានចាក់សោ សូមប្រឡងជាប់មេរៀនមុនជាមុនសិន!', 'warning', 5000);
+        return;
+      }
       if (data.isVipLocked) {
         openVipLessonLockModal(STATE.currentLesson?.title || 'មេរៀននេះ');
         return;
       }
-      throw new Error(data.error || 'Failed to start quiz');
+      throw new Error(data.error || 'មិនអាចចាប់ផ្តើម Quiz បានទេ សូមព្យាយាមម្តងទៀត!');
     }
 
     launchQuizEngine(data, 'LESSON QUIZ');
