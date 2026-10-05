@@ -2701,6 +2701,35 @@
   <!-- Toast Notification Container -->
   <div id="toastContainer" class="toast-container"></div>
 
-  <script src="/app.js?v=2.7_profile_fix"></script>
+  <script src="/app.js?v=2.8_debug"></script>
+  <script>
+    // === DEBUG SCRIPT (remove after fix) ===
+    window.addEventListener('load', function() {
+      var btn = document.querySelector('.m-nav-item[data-tab="profile"]');
+      var info = [];
+      info.push('Profile button found: ' + (btn ? 'YES' : 'NO'));
+      if (btn) {
+        var rect = btn.getBoundingClientRect();
+        info.push('Button visible: ' + (rect.width > 0 && rect.height > 0 ? 'YES' : 'NO'));
+        var style = window.getComputedStyle(btn);
+        info.push('pointer-events: ' + style.pointerEvents);
+        info.push('z-index: ' + style.zIndex);
+      }
+      info.push('handleProfileNavClick defined: ' + (typeof handleProfileNavClick === 'function' ? 'YES' : 'NO'));
+      info.push('openProfileModal defined: ' + (typeof openProfileModal === 'function' ? 'YES' : 'NO'));
+      info.push('STATE.currentUser: ' + (window.STATE && STATE.currentUser ? JSON.stringify({id: STATE.currentUser.id, name: STATE.currentUser.name}) : 'NULL/undefined'));
+      
+      // Check for overlapping element
+      if (btn) {
+        var rect = btn.getBoundingClientRect();
+        var centerX = rect.left + rect.width/2;
+        var centerY = rect.top + rect.height/2;
+        var topEl = document.elementFromPoint(centerX, centerY);
+        info.push('Element at button center: ' + (topEl ? topEl.tagName + '#' + topEl.id + '.' + topEl.className.substring(0,30) : 'NONE'));
+      }
+      
+      alert('=== DEBUG INFO ===\n' + info.join('\n'));
+    });
+  </script>
 </body>
 </html>
