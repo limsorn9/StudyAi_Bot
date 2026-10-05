@@ -148,8 +148,69 @@ function toggleNightMode() {
 }
 
 // ==========================================
-// DEVICE MODE SYSTEM (Phone Mode vs Desktop Mode)
+// DEVICE MODE & ZOOM SYSTEM (Phone Mode vs Desktop Mode)
 // ==========================================
+
+let currentZoomScale = 1.0;
+
+function updateViewportForDeviceMode(mode) {
+  let meta = document.getElementById('viewportMeta') || document.querySelector('meta[name="viewport"]');
+  if (!meta) {
+    meta = document.createElement('meta');
+    meta.id = 'viewportMeta';
+    meta.name = 'viewport';
+    document.head.appendChild(meta);
+  }
+
+  const isSmallScreen = window.innerWidth < 992 || window.screen.width < 992;
+
+  if (mode === 'desktop') {
+    if (isSmallScreen) {
+      // Simulate real 1200px wide Desktop site on mobile devices with free zoom in/out
+      meta.setAttribute('content', 'width=1200, initial-scale=0.35, minimum-scale=0.2, maximum-scale=5.0, user-scalable=yes');
+    } else {
+      meta.setAttribute('content', 'width=device-width, initial-scale=1.0, minimum-scale=0.2, maximum-scale=5.0, user-scalable=yes');
+    }
+  } else {
+    // Standard phone mode layout with free pinch zoom enabled
+    meta.setAttribute('content', 'width=device-width, initial-scale=1.0, minimum-scale=0.5, maximum-scale=5.0, user-scalable=yes');
+  }
+}
+
+function applyZoom(scale, showToastMsg = false) {
+  currentZoomScale = Math.min(Math.max(scale, 0.6), 2.0);
+  currentZoomScale = Math.round(currentZoomScale * 100) / 100;
+
+  try {
+    document.body.style.zoom = currentZoomScale;
+  } catch (e) {
+    console.warn('[Zoom] CSS zoom not supported:', e);
+  }
+
+  const percentText = Math.round(currentZoomScale * 100) + '%';
+  const badge = document.getElementById('currentZoomBadge');
+  if (badge) badge.textContent = percentText;
+  const floatLabel = document.getElementById('floatZoomLabel');
+  if (floatLabel) floatLabel.textContent = percentText;
+
+  localStorage.setItem('studyai_zoom_level', String(currentZoomScale));
+
+  if (showToastMsg && typeof showToast === 'function') {
+    showToast(`🔍 ទំហំពង្រីក៖ ${percentText}`, 'info', 1500);
+  }
+}
+
+function zoomIn() {
+  applyZoom(currentZoomScale + 0.1, true);
+}
+
+function zoomOut() {
+  applyZoom(currentZoomScale - 0.1, true);
+}
+
+function resetZoom() {
+  applyZoom(1.0, true);
+}
 
 function initDeviceMode() {
   const savedMode = localStorage.getItem('studyai_device_mode');
@@ -160,6 +221,11 @@ function initDeviceMode() {
     const autoMode = (window.innerWidth >= 1024) ? 'desktop' : 'phone';
     applyDeviceMode(autoMode, false);
   }
+
+  const savedZoom = parseFloat(localStorage.getItem('studyai_zoom_level'));
+  if (savedZoom && !isNaN(savedZoom) && savedZoom >= 0.6 && savedZoom <= 2.0) {
+    applyZoom(savedZoom, false);
+  }
 }
 
 function applyDeviceMode(mode, showNotification = false) {
@@ -169,8 +235,10 @@ function applyDeviceMode(mode, showNotification = false) {
   const badge = document.getElementById('currentDeviceModeBadge');
   const phoneBtn = document.getElementById('btnSetPhoneMode');
   const desktopBtn = document.getElementById('btnSetDesktopMode');
+  const zoomFloat = document.getElementById('desktopZoomFloat');
 
   body.classList.remove('mode-phone', 'mode-desktop');
+  updateViewportForDeviceMode(mode);
 
   if (mode === 'desktop') {
     body.classList.add('mode-desktop');
@@ -187,9 +255,10 @@ function applyDeviceMode(mode, showNotification = false) {
     }
     if (phoneBtn) phoneBtn.classList.remove('active');
     if (desktopBtn) desktopBtn.classList.add('active');
+    if (zoomFloat) zoomFloat.classList.remove('hidden');
 
     if (showNotification && typeof showToast === 'function') {
-      showToast('💻 បានប្តូរទៅ Desktop Mode (ទម្រង់កុំព្យូទ័រពេញអេក្រង់)');
+      showToast('💻 បានប្តូរទៅ Desktop Mode (ពេញអេក្រង់ & អាច Zoom In/Out បាន)');
     }
   } else {
     body.classList.add('mode-phone');
@@ -206,9 +275,10 @@ function applyDeviceMode(mode, showNotification = false) {
     }
     if (phoneBtn) phoneBtn.classList.add('active');
     if (desktopBtn) desktopBtn.classList.remove('active');
+    if (zoomFloat) zoomFloat.classList.add('hidden');
 
     if (showNotification && typeof showToast === 'function') {
-      showToast('📱 បានប្តូរទៅ Phone Mode (ទម្រង់ទូរសព្ទដៃស្អាត)');
+      showToast('📱 បានប្តូរទៅ Phone Mode (ទម្រង់ទូរសព្ទដៃ)');
     }
   }
 }

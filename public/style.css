@@ -8875,39 +8875,62 @@ body.day-mode .lesson-locked {
 }
 
 /* 2. Phone Mode (Centered Smartphone Frame) */
+body.mode-phone {
+  min-width: unset !important;
+  width: 100% !important;
+  overflow-x: hidden;
+}
+
 body.mode-phone .app-container {
   max-width: 480px !important;
+  min-width: unset !important;
   margin: 0 auto !important;
   box-shadow: 0 0 60px rgba(0, 0, 0, 0.85) !important;
   border-left: 1px solid rgba(255, 255, 255, 0.08);
   border-right: 1px solid rgba(255, 255, 255, 0.08);
+  overflow-x: hidden;
 }
 
 body.mode-phone .main-content {
   max-width: 100% !important;
+  min-width: unset !important;
   padding: 12px 14px 95px 14px !important;
 }
 
 body.mode-phone .mobile-bottom-nav {
   max-width: 520px !important;
+  min-width: unset !important;
 }
 
-/* 3. Desktop Mode (Full-Width Responsive Architecture) */
+/* 3. Desktop Mode (Full-Width Responsive Architecture & Zoom Support) */
+body.mode-desktop {
+  min-width: 1100px !important;
+  width: 100% !important;
+  overflow-x: auto !important;
+}
+
 body.mode-desktop .app-container {
   max-width: 1440px !important;
+  min-width: 1100px !important;
   width: 100% !important;
   margin: 0 auto !important;
   box-shadow: none !important;
+  overflow-x: visible !important;
   border-left: 1px solid rgba(255, 255, 255, 0.05);
   border-right: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 body.mode-desktop .main-content {
   max-width: 1380px !important;
+  min-width: 1060px !important;
   padding: 22px 32px 110px 32px !important;
+  overflow-x: visible !important;
 }
 
 body.mode-desktop .mobile-app-header {
+  min-width: 1100px !important;
+  max-width: 1440px !important;
+  margin: 0 auto !important;
   padding: 12px 32px;
 }
 
@@ -9080,4 +9103,70 @@ body.mode-desktop .mobile-bottom-nav .m-nav-item {
 
 body.mode-desktop .mobile-bottom-nav .m-nav-item .m-icon {
   font-size: 19px !important;
+}
+
+/* 4. Floating Zoom Widget in Desktop Mode */
+.desktop-zoom-float {
+  position: fixed;
+  bottom: 84px;
+  right: 18px;
+  z-index: 1050;
+  display: flex;
+  align-items: center;
+  background: rgba(15, 23, 42, 0.94);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.8), 0 0 18px rgba(56, 189, 248, 0.25);
+  border-radius: 9999px;
+  padding: 5px 8px;
+  gap: 6px;
+  transition: all 0.25s ease;
+}
+
+.desktop-zoom-float.hidden {
+  display: none !important;
+}
+
+.desktop-zoom-float .zoom-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #f8fafc;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.desktop-zoom-float .zoom-btn:hover {
+  background: rgba(56, 189, 248, 0.28);
+  border-color: #38bdf8;
+  transform: scale(1.12);
+}
+
+.desktop-zoom-float .zoom-btn:active {
+  transform: scale(0.94);
+}
+
+.desktop-zoom-float .zoom-val-btn {
+  padding: 4px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #38bdf8;
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: monospace;
+  transition: all 0.2s;
+}
+
+.desktop-zoom-float .zoom-val-btn:hover {
+  background: rgba(56, 189, 248, 0.2);
+  border-color: #38bdf8;
 }
