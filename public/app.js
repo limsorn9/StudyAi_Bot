@@ -6517,6 +6517,56 @@ function togglePasswordLogin() {
   if (form) form.classList.toggle('hidden');
 }
 
+async function handleStandardLoginSubmit() {
+  const userInput = document.getElementById('loginUsernameInput');
+  const pwdInput = document.getElementById('loginPasswordInput');
+  const username = userInput?.value?.trim();
+  const password = pwdInput?.value?.trim();
+  
+  if (!username || !password) {
+    showToast('⚠️ សូមបញ្ចូល ឈ្មោះគណនី និងលេខសម្ងាត់!', 'warning');
+    return;
+  }
+  
+  const btn = document.getElementById('btnSubmitLogin');
+  if (btn) btn.disabled = true;
+  
+  try {
+    const deviceId = getDeviceId();
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password, deviceId })
+    });
+    
+    const data = await res.json();
+    if (data.success) {
+      if (data.sessionToken) {
+        localStorage.setItem('studyai_session_token', data.sessionToken);
+      }
+      STATE.currentUser = data.user;
+      showToast('✅ ចូលគណនីបានជោគជ័យ!', 'success');
+      closeModal('loginModal');
+      
+      // Update UI
+      if (typeof updateNavProfileBadge === 'function') updateNavProfileBadge();
+      if (typeof renderProfileData === 'function') renderProfileData();
+      if (typeof refreshUserProfile === 'function') refreshUserProfile();
+      
+      // Clear inputs
+      if (userInput) userInput.value = '';
+      if (pwdInput) pwdInput.value = '';
+      togglePasswordLogin(); // hide form again
+    } else {
+      showToast(data.error || 'បរាជ័យក្នុងការចូលគណនី!', 'error');
+    }
+  } catch (err) {
+    showToast('❌ មានបញ្ហាក្នុងការភ្ជាប់ទៅកាន់ម៉ាស៊ីន', 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
 // ------------------------------------------
 // TELEGRAM AUTHENTICATION & SYNC
 // ------------------------------------------

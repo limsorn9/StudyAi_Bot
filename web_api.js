@@ -2097,11 +2097,36 @@ Provide practical English pronunciation coaching:
         return res.status(500).json({ error: 'ប្រព័ន្ធទិន្នន័យមិនទាន់ភ្ជាប់!' });
       }
 
-      const snap = await db.ref(`web_users/${cleanUser}`).once('value');
-      const account = snap.val();
+      const snap = await db.ref('web_users').once('value');
+      const allWebUsers = snap.val() || {};
+      
+      let account = null;
+      let matchedKey = null;
+
+      // Try to find matching user by username, phone (with or without 0 prefix), or ID
+      for (const [key, user] of Object.entries(allWebUsers)) {
+        if (!user) continue;
+        const u = user.username ? user.username.toLowerCase() : '';
+        const fName = user.fullName ? user.fullName.toLowerCase() : '';
+        const uid = user.userId ? user.userId.toLowerCase() : '';
+        
+        // Match cleanUser against username, phone, ID, or fullName
+        if (
+          u === cleanUser || 
+          uid === cleanUser || 
+          uid === `p_${cleanUser}` || 
+          (cleanUser.startsWith('0') && u === cleanUser.substring(1)) || 
+          (!cleanUser.startsWith('0') && u === `0${cleanUser}`) ||
+          fName === cleanUser
+        ) {
+          account = user;
+          matchedKey = key;
+          break;
+        }
+      }
 
       if (!account) {
-        return res.status(401).json({ error: 'មិនមានគណនី Username នេះក្នុងប្រព័ន្ធទេ!' });
+        return res.status(401).json({ error: 'មិនមានគណនី (Username/ID/Phone) នេះក្នុងប្រព័ន្ធទេ!' });
       }
 
       const hashed = hashPassword(password);
@@ -2109,7 +2134,7 @@ Provide practical English pronunciation coaching:
         return res.status(401).json({ error: 'ពាក្យសម្ងាត់ (Password) មិនត្រឹមត្រូវទេ!' });
       }
 
-      const effectiveUserId = account.linkedTelegramId || account.userId;
+      const effectiveUserId = account.userId || account.linkedTelegramId;
       const isVIP = checkVIP ? await checkVIP(effectiveUserId) : false;
       const yearly = checkYearlyVIP ? await checkYearlyVIP(effectiveUserId) : { eligible: false };
 
