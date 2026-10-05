@@ -7044,7 +7044,8 @@ function renderAdminStudentsTable(students) {
         </td>
         <td>
           ${phoneDisplay}
-          ${s.plainPassword ? `<div class="text-[11px] text-amber-400 font-mono font-bold mt-1" title="លេខសម្ងាត់សិស្ស">🔑 PWD: ${escapeHtml(s.plainPassword)}</div>` : ''}
+          <div class="text-[11px] text-sky-300 font-mono mt-0.5" title="ឈ្មោះចូលគណនី (Username/ID)">👤 ${escapeHtml(s.loginUsername || s.username || s.id)}</div>
+          ${s.plainPassword ? `<div class="text-[11px] text-amber-400 font-mono font-bold" title="លេខសម្ងាត់សិស្ស">🔑 ${escapeHtml(s.plainPassword)}</div>` : '<div class="text-[10px] text-slate-500 font-mono" title="លេខសម្ងាត់ត្រូវបាន Encrypted">🔑 [Encrypted]</div>'}
         </td>
         <td>
           <span class="badge-level">${escapeHtml(s.courseLevel || 'beginner')}</span>
@@ -7281,7 +7282,98 @@ function openAdminEditStudentModal(studentId) {
   if (elNotes) elNotes.value = student.notes || '';
   if (elBlocked) elBlocked.checked = !!student.isBlocked;
 
+  // Populate Login Credentials & Password
+  const elLoginUser = document.getElementById('editStudentLoginUsername');
+  const elCurPass = document.getElementById('editStudentCurrentPassword');
+  const elNewPass = document.getElementById('editStudentNewPassword');
+
+  if (elLoginUser) elLoginUser.value = student.loginUsername || student.username || student.phone || student.id;
+  if (elCurPass) elCurPass.value = student.plainPassword || '•••••••• (Encrypted)';
+  if (elNewPass) elNewPass.value = '';
+
   if (modal) modal.classList.remove('hidden');
+}
+
+function copyTextValue(elementId) {
+  const el = document.getElementById(elementId);
+  if (!el || !el.value) return showToast('⚠️ គ្មានព័ត៌មានសម្រាប់ចម្លងឡើយ!', 'warning');
+  navigator.clipboard.writeText(el.value).then(() => {
+    showToast(`📋 បានចម្លង៖ "${el.value}"`, 'success');
+  }).catch(() => {
+    el.select();
+    document.execCommand('copy');
+    showToast(`📋 បានចម្លង៖ "${el.value}"`, 'success');
+  });
+}
+
+function generateRandomPasswordForEdit() {
+  const randomPass = Math.floor(100000 + Math.random() * 900000).toString();
+  const input = document.getElementById('editStudentNewPassword');
+  if (input) {
+    input.value = randomPass;
+    input.focus();
+    showToast(`🎲 បានបង្កើតលេខសម្ងាត់ចៃដន្យ៖ ${randomPass}`, 'info');
+  }
+}
+
+async function handleAdminResetPasswordDirectly() {
+  const studentId = document.getElementById('editStudentId')?.value;
+  const newPassword = document.getElementById('editStudentNewPassword')?.value?.trim();
+  const newUsername = document.getElementById('editStudentLoginUsername')?.value?.trim();
+
+  if (!studentId) return showToast('❌ មិនមានព័ត៌មាន ID សិស្សឡើយ', 'error');
+  if (!newPassword || newPassword.length < 4) {
+    return showToast('❌ សូមបញ្ចូលលេខសម្ងាត់ថ្មីយ៉ាងតិច ៤ ខ្ទង់!', 'error');
+  }
+
+  try {
+    const adminId = getAdminId();
+    const res = await fetch('/api/admin/students/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminId, studentId, newPassword, newUsername })
+    });
+
+    const data = await res.json();
+    if (data.success) {
+      showToast(`⚡ ${data.message}`, 'success', 4000);
+      const curPass = document.getElementById('editStudentCurrentPassword');
+      if (curPass) curPass.value = data.plainPassword;
+      const newPassInput = document.getElementById('editStudentNewPassword');
+      if (newPassInput) newPassInput.value = '';
+      loadAdminStudents();
+    } else {
+      showToast(`❌ បរាជ័យ៖ ${data.error || 'Server error'}`, 'error');
+    }
+  } catch (err) {
+    showToast('❌ មានបញ្ហាក្នុងការតភ្ជាប់', 'error');
+  }
+}
+
+function copyStudentLoginInfoFromModal(btn) {
+  const name = document.getElementById('editStudentName')?.value || document.getElementById('editStudentHeaderName')?.textContent || 'សិស្ស';
+  const username = document.getElementById('editStudentLoginUsername')?.value || '';
+  const currentPass = document.getElementById('editStudentCurrentPassword')?.value || '';
+  const newPass = document.getElementById('editStudentNewPassword')?.value?.trim() || '';
+  const effectivePass = newPass || (currentPass.includes('••') ? 'សូមទាក់ទងអេដមីនដើម្បីកំណត់លេខសម្ងាត់' : currentPass);
+
+  const text = `🎓 ព័ត៌មានគណនីសិក្សា StudyAi Bot (SSOnline):\n` +
+               `👤 ឈ្មោះសិស្ស៖ ${name}\n` +
+               `🔑 ឈ្មោះចូលគណនី (Username/ID): ${username}\n` +
+               `🔒 លេខសម្ងាត់ (Password): ${effectivePass}\n` +
+               `🌐 ចូលរៀនលើវេបសាយ៖ ${window.location.origin}\n` +
+               `👉 ចូលទៅកាន់វេបសាយ រួចចុច "🔑 Login" -> "ចូលគណនីធម្មតា (Standard Login)" រួចបញ្ចូល Username & Password ខាងលើជាការស្រេច!`;
+
+  navigator.clipboard.writeText(text).then(() => {
+    if (btn) {
+      const orig = btn.innerHTML;
+      btn.innerHTML = '<span>✓ បានចម្លង!</span>';
+      setTimeout(() => btn.innerHTML = orig, 2000);
+    }
+    showToast('📋 បានចម្លងព័ត៌មាន Login ពេញលេញរួចរាល់! អាចផ្ញើជូនសិស្សតាម Telegram/SMS ភ្លាមៗ', 'success', 4000);
+  }).catch(() => {
+    showToast('📋 បានចម្លងព័ត៌មាន Login!', 'success');
+  });
 }
 
 async function handleSaveStudentInfoFromModal() {
@@ -7294,13 +7386,15 @@ async function handleSaveStudentInfoFromModal() {
   const courseLevel = document.getElementById('editStudentLevel')?.value;
   const notes = document.getElementById('editStudentNotes')?.value?.trim();
   const isBlocked = !!document.getElementById('editStudentBlockedCheck')?.checked;
+  const loginUsername = document.getElementById('editStudentLoginUsername')?.value?.trim();
+  const newPassword = document.getElementById('editStudentNewPassword')?.value?.trim();
 
   try {
     const adminId = getAdminId();
     const res = await fetch('/api/admin/students/update-info', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ adminId, studentId, name, khmerName, phone, courseLevel, notes, isBlocked })
+      body: JSON.stringify({ adminId, studentId, name, khmerName, phone, courseLevel, notes, isBlocked, loginUsername, newPassword })
     });
 
     const data = await res.json();

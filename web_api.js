@@ -4082,9 +4082,24 @@ Provide practical English pronunciation coaching:
       const statusFilter = (req.query.status || 'all').toLowerCase(); // all | vip | free
       const levelFilter = (req.query.level || 'all').toLowerCase();   // all | beginner | elementary | standard
 
-      const snap = await db.ref('users').once('value');
+      const [snap, webUsersSnap] = await Promise.all([
+        db.ref('users').once('value'),
+        db.ref('web_users').once('value')
+      ]);
       const allUsers = snap.val() || {};
+      const allWebUsers = webUsersSnap.val() || {};
       const now = Date.now();
+
+      // Index web_users by userId, username, phone
+      const webUsersIndex = {};
+      for (const [wKey, wVal] of Object.entries(allWebUsers)) {
+        if (!wVal) continue;
+        const entry = { ...wVal, _key: wKey };
+        if (wVal.userId) webUsersIndex[wVal.userId] = entry;
+        if (wVal.linkedTelegramId) webUsersIndex[wVal.linkedTelegramId.toString()] = entry;
+        if (wVal.username) webUsersIndex[wVal.username.toLowerCase()] = entry;
+        if (wVal.phone) webUsersIndex[wVal.phone] = entry;
+      }
 
       const students = [];
 
@@ -4101,9 +4116,20 @@ Provide practical English pronunciation coaching:
         const accountName = (prof.accountName || prof.khmerName || (displayName !== telegramFullName ? displayName : '')).trim();
 
         const phone = prof.phone || (uid.startsWith('p_') ? uid.replace('p_', '') : '');
-        const email = prof.email || '';
+        const email = prof.email || prof.gmail || '';
         const courseLevel = prof.courseLevel || 'beginner';
         const isBlocked = !!prof.isBlocked;
+
+        // Find web login account
+        const cleanUidPhone = phone ? phone.replace(/[^0-9]/g, '') : '';
+        const webAcc = webUsersIndex[uid] ||
+                       (cleanUidPhone ? webUsersIndex[cleanUidPhone] : null) ||
+                       (cleanUidPhone ? webUsersIndex[`0${cleanUidPhone}`] : null) ||
+                       (prof.username ? webUsersIndex[prof.username.toLowerCase()] : null) ||
+                       null;
+
+        const loginUsername = webAcc?.username || prof.username || (phone || (uid.startsWith('p_') ? uid.replace('p_', '') : uid));
+        const plainPassword = prof.plainPassword || webAcc?.plainPassword || '';
 
         // Apply filters
         if (statusFilter === 'vip' && !isVIP) continue;
@@ -4117,6 +4143,7 @@ Provide practical English pronunciation coaching:
             telegramFullName.toLowerCase().includes(search) ||
             phone.toLowerCase().includes(search) ||
             email.toLowerCase().includes(search) ||
+            loginUsername.toLowerCase().includes(search) ||
             (prof.khmerName || '').toLowerCase().includes(search) ||
             (prof.username || '').toLowerCase().includes(search)
           );
@@ -4132,6 +4159,7 @@ Provide practical English pronunciation coaching:
           accountName: accountName,
           telegramFullName: telegramFullName,
           telegramUsername: prof.username || '',
+          loginUsername: loginUsername,
           khmerName: prof.khmerName || '',
           phone: phone,
           email: email,
@@ -4151,7 +4179,7 @@ Provide practical English pronunciation coaching:
           isBlocked: isBlocked,
           registeredBy: prof.registeredBy || 'Self',
           createdAt: prof.createdAt || udata?.createdAt || null,
-          plainPassword: prof.plainPassword || ''
+          plainPassword: plainPassword
         });
       }
 
@@ -4335,7 +4363,7 @@ Provide practical English pronunciation coaching:
       if (!adminId) return;
       if (!db) return res.status(500).json({ error: 'Database disconnected' });
 
-      const { studentId, name, accountName, khmerName, phone, courseLevel, notes, isBlocked } = req.body;
+      const { studentId, name, accountName, khmerName, phone, courseLevel, notes, isBlocked, newPassword, loginUsername } = req.body;
       if (!studentId) return res.status(400).json({ error: 'Missing studentId' });
 
       const updates = {};
@@ -4350,15 +4378,107 @@ Provide practical English pronunciation coaching:
       if (courseLevel !== undefined) updates.courseLevel = courseLevel;
       if (notes !== undefined) updates.notes = notes.trim();
       if (isBlocked !== undefined) updates.isBlocked = !!isBlocked;
+
+      // Handle Password & Username Update if provided
+      let cleanUser = (loginUsername || '').trim().toLowerCase();
+      if (newPassword && newPassword.trim().length >= 4) {
+        const pass = newPassword.trim();
+        const hashed = hashPassword(pass);
+        updates.plainPassword = pass;
+        updates.passwordHash = hashed;
+
+        const uSnap = await db.ref(`users/${studentId}`).once('value');
+        const prof = uSnap.val()?.profile || {};
+        if (!cleanUser) {
+          cleanUser = (prof.username || prof.phone || (studentId.startsWith('p_') ? studentId.replace('p_', '') : studentId)).trim().toLowerCase();
+        }
+        updates.username = cleanUser;
+
+        // Also update or create in web_users for login
+        await db.ref(`web_users/${cleanUser}`).set({
+          username: cleanUser,
+          fullName: updates.name || prof.name || cleanUser,
+          phone: updates.phone || prof.phone || '',
+          userId: studentId,
+          passwordHash: hashed,
+          plainPassword: pass,
+          lastUpdated: Date.now()
+        });
+      } else if (cleanUser) {
+        updates.username = cleanUser;
+      }
+
       updates.lastUpdated = Date.now();
       updates.updatedBy = adminId.toString();
 
       await db.ref(`users/${studentId}/profile`).update(updates);
 
-      res.json({ success: true, message: 'បានរក្សាទុកព័ត៌មានសិស្សជោគជ័យ!' });
+      res.json({
+        success: true,
+        message: 'បានរក្សាទុកព័ត៌មានសិស្សជោគជ័យ!',
+        plainPassword: updates.plainPassword || undefined,
+        loginUsername: cleanUser || undefined
+      });
     } catch (err) {
       console.error('Admin update student info error:', err);
       res.status(500).json({ error: 'Server error updating student info' });
+    }
+  });
+
+  // 5b. Dedicated Reset / Set Student Password
+  router.post('/admin/students/reset-password', async (req, res) => {
+    try {
+      const adminId = await requireAdminAuth(req, res);
+      if (!adminId) return;
+      if (!db) return res.status(500).json({ error: 'Database disconnected' });
+
+      const { studentId, newPassword, newUsername } = req.body;
+      if (!studentId || !newPassword) {
+        return res.status(400).json({ error: 'Missing studentId or newPassword' });
+      }
+
+      if (newPassword.trim().length < 4) {
+        return res.status(400).json({ error: 'លេខសម្ងាត់ត្រូវមានយ៉ាងតិច ៤ ខ្ទង់!' });
+      }
+
+      const pass = newPassword.trim();
+      const hashed = hashPassword(pass);
+
+      const userSnap = await db.ref(`users/${studentId}`).once('value');
+      const udata = userSnap.val() || {};
+      const prof = udata.profile || {};
+
+      const cleanUser = (newUsername || prof.username || prof.phone || (studentId.startsWith('p_') ? studentId.replace('p_', '') : studentId)).trim().toLowerCase();
+
+      // Update in users/${studentId}/profile
+      await db.ref(`users/${studentId}/profile`).update({
+        plainPassword: pass,
+        passwordHash: hashed,
+        username: cleanUser,
+        passwordResetBy: adminId.toString(),
+        passwordResetAt: Date.now()
+      });
+
+      // Update or create in web_users so student can login immediately
+      await db.ref(`web_users/${cleanUser}`).set({
+        username: cleanUser,
+        fullName: prof.name || prof.accountName || cleanUser,
+        phone: prof.phone || '',
+        userId: studentId,
+        passwordHash: hashed,
+        plainPassword: pass,
+        lastUpdated: Date.now()
+      });
+
+      res.json({
+        success: true,
+        message: `បានកំណត់លេខសម្ងាត់ថ្មីជូនសិស្ស #${cleanUser} ដោយជោគជ័យ!`,
+        username: cleanUser,
+        plainPassword: pass
+      });
+    } catch (err) {
+      console.error('Admin reset student password error:', err);
+      res.status(500).json({ error: 'Server error resetting student password' });
     }
   });
 

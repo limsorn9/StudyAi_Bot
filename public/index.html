@@ -2477,6 +2477,61 @@
           </div>
         </div>
 
+        <!-- Student Login Credentials & Password Management Card -->
+        <div class="p-3.5 bg-slate-800/90 rounded-xl border border-sky-500/40 mb-3 shadow-md">
+          <div class="flex items-center justify-between mb-2">
+            <div class="text-xs font-bold text-sky-400 flex items-center gap-1.5">
+              <span>🔐 ព័ត៌មានចូលគណនី (Login Credentials)</span>
+            </div>
+            <button type="button" class="btn btn-outline btn-xs" onclick="copyStudentLoginInfoFromModal(this)" title="ចម្លងព័ត៌មាន Login ផ្ញើជូនសិស្ស">
+              <span>📋 ចម្លងព័ត៌មាន Login</span>
+            </button>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-2">
+            <!-- Username display / edit -->
+            <div>
+              <label class="text-[11px] font-bold text-slate-300 block mb-1">
+                👤 ឈ្មោះចូលគណនី (Username / Phone)
+              </label>
+              <div class="flex items-center gap-1.5">
+                <input type="text" id="editStudentLoginUsername" class="form-input text-xs font-mono font-bold bg-slate-900 text-sky-300" placeholder="Username...">
+                <button type="button" class="btn btn-glass btn-xs px-2" onclick="copyTextValue('editStudentLoginUsername')" title="ចម្លង Username">📋</button>
+              </div>
+            </div>
+
+            <!-- Current Password display -->
+            <div>
+              <label class="text-[11px] font-bold text-slate-300 block mb-1">
+                🔑 លេខសម្ងាត់បច្ចុប្បន្ន (Current Password)
+              </label>
+              <div class="flex items-center gap-1.5">
+                <input type="text" id="editStudentCurrentPassword" class="form-input text-xs font-mono font-bold bg-slate-900 text-amber-300" readonly placeholder="មិនទាន់មាន / Hashed">
+                <button type="button" class="btn btn-glass btn-xs px-2" onclick="copyTextValue('editStudentCurrentPassword')" title="ចម្លង Password">📋</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Reset / Change Password Box -->
+          <div class="pt-2.5 border-t border-slate-700/70">
+            <label class="text-[11px] font-bold text-emerald-400 block mb-1">
+              ⚡ កំណត់លេខសម្ងាត់ថ្មីជូនសិស្ស (Reset New Password)៖
+            </label>
+            <div class="flex items-center gap-2">
+              <input type="text" id="editStudentNewPassword" class="form-input text-xs font-mono font-bold text-emerald-300 flex-1" placeholder="បញ្ចូលលេខសម្ងាត់ថ្មី (យ៉ាងតិច ៤ ខ្ទង់)...">
+              <button type="button" class="btn btn-outline btn-xs font-semibold" onclick="generateRandomPasswordForEdit()" title="បង្កើតលេខកូដចៃដន្យ">
+                <span>🎲 Random</span>
+              </button>
+              <button type="button" class="btn btn-emerald btn-xs font-bold" onclick="handleAdminResetPasswordDirectly()" title="ប្តូរលេខសម្ងាត់ភ្លាមៗ">
+                <span>⚡ ប្តូរភ្លាមៗ</span>
+              </button>
+            </div>
+            <div class="text-[10px] text-slate-400 mt-1">
+              👉 នៅពេលសិស្សភ្លេច Password អេដមីនអាចបង្កើតលេខសម្ងាត់ថ្មីជូនសិស្សនៅត្រង់នេះ ហើយចុច "ចម្លងព័ត៌មាន Login" ផ្ញើជូនសិស្សតាម Telegram ឬ SMS បានភ្លាមៗ!
+            </div>
+          </div>
+        </div>
+
         <!-- VIP Management Box -->
         <div class="p-3 bg-slate-800/80 rounded-xl border border-amber-500/30 mb-3">
           <div class="text-xs font-bold text-amber-400 mb-2">💎 គ្រប់គ្រង VIP & សុពលភាព៖</div>
@@ -2708,6 +2763,6 @@
   <!-- Toast Notification Container -->
   <div id="toastContainer" class="toast-container"></div>
 
-  <script src="/app.js?v=2.15_fix_modal_nesting"></script>
+  <script src="/app.js?v=2.16_admin_pwd_mgmt"></script>
 </body>
 </html>
