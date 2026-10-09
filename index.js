@@ -67,8 +67,13 @@ function setLatestResponse(userId, text, tutor = 'piseth') {
 // Initialize Firebase Admin
 let firebaseCreds;
 try {
-  if (process.env.FIREBASE_CREDENTIALS) {
-    firebaseCreds = JSON.parse(process.env.FIREBASE_CREDENTIALS);
+  const credEnv = (process.env.FIREBASE_CREDENTIALS || '').trim();
+  if (credEnv.startsWith('{')) {
+    firebaseCreds = JSON.parse(credEnv);
+  } else if (credEnv && fs.existsSync(credEnv)) {
+    firebaseCreds = JSON.parse(fs.readFileSync(credEnv, 'utf8'));
+  } else if (fs.existsSync(path.join(__dirname, 'firebase-key.json'))) {
+    firebaseCreds = JSON.parse(fs.readFileSync(path.join(__dirname, 'firebase-key.json'), 'utf8'));
   } else {
     console.warn("⚠️ FIREBASE_CREDENTIALS is empty. Falling back to applicationDefault().");
   }
@@ -142,15 +147,28 @@ try {
 }
 
 const app = express();
-const PORT = process.env.PORT || 3000;
-const defaultWebUrl = process.env.WEBAPP_URL || process.env.RENDER_EXTERNAL_URL || 'https://studyai-bot-wmha.onrender.com/';
+const PORT = process.env.PORT || 5003;
+const defaultWebUrl = process.env.WEBAPP_URL || process.env.RENDER_EXTERNAL_URL || `http://104.223.45.253:${PORT}/`;
 
 try {
   if (bot) {
-    app.use(bot.webhookCallback('/webhook'));
-    bot.telegram.setWebhook(`${process.env.WebHook_URL}/webhook`).catch(e => {
-      console.error("❌ ERROR: Webhook Failed (តើ WebHook_URL ត្រឹមត្រូវទេ?):", e.message);
-    });
+    if (process.env.WebHook_URL) {
+      app.use(bot.webhookCallback('/webhook'));
+      bot.telegram.setWebhook(`${process.env.WebHook_URL}/webhook`).catch(e => {
+        console.error("❌ ERROR: Webhook Failed (តើ WebHook_URL ត្រឹមត្រូវទេ?):", e.message);
+      });
+    } else {
+      console.log("🚀 WebHook_URL not set -> Starting Telegram Bot in Polling Mode (VPS)...");
+      bot.telegram.deleteWebhook().then(() => {
+        bot.launch({ dropPendingUpdates: true }).catch(err => {
+          console.error("❌ Bot launch error:", err.message);
+        });
+      }).catch(() => {
+        bot.launch({ dropPendingUpdates: true }).catch(err => {
+          console.error("❌ Bot launch error:", err.message);
+        });
+      });
+    }
 
     // Delete bot command list so no command popup menu appears
     bot.telegram.deleteMyCommands().then(() => {
