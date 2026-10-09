@@ -148,7 +148,9 @@ try {
 
 const app = express();
 const PORT = process.env.PORT || 5003;
-const defaultWebUrl = process.env.WEBAPP_URL || process.env.RENDER_EXTERNAL_URL || `http://104.223.45.253:${PORT}/`;
+const defaultWebUrl = (process.env.WEBAPP_URL && process.env.WEBAPP_URL.startsWith('https://'))
+  ? process.env.WEBAPP_URL
+  : 'https://104-223-45-253.sslip.io';
 
 try {
   if (bot) {
@@ -529,11 +531,10 @@ const generateAndSendTTS = async (ctx, text) => {
 
 // Persistent Reply Keyboard Menu
 const mainMenuKeyboard = Markup.keyboard([
-  ['📚 បញ្ជីមេរៀន (Lessons)', '🎓 ប្រឡងបញ្ចប់មុខវិជ្ជា'],
-  ['🌐 បើក Web App (Study Online)', '📜 វិញ្ញាបនបត្ររបស់ខ្ញុំ'],
-  ['🌍 បកប្រែ (Translate EN↔KH)', '🔊 ស្តាប់ English (Listen EN)'],
-  ['🕰️ ប្រវត្តិសិក្សា', '💎 គណនី VIP (Upgrade)'],
-  ['🔗 យកកូដភ្ជាប់ Web (Link)', '❓ ជំនួយ (Help)']
+  [Markup.button.webApp('🌐 ចូលរៀនលើ Mini Web (Lessons)', defaultWebUrl)],
+  ['💬 ឆាតជាមួយគ្រូ AI', '🔍 ពិនិត្យគណនី & License'],
+  ['📜 វិញ្ញាបនបត្រ & ប្រវត្តិ', '🔄 ប្តូរគ្រូ AI'],
+  ['💎 គណនី VIP (Upgrade)', '❓ ជំនួយ (Help)']
 ]).resize();
 
 // Check Membership Button
@@ -543,11 +544,20 @@ bot.action('check_membership', async (ctx) => {
   const ok = await isMember(userId);
   if (ok) {
     const username = ctx.from.first_name || 'Student';
-    await ctx.reply(`✅ *ត្រូវហើយ! ${username} បានចូលជាសមាជិករួចហើយ!*\n\nសូមស្វាគមន៍! 🎉`, {
+    await ctx.reply(`✅ *ត្រូវហើយ! ${username} បានចូលជាសមាជិករួចហើយ!*\n\nសូមស្វាគមន៍មកកាន់ប្រព័ន្ធសិក្សា! 🎉`, {
       parse_mode: 'Markdown',
       reply_markup: mainMenuKeyboard.reply_markup
     });
-    await ctx.reply('សូមជ្រើសរើសខែដែលអ្នកចង់រៀន៖', getMonthsKeyboard());
+    await ctx.reply(
+      `👇 *សូមចុចប៊ូតុងខាងក្រោមដើម្បីបើក Mini Web រៀនមេរៀន៖*`,
+      {
+        parse_mode: 'Markdown',
+        reply_markup: Markup.inlineKeyboard([
+          [Markup.button.webApp('🌐 បើក Mini Web (រៀនមេរៀន)', defaultWebUrl)],
+          [Markup.button.url('💻 បើកលើ Browser', defaultWebUrl)]
+        ]).reply_markup
+      }
+    );
   } else {
     await ctx.reply(`❌ *ខ្ញុំមិនឃើញអ្នកនៅក្នុងឆានែលទេ!*\n\nសូម [ចូលឆានែល](${CHANNEL_URL}) ហើយចុច ✅ ម្ដងទៀត`, {
       parse_mode: 'Markdown',
@@ -802,16 +812,164 @@ bot.start(async (ctx) => {
     await db.ref(`users/${userId}/profile`).update(startProfUpdate);
   }
 
-  // Send the persistent menu first
-  await ctx.reply(`សួស្តី ${username}! ស្វាគមន៍មកកាន់ប្រព័ន្ធសិក្សាភាសាអង់គ្លេសខ្នាតស្តង់ដារ ១២ ខែ 📚`, mainMenuKeyboard);
-  
-  // Then send the inline keyboard for months
-  await ctx.reply(`នេះគឺជាកម្មវិធីសិក្សាទាំងមូល។ សូមជ្រើសរើសខែដែលអ្នកចង់រៀន៖`, getMonthsKeyboard());
+  // Send the persistent menu and welcome message
+  await ctx.reply(
+    `🎉 *ស្វាគមន៍មកកាន់ Teacher SSOnline English Academy!* 🎓\n\n` +
+    `សួស្តី *${username}*!\n\n` +
+    `📱 *ការរៀនមេរៀនទាំងអស់៖* ត្រូវបានរៀបចំយ៉ាងស្រស់ស្អាតលើ **Mini Web App** (ចុចប៊ូតុងខាងក្រោមដើម្បីចូលរៀន)!\n\n` +
+    `💬 *មុខងារលើ Telegram Chatbot៖*\n` +
+    `• 💬 *ឆាតជាមួយគ្រូ AI*៖ វាយសួរជាអក្សរ ឬផ្ញើសំឡេង (Voice) គ្រូ AI នឹងពន្យល់ភ្លាមៗ\n` +
+    `• 🔍 *ពិនិត្យគណនី & License*៖ ឆែកមើលស្ថានភាព VIP, សុពលភាព និងទិន្នន័យសិក្សា\n` +
+    `• 🌐 *ចូលរៀនលើ Mini Web*៖ ចុចបើក Mini Web ដើម្បីរៀនមេរៀន និងប្រឡង`,
+    {
+      parse_mode: 'Markdown',
+      reply_markup: mainMenuKeyboard.reply_markup
+    }
+  );
+
+  await ctx.reply(
+    `👇 *សូមចុចប៊ូតុងខាងក្រោមដើម្បីបើក Mini Web រៀនមេរៀន៖*`,
+    {
+      parse_mode: 'Markdown',
+      reply_markup: Markup.inlineKeyboard([
+        [Markup.button.webApp('🌐 បើក Mini Web (រៀនមេរៀន)', defaultWebUrl)],
+        [Markup.button.url('💻 បើកលើ Browser', defaultWebUrl)]
+      ]).reply_markup
+    }
+  );
 });
 
 // Handle Persistent Menu Button Clicks
-bot.hears('📚 បញ្ជីមេរៀន (Lessons)', async (ctx) => {
-  await ctx.reply("សូមជ្រើសរើសខែដែលអ្នកចង់រៀន៖", getMonthsKeyboard());
+bot.hears(['📚 បញ្ជីមេរៀន (Lessons)', '📚 បញ្ជីមេរៀន', '/lessons', '🎓 ប្រឡងបញ្ចប់មុខវិជ្ជា'], async (ctx) => {
+  await ctx.reply(
+    `📚 *មេរៀន និងការប្រឡងទាំងអស់ ត្រូវរៀនលើ Mini Web App!* 🌐\n\n` +
+    `ប្រព័ន្ធមេរៀនស្តង់ដារ ១២ ខែ, វេយ្យាករណ៍, ពាក្យគន្លឹះ និងវិញ្ញាសាប្រឡង ត្រូវបានរៀបចំយ៉ាងសម្បូរបែបលើ Mini Web។\n\n` +
+    `👉 *សូមចុចប៊ូតុងខាងក្រោមដើម្បីចូលរៀនភ្លាមៗ៖*`,
+    {
+      parse_mode: 'Markdown',
+      reply_markup: Markup.inlineKeyboard([
+        [Markup.button.webApp('🌐 បើក Mini Web (រៀនមេរៀន)', defaultWebUrl)],
+        [Markup.button.url('💻 បើកលើ Browser', defaultWebUrl)]
+      ]).reply_markup
+    }
+  );
+});
+
+// 💬 ឆាតជាមួយគ្រូ AI
+bot.hears(['💬 ឆាតជាមួយគ្រូ AI', '/chat', 'ឆាតជាមួយគ្រូ'], async (ctx) => {
+  await ctx.reply(
+    `💬 *ឆាតផ្ទាល់ជាមួយគ្រូ AI (Chat with AI Teacher)* 🧑‍🏫\n\n` +
+    `ប្អូនអាចសួរគ្រូ AI បានគ្រប់ពេលវេលា៖\n` +
+    `• ✍️ វាយពាក្យ ប្រយោគ ឬសំណួរជាភាសាអង់គ្លេស/ខ្មែរផ្ញើមកទីនេះ\n` +
+    `• 📖 សួរពន្យល់វេយ្យាករណ៍ (Grammar) ឬរបៀបប្រើប្រាស់\n` +
+    `• 🎙️ ផ្ញើសារជាសំឡេង (Voice Note) ដើម្បីហាត់ការបញ្ចេញសំឡេង\n\n` +
+    `👉 *ឥឡូវនេះ ប្អូនគ្រាន់តែវាយសារសួរផ្ញើមកទីនេះ គ្រូ AI នឹងឆ្លើយតបភ្លាមៗ!*`,
+    { parse_mode: 'Markdown' }
+  );
+});
+
+// 🔍 ពិនិត្យគណនី & License
+bot.hears(['🔍 ពិនិត្យគណនី & License', 'ពិនិត្យគណនី', '🔍 ពិនិត្យ License', '📋 ពិនិត្យ License របស់ខ្ញុំ'], async (ctx) => {
+  const userId = ctx.from.id.toString();
+  const info = await getUserLicenseInfo(db, userId, SUPER_ADMIN_IDS);
+  const tgFirst = ctx.from.first_name || 'Student';
+
+  let msg = `🔍 *ព័ត៌មានគណនី & ស្ថានភាព License* 👤\n\n` +
+    `• ឈ្មោះ៖ *${tgFirst}*\n` +
+    `• Telegram ID៖ \`${userId}\`\n` +
+    `• ស្ថានភាពគណនី៖ **${info.statusKhmer}**\n` +
+    `• កាលបរិច្ឆេទផុតកំណត់៖ **${info.expireDateFormatted}**\n`;
+
+  if (info.isVIP && !info.isAdmin) {
+    msg += `• រយៈពេលនៅសល់៖ **${info.daysRemaining} ថ្ងៃ ${info.hoursRemaining} ម៉ោង**\n`;
+  }
+
+  const buttons = [];
+  if (!info.isVIP) {
+    buttons.push([Markup.button.callback('💎 Upgrade VIP', 'vip_upgrade')]);
+  }
+  buttons.push([Markup.button.callback('🔑 បញ្ចូល License Key', 'enter_license_key')]);
+  buttons.push([Markup.button.webApp('🌐 ចូលរៀនលើ Mini Web', defaultWebUrl)]);
+
+  await ctx.reply(msg, {
+    parse_mode: 'Markdown',
+    reply_markup: Markup.inlineKeyboard(buttons).reply_markup
+  });
+});
+
+// 📜 វិញ្ញាបនបត្រ & ប្រវត្តិ
+bot.hears(['📜 វិញ្ញាបនបត្រ & ប្រវត្តិ', '📜 វិញ្ញាបនបត្ររបស់ខ្ញុំ', '🕰️ ប្រវត្តិសិក្សា'], async (ctx) => {
+  const userId = ctx.from.id;
+  let certCount = 0;
+  let progressCount = 0;
+  let msg = `📜 *វិញ្ញាបនបត្រ & ប្រវត្តិការសិក្សា* 🎓\n\n`;
+
+  if (db) {
+    try {
+      const pSnap = await db.ref(`users/${userId}/progress`).once('value');
+      const pVal = pSnap.val();
+      if (pVal) progressCount = Object.keys(pVal).length;
+
+      const cSnap = await db.ref(`certificates/${userId}`).once('value');
+      const cVal = cSnap.val();
+      if (cVal) certCount = Object.keys(cVal).length;
+    } catch (e) {}
+  }
+
+  msg += `• មេរៀនដែលបានរៀន/ប្រឡងរួច៖ *${progressCount} មេរៀន*\n`;
+  msg += `• វិញ្ញាបនបត្រទទួលបាន៖ *${certCount} ច្បាប់*\n\n`;
+  msg += `💡 ប្អូនអាចពិនិត្យមើលវិញ្ញាបនបត្រច្បាស់លាស់ និងប្រឡងបន្ថែមលើ **Mini Web App**!`;
+
+  await ctx.reply(msg, {
+    parse_mode: 'Markdown',
+    reply_markup: Markup.inlineKeyboard([
+      [Markup.button.webApp('🌐 មើលវិញ្ញាបនបត្រលើ Mini Web', defaultWebUrl)],
+      [Markup.button.callback('📜 បង្ហាញវិញ្ញាបនបត្រតាម Telegram', 'my_certificates_menu')]
+    ]).reply_markup
+  });
+});
+
+// 🔄 ប្តូរគ្រូ AI
+bot.hears(['🔄 ប្តូរគ្រូ AI', '/tutor'], async (ctx) => {
+  const userId = ctx.from.id.toString();
+  let currentTutor = 'sorn';
+  if (db) {
+    try {
+      const snap = await db.ref(`users/${userId}/currentTutor`).once('value');
+      if (snap.val()) currentTutor = snap.val();
+    } catch (_) {}
+  }
+  const tutorName = currentTutor === 'piseth' ? 'អ្នកគ្រូ ពិសិដ្ឋ (Teacher Piseth - Female Voice)' : 'លោកគ្រូ ស៊ន (Teacher Sorn - Male Voice)';
+  return ctx.reply(
+    `🔄 *ជ្រើសរើសគ្រូ AI ផ្ទាល់ខ្លួនរបស់អ្នក* 🧑‍🏫\n\n` +
+    `បច្ចុប្បន្ន៖ *${tutorName}*\n\n` +
+    `សូមជ្រើសរើសគ្រូដែលអ្នកចង់ឱ្យបង្រៀន និងឆ្លើយតប៖`,
+    {
+      parse_mode: 'Markdown',
+      reply_markup: Markup.inlineKeyboard([
+        [Markup.button.callback('👨‍🏫 លោកគ្រូ ស៊ន (Teacher Sorn - Male)', 'set_tutor_sorn')],
+        [Markup.button.callback('👩‍🏫 អ្នកគ្រូ ពិសិដ្ឋ (Teacher Piseth - Female)', 'set_tutor_piseth')]
+      ]).reply_markup
+    }
+  );
+});
+
+bot.action('set_tutor_sorn', async (ctx) => {
+  try { await ctx.answerCbQuery(); } catch (_) {}
+  const userId = ctx.from.id.toString();
+  if (db) {
+    await db.ref(`users/${userId}/currentTutor`).set('sorn').catch(() => {});
+  }
+  return ctx.reply('✅ អ្នកបានជ្រើសរើស *លោកគ្រូ ស៊ន (Teacher Sorn)* ជោគជ័យ! សាកល្បងសួរសំណួរមកគ្រូឥឡូវនេះបាន!', { parse_mode: 'Markdown' });
+});
+
+bot.action('set_tutor_piseth', async (ctx) => {
+  try { await ctx.answerCbQuery(); } catch (_) {}
+  const userId = ctx.from.id.toString();
+  if (db) {
+    await db.ref(`users/${userId}/currentTutor`).set('piseth').catch(() => {});
+  }
+  return ctx.reply('✅ អ្នកបានជ្រើសរើស *អ្នកគ្រូ ពិសិដ្ឋ (Teacher Piseth)* ជោគជ័យ! សាកល្បងសួរសំណួរមកគ្រូឥឡូវនេះបាន!', { parse_mode: 'Markdown' });
 });
 
 
@@ -3977,15 +4135,21 @@ bot.on('text', async (ctx, next) => {
 
   // Ignore persistent menu clicks
   const menuOptions = [
+    '🌐 ចូលរៀនលើ Mini Web (Lessons)',
+    '🌐 ចូលរៀនលើ Mini Web',
+    '💬 ឆាតជាមួយគ្រូ AI',
+    '🔍 ពិនិត្យគណនី & License',
+    '📜 វិញ្ញាបនបត្រ & ប្រវត្តិ',
+    '🔄 ប្តូរគ្រូ AI',
+    '💎 គណនី VIP (Upgrade)',
+    '❓ ជំនួយ (Help)',
     '📚 បញ្ជីមេរៀន (Lessons)',
+    '📚 បញ្ជីមេរៀន',
     '🎓 ប្រឡងបញ្ចប់មុខវិជ្ជា',
     '🌐 បើក Web App (Study Online)',
     '📜 វិញ្ញាបនបត្ររបស់ខ្ញុំ',
-    '🔄 ប្តូរគ្រូ AI',
     '🕰️ ប្រវត្តិសិក្សា',
     '🔗 យកកូដភ្ជាប់ Web (Link)',
-    '❓ ជំនួយ (Help)',
-    '💎 គណនី VIP (Upgrade)',
     '🌍 បកប្រែ (Translate EN↔KH)',
     '🔊 ស្តាប់ English (Listen EN)'
   ];
